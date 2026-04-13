@@ -347,7 +347,7 @@ async function loadFromSupabase() {
     ]);
     _cache = {
       clients: clients||[],
-      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status, createdAt:p.created_at})),
+      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status, createdAt:p.created_at, notes:p.notes||''})),
       sessions: (sessions||[]).map(s=>({...s, clientId:s.client_id, packageId:s.package_id, intervalDays:s.interval_days, createdAt:s.created_at}))
     };
   } catch(e) {
@@ -411,7 +411,13 @@ async function dbUpdatePackage(id, data) {
   if(data.price!==undefined) row.price=data.price;
   if(data.paymentStatus) row.payment_status=data.paymentStatus;
   if(data.clientId) row.client_id=data.clientId;
+  if(data.notes!==undefined) row.notes=data.notes;
   await supaFetch('PATCH', 'packages', row, `?id=eq.${id}`);
+  // If time change requested, update future sessions
+  if(data.newTime) {
+    const today2 = today();
+    await supaFetch('PATCH', 'sessions', {time: data.newTime}, `?package_id=eq.${id}&date=gte.${today2}&status=eq.agendada`);
+  }
   await loadFromSupabase();
 }
 async function dbDeletePackage(id) {
@@ -875,6 +881,8 @@ function showPackageForm(clientId=null,pkgId=null){
   const db=getDB();const pkg=pkgId?db.packages.find(p=>p.id===pkgId):null;
   if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
   const isNew=!pkgId;
+  // Get current package time from its sessions
+  const pkgTime = pkgId ? (db.sessions.find(s=>s.packageId===pkgId)?.time||'09:00') : '09:00';
   showModal(pkgId?'Editar Pacote':'Novo Pacote',`
     <div class="form-group"><label>Cliente *</label>
       <select id="pf-client">${db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(pkg?.clientId||clientId)===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
@@ -884,6 +892,14 @@ function showPackageForm(clientId=null,pkgId=null){
       <div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="${pkg?.totalSessions||''}" min="1" placeholder="Ex: 8"/></div>
       <div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="${pkg?.price||''}" min="0" step="0.01" placeholder="Ex: 800.00"/></div>
     </div>
+    ${!isNew?`<div class="form-group"><label>Horário das Sessões</label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input type="time" id="pf-edit-time" value="${pkgTime}" style="max-width:140px"/>
+        <label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500">
+          <input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em todas as sessões futuras
+        </label>
+      </div>
+    </div>`:''}
     ${isNew?`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">
       <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático das Sessões</div>
       <div class="form-row">
@@ -907,6 +923,10 @@ function showPackageForm(clientId=null,pkgId=null){
         </div>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:4px">💡 As sessões serão criadas automaticamente já agendadas no calendário.</div>
+    </div>`:''}
+    ${!isNew?`<div class="form-group">
+      <label>📋 Prontuário / Evolução do Pacote</label>
+      <textarea id="pf-pkg-notes" rows="5" placeholder="Anotações clínicas, evolução do paciente, observações do período...">${pkg?.notes||''}</textarea>
     </div>`:''}
     <div class="form-group"><label>Status de Pagamento</label>
       <select id="pf-payment">
@@ -949,8 +969,15 @@ async function savePackage(id){
   if(id){
     const st=pkgStats(db.packages.find(p=>p.id===id));
     if(totalSessions<st.used){showToast('Não pode reduzir abaixo das já realizadas',true);return;}
-    await dbUpdatePackage(id,{clientId,name,totalSessions,price,paymentStatus});
-    showToast('✅ Pacote atualizado!');
+    const editTime = document.getElementById('pf-edit-time')?.value;
+    const propagateTime = document.getElementById('pf-propagate-time')?.checked;
+    const pkgNotes = document.getElementById('pf-pkg-notes')?.value||'';
+    await dbUpdatePackage(id,{
+      clientId, name, totalSessions, price, paymentStatus,
+      notes: pkgNotes,
+      newTime: propagateTime && editTime ? editTime : null
+    });
+    showToast(propagateTime ? '✅ Pacote e horários atualizados!' : '✅ Pacote atualizado!');
     renderPackages();
     return;
   }
@@ -1059,6 +1086,52 @@ async function deletePackageDo(id){
 // ═══════════════════════════════════════════════════════════════
 // SESSIONS
 // ═══════════════════════════════════════════════════════════════
+function showProntuario(clientId) {
+  const db = getDB();
+  const client = db.clients.find(c=>c.id===clientId);
+  const pkgs = db.packages.filter(p=>p.clientId===clientId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+
+  if(pkgs.length===0){
+    showToast('Este cliente não tem pacotes ainda.', true);
+    return;
+  }
+
+  const html = pkgs.map(pkg => {
+    const sessionsInPkg = db.sessions.filter(s=>s.packageId===pkg.id).sort((a,b)=>a.date.localeCompare(b.date));
+    const firstDate = sessionsInPkg[0]?.date;
+    const lastDate = sessionsInPkg[sessionsInPkg.length-1]?.date;
+    const done = sessionsInPkg.filter(s=>s.status==='realizada'||s.status==='completed').length;
+    const pkgLabel = pkg.name + (firstDate ? ` (${fmtDate(firstDate)}${lastDate&&lastDate!==firstDate?' – '+fmtDate(lastDate):''})` : '');
+
+    return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <div style="font-weight:700;font-size:14px">${pkgLabel}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${pkg.paymentStatus==='paid'?'badge-green':'badge-yellow'}">${pkg.paymentStatus==='paid'?'Pago':'Pendente'}</span></div>
+        </div>
+      </div>
+      <textarea
+        id="pron-${pkg.id}"
+        rows="5"
+        placeholder="Anotações clínicas, evolução, observações deste pacote/período..."
+        style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);font-size:13.5px;font-family:inherit;outline:none;resize:vertical;line-height:1.6"
+      >${pkg.notes||''}</textarea>
+      <div style="text-align:right;margin-top:8px">
+        <button class="btn btn-primary btn-sm" onclick="saveProntuario('${pkg.id}')">💾 Salvar anotação</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  showModal(`📋 Prontuário — ${client?.name||''}`, html, true);
+}
+
+window.saveProntuario = async function(pkgId) {
+  const notes = document.getElementById('pron-' + pkgId)?.value || '';
+  await supaFetch('PATCH', 'packages', {notes}, `?id=eq.${pkgId}`);
+  await loadFromSupabase();
+  showToast('✅ Prontuário salvo!');
+};
+
 function renderSessions(){
   const db=getDB();
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
@@ -1103,7 +1176,10 @@ function renderSessions(){
               </div>
             </div>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="showClientDetail('${clientId}')">Ver perfil →</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="showProntuario('${clientId}')">📋 Prontuário</button>
+            <button class="btn btn-ghost btn-sm" onclick="showClientDetail('${clientId}')">Ver perfil →</button>
+          </div>
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Ações</th></tr></thead>
