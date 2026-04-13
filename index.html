@@ -249,7 +249,7 @@ select option{background:var(--bg3);}
     <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
     <div class="form-group"><label>Email</label><input type="email" id="login-email" value="admin@admin.com" placeholder="seu@email.com"/></div>
     <div class="form-group"><label>Senha</label><input type="password" id="login-pass" value="1234" placeholder="••••••"/></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="doLogin()">Entrar →</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="(async()=>{await doLogin();})()">Entrar →</button>
   </div>
 </div>
 
@@ -455,7 +455,7 @@ function doLogout() {
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
 }
-document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')(async()=>{await doLogin();})();});
 if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
