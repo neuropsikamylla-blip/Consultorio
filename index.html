@@ -1051,8 +1051,9 @@ function buildMonthDay(dt,db,todayStr,other){
       const pkgSessions=pkg?db.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
       const sessNum=pkgSessions.findIndex(ss=>ss.id===s.id)+1;
       const total=pkg?pkg.totalSessions:0;
-      const firstName=clientName(s.clientId).split(' ')[0];
-      const label=pkg?`${firstName} ${sessNum}/${total}`:`${firstName}`;
+      const nameParts=clientName(s.clientId).split(' ');
+      const shortName=nameParts.length>=2?`${nameParts[0]} ${nameParts[1]}`:nameParts[0];
+      const label=pkg?`${shortName} ${sessNum}/${total}`:`${shortName}`;
       return`<span class="cal-chip ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':s.status==='realizada'?'realizada':''}" title="${clientName(s.clientId)} — Sessão ${sessNum}/${total}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
         ${s.time?`<strong>${s.time.slice(0,5)}</strong> `:''}${label}
       </span>`;}).join('')}
@@ -1102,7 +1103,8 @@ function buildWeekGrid(db,todayStr){
         const pkgSess2=pkg2?db2.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
         const n2=pkgSess2.findIndex(ss=>ss.id===s.id)+1;
         const t2=pkg2?pkg2.totalSessions:0;
-        const fn2=clientName(s.clientId).split(' ')[0];
+        const np2=clientName(s.clientId).split(' ');
+        const fn2=np2.length>=2?`${np2[0]} ${np2[1]}`:np2[0];
         const lbl2=pkg2?`${fn2} ${n2}/${t2}`:fn2;
         return`<span class="week-event ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':''}" title="${clientName(s.clientId)} — Sessão ${n2}/${t2}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">${lbl2}</span>`;}).join('')}
       </div>`;
