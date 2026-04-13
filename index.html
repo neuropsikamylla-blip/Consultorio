@@ -295,24 +295,29 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const AUTH_KEY = 'consultorio_auth';
 const CREDS_KEY = 'consultorio_creds';
 
+// Simple, reliable Supabase REST wrapper
 async function supaFetch(method, table, body=null, query='') {
-  const url = `${SUPA_URL}/rest/v1/${table}${query}`;
+  const url = SUPA_URL + '/rest/v1/' + table + (query||'');
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json'
+  };
+  if(method==='POST'||method==='PATCH') headers['Prefer'] = 'return=representation';
+  
+  const opts = { method: method, headers: headers };
+  if(body !== null) opts.body = JSON.stringify(body);
+  
   try {
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': method==='POST' ? 'return=representation' : method==='PATCH'||method==='DELETE' ? 'return=representation' : ''
-      },
-      body: body ? JSON.stringify(body) : null
-    });
-    if (!res.ok) { const e = await res.text(); console.error('Supabase error:', e); return null; }
+    const res = await fetch(url, opts);
     const text = await res.text();
-    return text ? JSON.parse(text) : null;
-  } catch(e) {
-    console.error('Supabase fetch error:', e.message);
+    if(!res.ok) {
+      console.error('DB Error', res.status, text);
+      return null;
+    }
+    return text ? JSON.parse(text) : [];
+  } catch(err) {
+    console.error('Network error:', err.message);
     return null;
   }
 }
@@ -391,11 +396,12 @@ async function dbDeleteClient(id) {
 
 async function dbAddPackage(data) {
   const row = { id:genId(), client_id:data.clientId, name:data.name, total_sessions:data.totalSessions, price:data.price, payment_status:data.paymentStatus||'pending', created_at:new Date().toISOString() };
+  console.log('Creating package:', row);
   const result = await supaFetch('POST', 'packages', row);
-  // Return the row with confirmed id (use result if available, fallback to row)
-  const savedPkg = (Array.isArray(result) && result[0]) ? result[0] : row;
+  console.log('Package result:', result);
+  // Always use our generated id since we set it
   await loadFromSupabase();
-  return savedPkg;
+  return row; // row.id is reliable since we generated it
 }
 async function dbUpdatePackage(id, data) {
   const row = {};
@@ -419,7 +425,8 @@ async function dbAddSession(data) {
   return row;
 }
 async function dbAddSessionsBatch(sessions) {
-  // Insert one by one for maximum compatibility
+  console.log('Inserting', sessions.length, 'sessions...');
+  let ok = 0, fail = 0;
   for(const s of sessions) {
     const row = {
       id: genId(),
@@ -433,9 +440,16 @@ async function dbAddSessionsBatch(sessions) {
       interval_days: s.intervalDays || null,
       created_at: new Date().toISOString()
     };
+    console.log('Inserting session:', row.date, 'pkg:', row.package_id);
     const result = await supaFetch('POST', 'sessions', row);
-    if(!result) console.error('Failed to insert session:', row);
+    if(result && (Array.isArray(result) ? result.length > 0 : result.id)) {
+      ok++;
+    } else {
+      fail++;
+      console.error('Failed session insert, result:', result);
+    }
   }
+  console.log('Sessions done:', ok, 'ok,', fail, 'failed');
   await loadFromSupabase();
 }
 async function dbUpdateSession(id, data) {
