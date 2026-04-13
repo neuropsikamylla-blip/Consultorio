@@ -936,37 +936,105 @@ async function savePackage(id){
   }
   const db=getDB();
   closeModal();
+
   if(id){
     const st=pkgStats(db.packages.find(p=>p.id===id));
-    if(totalSessions<st.used){showToast(`Não pode reduzir abaixo de ${st.used}`,true);return;}
+    if(totalSessions<st.used){showToast('Não pode reduzir abaixo das já realizadas',true);return;}
     await dbUpdatePackage(id,{clientId,name,totalSessions,price,paymentStatus});
     showToast('✅ Pacote atualizado!');
-  } else {
-    const firstDate=document.getElementById('pf-first-date')?.value;
-    const time=document.getElementById('pf-time')?.value||'09:00';
-    const interval=parseInt(document.getElementById('pf-interval')?.value||'7');
-    const category=document.getElementById('pf-category')?.value||'psicoterapia';
-    const newPkg=await dbAddPackage({clientId,name,totalSessions,price,paymentStatus});
-    // Auto-generate sessions in batch
-    const sessionsList=[];
-    // Generate all session dates
-    for(let i=0;i<totalSessions;i++){
-      const d=new Date(firstDate+'T12:00:00');
-      d.setDate(d.getDate()+(i*interval));
-      sessionsList.push({
-        clientId: clientId,
-        packageId: newPkg.id,
-        date: d.toISOString().split('T')[0],
-        time: time,
-        category: category,
-        intervalDays: interval
-      });
-    }
-    await dbAddSessionsBatch(sessionsList);
-    showToast(`✅ Pacote criado com ${totalSessions} sessões!`);
+    renderPackages();
+    return;
   }
+
+  // NEW PACKAGE — create package then sessions
+  const firstDate=document.getElementById('pf-first-date').value;
+  const time=document.getElementById('pf-time')?.value||'09:00';
+  const interval=parseInt(document.getElementById('pf-interval')?.value||'7');
+  const category=document.getElementById('pf-category')?.value||'psicoterapia';
+
+  // Show progress toast
+  showToast('⏳ Criando pacote e sessões...');
+
+  // Step 1: Create package
+  const pkgId = genId();
+  const pkgRow = {
+    id: pkgId,
+    client_id: clientId,
+    name: name,
+    total_sessions: totalSessions,
+    price: price,
+    payment_status: paymentStatus,
+    created_at: new Date().toISOString()
+  };
+
+  const pkgRes = await fetch(SUPA_URL + '/rest/v1/packages', {
+    method: 'POST',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify(pkgRow)
+  });
+
+  if(!pkgRes.ok){
+    const e = await pkgRes.text();
+    console.error('Package insert failed:', e);
+    showToast('❌ Erro ao criar pacote. Tente novamente.', true);
+    return;
+  }
+
+  // Step 2: Create sessions one by one
+  let successCount = 0;
+  for(let i = 0; i < totalSessions; i++){
+    const d = new Date(firstDate + 'T12:00:00');
+    d.setDate(d.getDate() + (i * interval));
+    const dateStr = d.toISOString().split('T')[0];
+
+    const sessRow = {
+      id: pkgId + '_s' + (i+1),
+      client_id: clientId,
+      package_id: pkgId,
+      date: dateStr,
+      time: time,
+      status: 'agendada',
+      category: category,
+      notes: '',
+      interval_days: interval,
+      created_at: new Date(Date.now() + i * 10).toISOString()
+    };
+
+    const sessRes = await fetch(SUPA_URL + '/rest/v1/sessions', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(sessRow)
+    });
+
+    if(sessRes.ok){
+      successCount++;
+    } else {
+      const e = await sessRes.text();
+      console.error('Session', i+1, 'failed:', e);
+    }
+  }
+
+  // Step 3: Reload and show result
+  await loadFromSupabase();
   renderPackages();
+  
+  if(successCount === totalSessions){
+    showToast('✅ Pacote criado com ' + totalSessions + ' sessões!');
+  } else {
+    showToast('⚠️ Pacote criado mas apenas ' + successCount + '/' + totalSessions + ' sessões foram salvas.', true);
+  }
 }
+
 
 async function togglePayment(id){
   const db=getDB();const pkg=db.packages.find(p=>p.id===id);
