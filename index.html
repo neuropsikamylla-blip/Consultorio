@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gestão do Consultório</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #181c27;
+  --bg3: #1e2333;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.13);
+  --text: #e8eaf0;
+  --text2: #9099b0;
+  --text3: #5a6278;
+  --green: #34d98a;
+  --green2: #27ae6e;
+  --green-bg: rgba(52,217,138,0.10);
+  --green-bg2: rgba(52,217,138,0.18);
+  --red: #f06060;
+  --red-bg: rgba(240,96,96,0.12);
+  --yellow: #f5c842;
+  --yellow-bg: rgba(245,200,66,0.12);
+  --blue: #60a5fa;
+  --blue-bg: rgba(96,165,250,0.12);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 4px 32px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+h1,h2,h3,h4{font-family:'Sora',sans-serif;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:99px;}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);padding:20px;}
+.login-card{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:48px 40px;width:100%;max-width:400px;box-shadow:var(--shadow);}
+.login-logo{text-align:center;margin-bottom:32px;}
+.login-logo .icon{width:56px;height:56px;background:var(--green-bg2);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;}
+.login-logo h1{font-size:22px;color:var(--text);font-weight:700;}
+.login-logo p{color:var(--text2);font-size:13px;margin-top:4px;}
+.login-hint{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:20px;font-size:12px;color:var(--text2);}
+.login-hint strong{color:var(--green);font-family:'Sora',sans-serif;}
+
+/* LAYOUT */
+#app{display:flex;min-height:100vh;}
+.sidebar{width:230px;min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform 0.25s;}
+.sidebar-logo{padding:24px 20px 16px;border-bottom:1px solid var(--border);}
+.sidebar-logo h2{font-size:15px;font-weight:700;color:var(--text);}
+.sidebar-logo p{font-size:11px;color:var(--text3);margin-top:2px;}
+.nav{flex:1;padding:12px 10px;overflow-y:auto;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13.5px;font-weight:500;transition:all 0.15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:var(--green-bg2);color:var(--green);}
+.nav-item .ico{font-size:17px;width:22px;text-align:center;}
+.sidebar-footer{padding:14px 10px;border-top:1px solid var(--border);}
+.main{margin-left:230px;flex:1;min-height:100vh;padding:28px 32px;}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:between;margin-bottom:28px;}
+.page-title{font-size:22px;font-weight:700;color:var(--text);flex:1;}
+.page-subtitle{font-size:13px;color:var(--text2);margin-top:3px;}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.card-sm{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.stat-icon{font-size:22px;margin-bottom:10px;}
+.stat-val{font-family:'Sora',sans-serif;font-size:28px;font-weight:700;color:var(--text);line-height:1;}
+.stat-label{font-size:12px;color:var(--text2);margin-top:5px;}
+.stat-card.green{border-color:rgba(52,217,138,0.2);background:linear-gradient(135deg,var(--bg2) 60%,rgba(52,217,138,0.04));}
+.stat-card.red{border-color:rgba(240,96,96,0.2);}
+.stat-card.yellow{border-color:rgba(245,200,66,0.2);}
+.stat-card.blue{border-color:rgba(96,165,250,0.2);}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid var(--border);}
+td{padding:12px 14px;font-size:13.5px;color:var(--text);border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg3);}
+.td-muted{color:var(--text2);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;}
+.badge-green{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
+.badge-red{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
+.badge-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid rgba(245,200,66,0.25);}
+.badge-blue{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(96,165,250,0.25);}
+.badge-gray{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--green);color:#0a1a12;}
+.btn-primary:hover{background:#3ee99a;}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border2);}
+.btn-secondary:hover{background:#252b3b;}
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
+.btn-danger:hover{background:rgba(240,96,96,0.2);}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--bg3);color:var(--text);}
+.btn-sm{padding:6px 11px;font-size:12px;}
+.btn-icon{padding:7px;border-radius:var(--radius-sm);background:var(--bg3);color:var(--text2);border:1px solid var(--border);cursor:pointer;font-size:15px;transition:all 0.15s;}
+.btn-icon:hover{background:#252b3b;color:var(--text);}
+
+/* FORMS */
+.form-group{margin-bottom:16px;}
+label{display:block;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+input,select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.15s;}
+input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(52,217,138,0.1);}
+textarea{resize:vertical;min-height:80px;}
+select option{background:var(--bg3);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn 0.15s ease;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:slideUp 0.2s ease;}
+.modal-lg{max-width:680px;}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-header h3{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:2px 6px;border-radius:6px;line-height:1;}
+.modal-close:hover{background:var(--bg3);color:var(--text);}
+.modal-body{padding:24px;}
+
+/* PROGRESS BAR */
+.progress-bar{height:6px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:99px;transition:width 0.4s ease;}
+.progress-green{background:var(--green);}
+.progress-yellow{background:var(--yellow);}
+.progress-red{background:var(--red);}
+
+/* CLIENT DETAIL */
+.client-header{display:flex;align-items:center;gap:16px;margin-bottom:24px;}
+.client-avatar{width:54px;height:54px;border-radius:14px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:22px;font-family:'Sora',sans-serif;font-weight:700;color:var(--green);flex-shrink:0;}
+.package-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;}
+.package-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.session-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+.dot-green{background:var(--green);}
+.dot-yellow{background:var(--yellow);}
+.dot-red{background:var(--red);}
+
+/* AGENDA */
+.agenda-day{margin-bottom:20px;}
+.agenda-day-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.agenda-day-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.agenda-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;}
+.agenda-item-left{width:3px;height:36px;border-radius:99px;flex-shrink:0;}
+.agenda-item-name{font-size:13.5px;font-weight:600;}
+.agenda-item-pkg{font-size:12px;color:var(--text2);}
+
+/* SEARCH */
+.search-bar{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+.search-input-wrap{position:relative;flex:1;}
+.search-input-wrap input{padding-left:36px;}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:15px;}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:52px 20px;color:var(--text2);}
+.empty-icon{font-size:44px;margin-bottom:12px;opacity:0.4;}
+.empty p{font-size:14px;}
+.empty small{font-size:12px;color:var(--text3);}
+
+/* ALERT */
+.alert{padding:11px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.alert-red{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
+.alert-green{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
+.alert-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid rgba(245,200,66,0.25);}
+
+/* MOBILE */
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);width:240px;}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;padding:16px;}
+  .grid-4{grid-template-columns:1fr 1fr;}
+  .grid-2{grid-template-columns:1fr;}
+  .grid-3{grid-template-columns:1fr;}
+  .form-row{grid-template-columns:1fr;}
+  .hamburger{display:block;}
+  .topbar{gap:10px;}
+  .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;display:none;}
+  .sidebar-overlay.open{display:block;}
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.page{animation:fadeIn 0.2s ease;}
+
+/* SECTION HEADER */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.section-title{font-size:15px;font-weight:700;color:var(--text);}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--bg3);border-radius:var(--radius-sm);padding:4px;margin-bottom:20px;}
+.tab{padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);transition:all 0.15s;}
+.tab.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,0.3);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">🧠</div>
+      <h1>Gestão do Consultório</h1>
+      <p>Área restrita — faça seu login</p>
+    </div>
+    <div class="login-hint">
+      Acesso padrão: <strong><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0c6d686165624c6f63627f796078637e6563226f6361">[email&#160;protected]</a></strong> / <strong>1234</strong><br>
+      <small style="font-size:11px;margin-top:4px;display:block;">Você pode alterar nas configurações depois.</small>
+    </div>
+    <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="seu@email.com" value="admin@consultorio.com"/>
+    </div>
+    <div class="form-group">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="••••••" value="1234"/>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="doLogin()">Entrar →</button>
+  </div>
+</div>
+
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <h2>🧠 Consultório</h2>
+      <p id="sidebar-user-name">Profissional</p>
+    </div>
+    <div class="nav">
+      <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">
+        <span class="ico">📊</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="navigate('clients')" data-page="clients">
+        <span class="ico">👥</span> Clientes
+      </button>
+      <button class="nav-item" onclick="navigate('packages')" data-page="packages">
+        <span class="ico">📦</span> Pacotes
+      </button>
+      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions">
+        <span class="ico">📅</span> Sessões
+      </button>
+      <button class="nav-item" onclick="navigate('agenda')" data-page="agenda">
+        <span class="ico">🗓️</span> Agenda
+      </button>
+      <button class="nav-item" onclick="navigate('financial')" data-page="financial">
+        <span class="ico">💰</span> Financeiro
+      </button>
+      <button class="nav-item" onclick="navigate('settings')" data-page="settings">
+        <span class="ico">⚙️</span> Configurações
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;" onclick="exportBackup()">⬇️ Backup</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;" onclick="importBackup()">⬆️ Restaurar</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;color:var(--red);" onclick="doLogout()">Sair</button>
+    </div>
+  </nav>
+
+  <main class="main" id="main-content">
+    <div class="topbar">
+      <button class="hamburger" onclick="openSidebar()">☰</button>
+      <div style="flex:1">
+        <div class="page-title" id="page-title">Dashboard</div>
+      </div>
+      <div id="topbar-actions"></div>
+    </div>
+    <div id="page-content"></div>
+  </main>
+</div>
+
+<!-- MODALS -->
+<div id="modal-container"></div>
+<input type="file" id="import-file" accept=".json" style="display:none" onchange="loadBackupFile(event)"/>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ═══════════════════════════════════════════════════
+// DATA LAYER
+// ═══════════════════════════════════════════════════
+const DB_KEY = 'consultorio_v1';
+const AUTH_KEY = 'consultorio_auth';
+
+function getDB() {
+  const raw = localStorage.getItem(DB_KEY);
+  if (!raw) return { clients:[], packages:[], sessions:[], credentials:{email:'admin@consultorio.com',password:'1234',name:'Profissional'} };
+  return JSON.parse(raw);
+}
+
+function saveDB(db) {
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ═══════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const db = getDB();
+  const err = document.getElementById('login-error');
+
+  if (email === db.credentials.email && pass === db.credentials.password) {
+    localStorage.setItem(AUTH_KEY, '1');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('sidebar-user-name').textContent = db.credentials.name;
+    err.style.display = 'none';
+    navigate('dashboard');
+  } else {
+    err.style.display = 'flex';
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem(AUTH_KEY);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// Check session
+if (localStorage.getItem(AUTH_KEY)) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  const db = getDB();
+  document.getElementById('sidebar-user-name').textContent = db.credentials.name;
+  setTimeout(() => navigate('dashboard'), 10);
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════
+let currentPage = 'dashboard';
+
+function navigate(page) {
+  currentPage = page;
+  closeSidebar();
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  const titles = {dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',settings:'Configurações'};
+  document.getElementById('page-title').textContent = titles[page] || page;
+  document.getElementById('topbar-actions').innerHTML = '';
+  const content = document.getElementById('page-content');
+  content.innerHTML = '';
+  const pages = {dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,settings:renderSettings};
+  if (pages[page]) pages[page]();
+}
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function fmt(v) {
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+function getInitials(name) {
+  if (!name) return '?';
+  return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
+}
+function pkgStats(pkg) {
+  const db = getDB();
+  const used = db.sessions.filter(s => s.packageId === pkg.id && s.status === 'completed').length;
+  const total = db.sessions.filter(s => s.packageId === pkg.id).length;
+  return {
+    used,
+    remaining: pkg.totalSessions - used,
+    totalRegistered: total,
+    isExhausted: (pkg.totalSessions - used) <= 0,
+    canAdd: total < pkg.totalSessions,
+    pct: Math.round((used / pkg.totalSessions) * 100)
+  };
+}
+function clientName(id) {
+  const db = getDB();
+  const c = db.clients.find(c=>c.id===id);
+  return c ? c.name : '—';
+}
+function pkgName(id) {
+  const db = getDB();
+  const p = db.packages.find(p=>p.id===id);
+  return p ? p.name : '—';
+}
+
+// ═══════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════
+function showModal(title, bodyHTML, large=false) {
+  const c = document.getElementById('modal-container');
+  c.innerHTML = `
+    <div class="modal-overlay" id="active-modal" onclick="if(event.target===this)closeModal()">
+      <div class="modal ${large?'modal-lg':''}">
+        <div class="modal-header">
+          <h3>${title}</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">${bodyHTML}</div>
+      </div>
+    </div>`;
+}
+function closeModal() {
+  document.getElementById('modal-container').innerHTML = '';
+}
+
+function confirm(msg, cb) {
+  showModal('Confirmar', `
+    <p style="color:var(--text2);margin-bottom:20px;">${msg}</p>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="closeModal();(${cb.toString()})()">Confirmar</button>
+    </div>`);
+}
+
+// ═══════════════════════════════════════════════════
+// BACKUP
+// ═══════════════════════════════════════════════════
+function exportBackup() {
+  const db = getDB();
+  const blob = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `consultorio-backup-${today()}.json`;
+  a.click();
+}
+function importBackup() {
+  document.getElementById('import-file').click();
+}
+function loadBackupFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.clients || !data.packages || !data.sessions) throw new Error('Arquivo inválido');
+      saveDB(data);
+      navigate(currentPage);
+      showToast('✅ Backup restaurado com sucesso!');
+    } catch {
+      showToast('❌ Arquivo inválido', true);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function showToast(msg, error=false) {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;background:${error?'var(--red-bg)':'var(--green-bg2)'};border:1px solid ${error?'rgba(240,96,96,0.3)':'rgba(52,217,138,0.3)'};color:${error?'var(--red)':'var(--green)'};padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;z-index:999;animation:fadeIn 0.2s ease;`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ═══════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════
+function renderDashboard() {
+  const db = getDB();
+  const totalClients = db.clients.length;
+  const totalCompleted = db.sessions.filter(s=>s.status==='completed').length;
+  const totalPending = db.sessions.filter(s=>s.status==='pending').length;
+  const totalRevenue = db.packages.filter(p=>p.paymentStatus==='paid').reduce((a,p)=>a+p.price,0);
+  const pendingRevenue = db.packages.filter(p=>p.paymentStatus==='pending').reduce((a,p)=>a+p.price,0);
+
+  // Upcoming sessions (next 7 days)
+  const now = today();
+  const in7 = new Date(); in7.setDate(in7.getDate()+7);
+  const in7str = in7.toISOString().split('T')[0];
+  const upcoming = db.sessions
+    .filter(s=>s.status==='pending' && s.date>=now && s.date<=in7str)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .slice(0,5);
+
+  const recentSessions = [...db.sessions]
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .slice(0,5);
+
+  const html = `<div class="page">
+    <div class="grid-4">
+      <div class="stat-card green">
+        <div class="stat-icon">👥</div>
+        <div class="stat-val">${totalClients}</div>
+        <div class="stat-label">Total de Clientes</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-icon">✅</div>
+        <div class="stat-val">${totalCompleted}</div>
+        <div class="stat-label">Sessões Realizadas</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-val">${totalPending}</div>
+        <div class="stat-label">Sessões Pendentes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-val" style="font-size:20px">${fmt(totalRevenue)}</div>
+        <div class="stat-label">Receita Confirmada</div>
+      </div>
+    </div>
+
+    ${pendingRevenue > 0 ? `<div class="alert alert-yellow" style="margin-bottom:20px;">⚠️ <strong>${fmt(pendingRevenue)}</strong> em pagamentos pendentes</div>` : ''}
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title">📅 Próximas Sessões</div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('agenda')">Ver agenda →</button>
+        </div>
+        ${upcoming.length === 0
+          ? `<div class="empty"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>`
+          : upcoming.map(s=>`
+            <div class="agenda-item" style="margin-bottom:6px;">
+              <div class="agenda-item-left" style="background:var(--blue)"></div>
+              <div style="flex:1">
+                <div class="agenda-item-name">${clientName(s.clientId)}</div>
+                <div class="agenda-item-pkg">${pkgName(s.packageId)} · ${fmtDate(s.date)}</div>
+              </div>
+              <span class="badge badge-blue">Pendente</span>
+            </div>`).join('')}
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title">🕐 Sessões Recentes</div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('sessions')">Ver todas →</button>
+        </div>
+        ${recentSessions.length === 0
+          ? `<div class="empty"><div class="empty-icon">📭</div><p>Nenhuma sessão registrada</p></div>`
+          : recentSessions.map(s=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <div style="flex:1">
+                <div style="font-size:13.5px;font-weight:600;">${clientName(s.clientId)}</div>
+                <div style="font-size:12px;color:var(--text2)">${fmtDate(s.date)}</div>
+              </div>
+              <span class="badge ${s.status==='completed'?'badge-green':'badge-yellow'}">${s.status==='completed'?'Realizada':'Pendente'}</span>
+            </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('page-content').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// CLIENTS
+// ═══════════════════════════════════════════════════
+function renderClients() {
+  const db = getDB();
+  document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="showClientForm()">+ Novo Cliente</button>`;
+
+  let search = '';
+
+  function render() {
+    const filtered = db.clients.filter(c =>
+      !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.email||'').toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone||'').includes(search)
+    ).sort((a,b)=>a.name.localeCompare(b.name));
+
+    const html = `<div class="page">
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Buscar cliente..." id="client-search" value="${search}" oninput="clientSearchChange(this.value)" style="padding-left:36px"/>
+        </div>
+      </div>
+      ${filtered.length === 0
+        ? `<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente encontrado</p><small>Clique em "Novo Cliente" para cadastrar</small></div></div>`
+        : `<div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>Cliente</th><th>Telefone</th><th>Pacotes</th><th>Sessões</th><th>Ações</th></tr></thead>
+          <tbody>
+          ${filtered.map(c => {
+            const pkgs = db.packages.filter(p=>p.clientId===c.id);
+            const completedSessions = db.sessions.filter(s=>s.clientId===c.id&&s.status==='completed').length;
+            return `<tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0;">${getInitials(c.name)}</div>
+                  <div>
+                    <div style="font-weight:600;">${c.name}</div>
+                    ${c.email?`<div style="font-size:12px;color:var(--text2)">${c.email}</div>`:''}
+                  </div>
+                </div>
+              </td>
+              <td class="td-muted">${c.phone||'—'}</td>
+              <td><span class="badge badge-blue">${pkgs.length} pacote${pkgs.length!==1?'s':''}</span></td>
+              <td><span class="badge badge-green">${completedSessions} realizada${completedSessions!==1?'s':''}</span></td>
+              <td>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-icon" title="Ver detalhes" onclick="showClientDetail('${c.id}')">👁️</button>
+                  <button class="btn-icon" title="Registrar sessão" onclick="showSessionForm('${c.id}')">📝</button>
+                  <button class="btn-icon" title="Editar" onclick="showClientForm('${c.id}')">✏️</button>
+                  <button class="btn-icon" title="Excluir" onclick="deleteClientConfirm('${c.id}')">🗑️</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody></table></div></div>`}
+    </div>`;
+    document.getElementById('page-content').innerHTML = html;
+  }
+
+  window.clientSearchChange = (v) => { search = v; render(); };
+  render();
+}
+
+function showClientForm(id=null) {
+  const db = getDB();
+  const c = id ? db.clients.find(c=>c.id===id) : null;
+  showModal(id ? 'Editar Cliente' : 'Novo Cliente', `
+    <div class="form-group"><label>Nome *</label><input type="text" id="cf-name" value="${c?.name||''}" placeholder="Nome completo"/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Telefone</label><input type="tel" id="cf-phone" value="${c?.phone||''}" placeholder="(11) 99999-9999"/></div>
+      <div class="form-group"><label>Email</label><input type="email" id="cf-email" value="${c?.email||''}" placeholder="email@exemplo.com"/></div>
+    </div>
+    <div class="form-group"><label>Observações</label><textarea id="cf-notes" placeholder="Notas sobre o cliente...">${c?.notes||''}</textarea></div>
+    <div id="cf-error" class="alert alert-red" style="display:none"></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveClient('${id||''}')">Salvar</button>
+    </div>`);
+}
+
+function saveClient(id) {
+  const name = document.getElementById('cf-name').value.trim();
+  const err = document.getElementById('cf-error');
+  if (!name) { err.textContent='Nome é obrigatório'; err.style.display='flex'; return; }
+
+  const db = getDB();
+  const data = {
+    name,
+    phone: document.getElementById('cf-phone').value.trim(),
+    email: document.getElementById('cf-email').value.trim(),
+    notes: document.getElementById('cf-notes').value.trim(),
+  };
+
+  if (id) {
+    const idx = db.clients.findIndex(c=>c.id===id);
+    db.clients[idx] = {...db.clients[idx], ...data};
+  } else {
+    db.clients.push({id:genId(), createdAt:new Date().toISOString(), ...data});
+  }
+
+  saveDB(db);
+  closeModal();
+  renderClients();
+  showToast(id ? '✅ Cliente atualizado!' : '✅ Cliente cadastrado!');
+}
+
+function deleteClientConfirm(id) {
+  const db = getDB();
+  const c = db.clients.find(c=>c.id===id);
+  showModal('Excluir Cliente', `
+    <div class="alert alert-red">⚠️ Isso irá excluir <strong>${c.name}</strong> e todos os seus pacotes e sessões.</div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="deleteClientDo('${id}')">Excluir</button>
+    </div>`);
+}
+
+function deleteClientDo(id) {
+  const db = getDB();
+  db.clients = db.clients.filter(c=>c.id!==id);
+  db.packages = db.packages.filter(p=>p.clientId!==id);
+  db.sessions = db.sessions.filter(s=>s.clientId!==id);
+  saveDB(db);
+  closeModal();
+  renderClients();
+  showToast('🗑️ Cliente excluído');
+}
+
+function showClientDetail(id) {
+  const db = getDB();
+  const c = db.clients.find(c=>c.id===id);
+  if (!c) return;
+  const pkgs = db.packages.filter(p=>p.clientId===id);
+  const sessions = db.sessions.filter(s=>s.clientId===id).sort((a,b)=>b.date.localeCompare(a.date));
+
+  const pkgsHTML = pkgs.length === 0
+    ? `<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>`
+    : pkgs.map(p => {
+        const stats = pkgStats(p);
+        const pct = stats.pct;
+        const barClass = pct >= 100 ? 'progress-red' : pct >= 70 ? 'progress-yellow' : 'progress-green';
+        return `<div class="package-card">
+          <div class="package-header">
+            <div>
+              <strong>${p.name}</strong>
+              ${stats.isExhausted ? '<span class="badge badge-red" style="margin-left:8px">Encerrado</span>' : ''}
+            </div>
+            <span class="badge ${p.paymentStatus==='paid'?'badge-green':'badge-yellow'}">${p.paymentStatus==='paid'?'💰 Pago':'⏳ Pendente'}</span>
+          </div>
+          <div style="display:flex;gap:16px;margin-bottom:10px;">
+            <div style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">${p.totalSessions}</strong></div>
+            <div style="font-size:12px;color:var(--text2)">Usadas: <strong style="color:var(--text)">${stats.used}</strong></div>
+            <div style="font-size:12px;color:var(--text2)">Restantes: <strong style="color:${stats.remaining<=0?'var(--red)':stats.remaining<=2?'var(--yellow)':'var(--green)'}">${stats.remaining}</strong></div>
+            <div style="font-size:12px;color:var(--text2)">Valor: <strong style="color:var(--text)">${fmt(p.price)}</strong></div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+        </div>`;
+      }).join('');
+
+  const sessHTML = sessions.length === 0
+    ? `<div class="empty" style="padding:20px"><p>Nenhuma sessão registrada</p></div>`
+    : `<table style="width:100%;border-collapse:collapse">
+        <thead><tr><th>Data</th><th>Pacote</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>${sessions.map(s=>`<tr>
+          <td>${fmtDate(s.date)}</td>
+          <td class="td-muted">${pkgName(s.packageId)}</td>
+          <td><span class="badge ${s.status==='completed'?'badge-green':'badge-yellow'}">${s.status==='completed'?'Realizada':'Pendente'}</span></td>
+          <td><div style="display:flex;gap:6px">
+            ${s.status==='pending'?`<button class="btn-icon" title="Marcar como realizada" onclick="markSessionDone('${s.id}','${id}')">✅</button>`:''}
+            <button class="btn-icon" title="Excluir" onclick="deleteSessionFromDetail('${s.id}','${id}')">🗑️</button>
+          </div></td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+
+  showModal(`Cliente: ${c.name}`, `
+    <div class="client-header">
+      <div class="client-avatar">${getInitials(c.name)}</div>
+      <div>
+        ${c.phone?`<div style="font-size:13px;color:var(--text2)">📱 ${c.phone}</div>`:''}
+        ${c.email?`<div style="font-size:13px;color:var(--text2)">✉️ ${c.email}</div>`:''}
+        ${c.notes?`<div style="font-size:12px;color:var(--text3);margin-top:4px">${c.notes}</div>`:''}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm('${id}')">+ Registrar Sessão</button>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm('${id}')">+ Novo Pacote</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm('${id}')">✏️ Editar</button>
+    </div>
+    <div class="section-header"><div class="section-title">📦 Pacotes</div></div>
+    ${pkgsHTML}
+    <div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico de Sessões</div></div>
+    ${sessHTML}
+  `, true);
+}
+
+function markSessionDone(sessionId, clientId) {
+  const db = getDB();
+  const s = db.sessions.find(s=>s.id===sessionId);
+  if (!s) return;
+  const pkg = db.packages.find(p=>p.id===s.packageId);
+  if (!pkg) return;
+  const stats = pkgStats(pkg);
+  if (stats.isExhausted) { showToast('❌ Pacote esgotado!', true); return; }
+  const idx = db.sessions.findIndex(s=>s.id===sessionId);
+  db.sessions[idx].status = 'completed';
+  saveDB(db);
+  showToast('✅ Sessão marcada como realizada!');
+  showClientDetail(clientId);
+}
+
+function deleteSessionFromDetail(sessionId, clientId) {
+  const db = getDB();
+  db.sessions = db.sessions.filter(s=>s.id!==sessionId);
+  saveDB(db);
+  showToast('🗑️ Sessão removida');
+  showClientDetail(clientId);
+}
+
+// ═══════════════════════════════════════════════════
+// PACKAGES
+// ═══════════════════════════════════════════════════
+function renderPackages() {
+  const db = getDB();
+  document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="showPackageForm()">+ Novo Pacote</button>`;
+
+  const html = `<div class="page">
+    ${db.packages.length === 0
+      ? `<div class="card"><div class="empty"><div class="empty-icon">📦</div><p>Nenhum pacote cadastrado</p><small>Clique em "Novo Pacote" para começar</small></div></div>`
+      : `<div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>Pacote</th><th>Cliente</th><th>Sessões</th><th>Progresso</th><th>Valor</th><th>Pagamento</th><th>Ações</th></tr></thead>
+          <tbody>
+          ${db.packages.map(p => {
+            const stats = pkgStats(p);
+            const pct = stats.pct;
+            const barClass = pct>=100?'progress-red':pct>=70?'progress-yellow':'progress-green';
+            return `<tr>
+              <td><strong>${p.name}</strong>${stats.isExhausted?'<span class="badge badge-red" style="margin-left:6px">Encerrado</span>':''}</td>
+              <td>${clientName(p.clientId)}</td>
+              <td>
+                <span style="color:var(--green)">${stats.used}</span>
+                <span style="color:var(--text3)"> / ${p.totalSessions}</span>
+                <span style="color:${stats.remaining<=0?'var(--red)':stats.remaining<=2?'var(--yellow)':'var(--text2)'}"> (${stats.remaining} rest.)</span>
+              </td>
+              <td style="min-width:100px">
+                <div class="progress-bar"><div class="progress-fill ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+              </td>
+              <td>${fmt(p.price)}</td>
+              <td>
+                <span class="badge ${p.paymentStatus==='paid'?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="togglePayment('${p.id}')">
+                  ${p.paymentStatus==='paid'?'💰 Pago':'⏳ Pendente'}
+                </span>
+              </td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn-icon" title="Editar" onclick="showPackageForm(null,'${p.id}')">✏️</button>
+                  <button class="btn-icon" title="Excluir" onclick="deletePackageConfirm('${p.id}')">🗑️</button>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+          </tbody></table></div></div>`}
+  </div>`;
+
+  document.getElementById('page-content').innerHTML = html;
+}
+
+function showPackageForm(clientId=null, pkgId=null) {
+  const db = getDB();
+  const pkg = pkgId ? db.packages.find(p=>p.id===pkgId) : null;
+
+  if (db.clients.length === 0) {
+    showToast('❌ Cadastre um cliente primeiro!', true);
+    return;
+  }
+
+  showModal(pkgId ? 'Editar Pacote' : 'Novo Pacote', `
+    <div class="form-group">
+      <label>Cliente *</label>
+      <select id="pf-client">
+        ${db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(pkg?.clientId||clientId)===c.id?'selected':''}>${c.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="${pkg?.name||''}" placeholder="Ex: Pacote 8 sessões, Pacote mensal..."/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="${pkg?.totalSessions||''}" min="1" placeholder="Ex: 4, 8, 10"/></div>
+      <div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="${pkg?.price||''}" min="0" step="0.01" placeholder="Ex: 800.00"/></div>
+    </div>
+    <div class="form-group">
+      <label>Status de Pagamento</label>
+      <select id="pf-payment">
+        <option value="pending" ${pkg?.paymentStatus!=='paid'?'selected':''}>⏳ Pendente</option>
+        <option value="paid" ${pkg?.paymentStatus==='paid'?'selected':''}>💰 Pago</option>
+      </select>
+    </div>
+    <div id="pf-error" class="alert alert-red" style="display:none"></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePackage('${pkgId||''}')">Salvar</button>
+    </div>`);
+}
+
+function savePackage(id) {
+  const clientId = document.getElementById('pf-client').value;
+  const name = document.getElementById('pf-name').value.trim();
+  const totalSessions = parseInt(document.getElementById('pf-sessions').value);
+  const price = parseFloat(document.getElementById('pf-price').value);
+  const paymentStatus = document.getElementById('pf-payment').value;
+  const err = document.getElementById('pf-error');
+
+  if (!name || !totalSessions || isNaN(price)) {
+    err.textContent = 'Preencha todos os campos obrigatórios'; err.style.display='flex'; return;
+  }
+  if (totalSessions < 1) {
+    err.textContent = 'Número de sessões deve ser maior que 0'; err.style.display='flex'; return;
+  }
+
+  const db = getDB();
+
+  if (id) {
+    const stats = pkgStats(db.packages.find(p=>p.id===id));
+    if (totalSessions < stats.used) {
+      err.textContent = `Não é possível reduzir para menos que ${stats.used} (já realizadas)`; err.style.display='flex'; return;
+    }
+    const idx = db.packages.findIndex(p=>p.id===id);
+    db.packages[idx] = {...db.packages[idx], clientId, name, totalSessions, price, paymentStatus};
+  } else {
+    db.packages.push({id:genId(), createdAt:new Date().toISOString(), clientId, name, totalSessions, price, paymentStatus});
+  }
+
+  saveDB(db);
+  closeModal();
+  renderPackages();
+  showToast(id ? '✅ Pacote atualizado!' : '✅ Pacote criado!');
+}
+
+function togglePayment(id) {
+  const db = getDB();
+  const idx = db.packages.findIndex(p=>p.id===id);
+  db.packages[idx].paymentStatus = db.packages[idx].paymentStatus === 'paid' ? 'pending' : 'paid';
+  saveDB(db);
+  renderPackages();
+  showToast('✅ Status de pagamento atualizado!');
+}
+
+function deletePackageConfirm(id) {
+  const db = getDB();
+  const p = db.packages.find(p=>p.id===id);
+  showModal('Excluir Pacote', `
+    <div class="alert alert-red">⚠️ Isso irá excluir o pacote <strong>${p.name}</strong> e todas as suas sessões.</div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="deletePackageDo('${id}')">Excluir</button>
+    </div>`);
+}
+
+function deletePackageDo(id) {
+  const db = getDB();
+  db.packages = db.packages.filter(p=>p.id!==id);
+  db.sessions = db.sessions.filter(s=>s.packageId!==id);
+  saveDB(db);
+  closeModal();
+  renderPackages();
+  showToast('🗑️ Pacote excluído');
+}
+
+// ═══════════════════════════════════════════════════
+// SESSIONS
+// ═══════════════════════════════════════════════════
+function renderSessions() {
+  const db = getDB();
+  document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
+
+  const sorted = [...db.sessions].sort((a,b)=>b.date.localeCompare(a.date));
+
+  const html = `<div class="page">
+    ${sorted.length === 0
+      ? `<div class="card"><div class="empty"><div class="empty-icon">📅</div><p>Nenhuma sessão registrada</p><small>Clique em "Nova Sessão" para adicionar</small></div></div>`
+      : `<div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>Data</th><th>Cliente</th><th>Pacote</th><th>Status</th><th>Notas</th><th>Ações</th></tr></thead>
+          <tbody>
+          ${sorted.map(s=>`<tr>
+            <td><strong>${fmtDate(s.date)}</strong></td>
+            <td>${clientName(s.clientId)}</td>
+            <td class="td-muted">${pkgName(s.packageId)}</td>
+            <td><span class="badge ${s.status==='completed'?'badge-green':'badge-yellow'}">${s.status==='completed'?'✅ Realizada':'⏳ Pendente'}</span></td>
+            <td class="td-muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes||'—'}</td>
+            <td>
+              <div style="display:flex;gap:6px">
+                ${s.status==='pending'?`<button class="btn-icon" title="Marcar realizada" onclick="markSessionCompleted('${s.id}')">✅</button>`:''}
+                <button class="btn-icon" title="Editar" onclick="showSessionEditForm('${s.id}')">✏️</button>
+                <button class="btn-icon" title="Excluir" onclick="deleteSessionConfirm('${s.id}')">🗑️</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+          </tbody></table></div></div>`}
+  </div>`;
+  document.getElementById('page-content').innerHTML = html;
+}
+
+function showSessionForm(preClientId=null) {
+  const db = getDB();
+  if (db.clients.length === 0) { showToast('❌ Cadastre um cliente primeiro!', true); return; }
+  if (db.packages.length === 0) { showToast('❌ Crie um pacote primeiro!', true); return; }
+
+  const clientOptions = db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>
+    `<option value="${c.id}" ${c.id===preClientId?'selected':''}>${c.name}</option>`).join('');
+
+  showModal('Nova Sessão', `
+    <div class="form-group">
+      <label>Cliente *</label>
+      <select id="sf-client" onchange="updatePackageOptions()">
+        <option value="">Selecione...</option>${clientOptions}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Pacote *</label>
+      <select id="sf-package"><option value="">Selecione o cliente primeiro...</option></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="${today()}"/></div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="sf-status">
+          <option value="pending">⏳ Pendente</option>
+          <option value="completed">✅ Realizada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="sf-notes" placeholder="Observações sobre a sessão..."></textarea></div>
+    <div id="sf-warn" class="alert alert-yellow" style="display:none"></div>
+    <div id="sf-error" class="alert alert-red" style="display:none"></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSession()">Salvar</button>
+    </div>`);
+
+  if (preClientId) {
+    setTimeout(() => updatePackageOptions(preClientId), 50);
+  }
+}
+
+window.updatePackageOptions = function(forceClientId=null) {
+  const clientId = forceClientId || document.getElementById('sf-client')?.value;
+  const sel = document.getElementById('sf-package');
+  const warn = document.getElementById('sf-warn');
+  if (!sel || !clientId) return;
+  const db = getDB();
+  const pkgs = db.packages.filter(p=>p.clientId===clientId);
+  sel.innerHTML = pkgs.length === 0
+    ? `<option value="">Nenhum pacote para este cliente</option>`
+    : pkgs.map(p => {
+        const stats = pkgStats(p);
+        const label = stats.isExhausted
+          ? `${p.name} — ENCERRADO`
+          : `${p.name} (${stats.remaining} sessão${stats.remaining!==1?'s':''} restante${stats.remaining!==1?'s':''})`;
+        return `<option value="${p.id}" ${stats.isExhausted?'disabled':''}>${label}</option>`;
+      }).join('');
+
+  if (warn) {
+    const allExhausted = pkgs.every(p=>pkgStats(p).isExhausted);
+    warn.style.display = (pkgs.length > 0 && allExhausted) ? 'flex' : 'none';
+    if (allExhausted && pkgs.length > 0) warn.textContent = '⚠️ Todos os pacotes deste cliente estão esgotados.';
+  }
+};
+
+function saveSession() {
+  const clientId = document.getElementById('sf-client').value;
+  const packageId = document.getElementById('sf-package').value;
+  const date = document.getElementById('sf-date').value;
+  const status = document.getElementById('sf-status').value;
+  const notes = document.getElementById('sf-notes').value.trim();
+  const err = document.getElementById('sf-error');
+
+  if (!clientId || !packageId || !date) {
+    err.textContent='Preencha todos os campos obrigatórios'; err.style.display='flex'; return;
+  }
+
+  const db = getDB();
+  const pkg = db.packages.find(p=>p.id===packageId);
+  if (!pkg) return;
+
+  const stats = pkgStats(pkg);
+  if (!stats.canAdd) {
+    err.textContent=`Pacote esgotado! (${pkg.totalSessions}/${pkg.totalSessions} sessões)`; err.style.display='flex'; return;
+  }
+  if (status === 'completed' && stats.isExhausted) {
+    err.textContent='Pacote já esgotado! Não é possível adicionar sessão realizada.'; err.style.display='flex'; return;
+  }
+
+  db.sessions.push({id:genId(), createdAt:new Date().toISOString(), clientId, packageId, date, status, notes});
+  saveDB(db);
+  closeModal();
+  renderSessions();
+  showToast('✅ Sessão registrada!');
+}
+
+function showSessionEditForm(id) {
+  const db = getDB();
+  const s = db.sessions.find(s=>s.id===id);
+  if (!s) return;
+
+  showModal('Editar Sessão', `
+    <div class="form-row">
+      <div class="form-group"><label>Data *</label><input type="date" id="se-date" value="${s.date}"/></div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="se-status">
+          <option value="pending" ${s.status==='pending'?'selected':''}>⏳ Pendente</option>
+          <option value="completed" ${s.status==='completed'?'selected':''}>✅ Realizada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="se-notes">${s.notes||''}</textarea></div>
+    <div id="se-error" class="alert alert-red" style="display:none"></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSessionEdit('${id}')">Salvar</button>
+    </div>`);
+}
+
+function saveSessionEdit(id) {
+  const date = document.getElementById('se-date').value;
+  const status = document.getElementById('se-status').value;
+  const notes = document.getElementById('se-notes').value.trim();
+  const err = document.getElementById('se-error');
+  if (!date) { err.textContent='Data é obrigatória'; err.style.display='flex'; return; }
+
+  const db = getDB();
+  const s = db.sessions.find(s=>s.id===id);
+  if (status === 'completed' && s.status !== 'completed') {
+    const pkg = db.packages.find(p=>p.id===s.packageId);
+    const stats = pkgStats(pkg);
+    if (stats.isExhausted) {
+      err.textContent='Pacote esgotado! Não é possível marcar como realizada.'; err.style.display='flex'; return;
+    }
+  }
+
+  const idx = db.sessions.findIndex(s=>s.id===id);
+  db.sessions[idx] = {...db.sessions[idx], date, status, notes};
+  saveDB(db);
+  closeModal();
+  renderSessions();
+  showToast('✅ Sessão atualizada!');
+}
+
+function markSessionCompleted(id) {
+  const db = getDB();
+  const s = db.sessions.find(s=>s.id===id);
+  if (!s) return;
+  const pkg = db.packages.find(p=>p.id===s.packageId);
+  const stats = pkgStats(pkg);
+  if (stats.isExhausted) { showToast('❌ Pacote já esgotado!', true); return; }
+  const idx = db.sessions.findIndex(s=>s.id===id);
+  db.sessions[idx].status = 'completed';
+  saveDB(db);
+  renderSessions();
+  showToast('✅ Sessão marcada como realizada!');
+}
+
+function deleteSessionConfirm(id) {
+  showModal('Excluir Sessão', `
+    <p style="color:var(--text2);margin-bottom:20px;">Tem certeza que deseja excluir esta sessão?</p>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="deleteSessionDo('${id}')">Excluir</button>
+    </div>`);
+}
+
+function deleteSessionDo(id) {
+  const db = getDB();
+  db.sessions = db.sessions.filter(s=>s.id!==id);
+  saveDB(db);
+  closeModal();
+  renderSessions();
+  showToast('🗑️ Sessão excluída');
+}
+
+// ═══════════════════════════════════════════════════
+// AGENDA
+// ═══════════════════════════════════════════════════
+function renderAgenda() {
+  const db = getDB();
+  document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
+
+  const sorted = [...db.sessions].sort((a,b)=>a.date.localeCompare(b.date));
+
+  // Group by date
+  const groups = {};
+  sorted.forEach(s => {
+    if (!groups[s.date]) groups[s.date] = [];
+    groups[s.date].push(s);
+  });
+
+  const todayStr = today();
+
+  const html = `<div class="page">
+    <div class="tabs">
+      <button class="tab active" id="tab-all" onclick="agendaTab('all')">Todas</button>
+      <button class="tab" id="tab-upcoming" onclick="agendaTab('upcoming')">Próximas</button>
+      <button class="tab" id="tab-past" onclick="agendaTab('past')">Passadas</button>
+    </div>
+    <div id="agenda-content">
+    ${Object.keys(groups).length === 0
+      ? `<div class="card"><div class="empty"><div class="empty-icon">🗓️</div><p>Nenhuma sessão na agenda</p></div></div>`
+      : Object.entries(groups).map(([date, sessions]) => {
+          const isToday = date === todayStr;
+          const isPast = date < todayStr;
+          const d = new Date(date + 'T12:00:00');
+          const weekday = d.toLocaleDateString('pt-BR',{weekday:'long'});
+          const dateLabel = isToday ? '📍 Hoje' : `${weekday.charAt(0).toUpperCase()+weekday.slice(1)}, ${fmtDate(date)}`;
+          return `<div class="agenda-day" data-date="${date}">
+            <div class="agenda-day-title">${dateLabel}</div>
+            ${sessions.map(s=>{
+              const color = s.status==='completed' ? 'var(--green)' : isPast ? 'var(--red)' : 'var(--blue)';
+              return `<div class="agenda-item">
+                <div class="agenda-item-left" style="background:${color}"></div>
+                <div style="flex:1">
+                  <div class="agenda-item-name">${clientName(s.clientId)}</div>
+                  <div class="agenda-item-pkg">${pkgName(s.packageId)}${s.notes?` · ${s.notes}`:''}</div>
+                </div>
+                <span class="badge ${s.status==='completed'?'badge-green':isPast?'badge-red':'badge-blue'}">
+                  ${s.status==='completed'?'Realizada':isPast?'Não realizada':'Pendente'}
+                </span>
+              </div>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+    </div>
+  </div>`;
+
+  document.getElementById('page-content').innerHTML = html;
+}
+
+window.agendaTab = function(tab) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  const todayStr = today();
+  document.querySelectorAll('.agenda-day').forEach(el=>{
+    const date = el.dataset.date;
+    if (tab === 'all') el.style.display='';
+    else if (tab === 'upcoming') el.style.display = date >= todayStr ? '' : 'none';
+    else if (tab === 'past') el.style.display = date < todayStr ? '' : 'none';
+  });
+};
+
+// ═══════════════════════════════════════════════════
+// FINANCIAL
+// ═══════════════════════════════════════════════════
+function renderFinancial() {
+  const db = getDB();
+  const paid = db.packages.filter(p=>p.paymentStatus==='paid');
+  const pending = db.packages.filter(p=>p.paymentStatus==='pending');
+  const totalRevenue = paid.reduce((a,p)=>a+p.price,0);
+  const pendingRevenue = pending.reduce((a,p)=>a+p.price,0);
+  const totalAll = totalRevenue + pendingRevenue;
+
+  const html = `<div class="page">
+    <div class="grid-3" style="margin-bottom:24px">
+      <div class="stat-card green">
+        <div class="stat-icon">💰</div>
+        <div class="stat-val">${fmt(totalRevenue)}</div>
+        <div class="stat-label">Receita Confirmada (${paid.length} pacote${paid.length!==1?'s':''})</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-val">${fmt(pendingRevenue)}</div>
+        <div class="stat-label">A Receber (${pending.length} pacote${pending.length!==1?'s':''})</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-icon">📊</div>
+        <div class="stat-val">${fmt(totalAll)}</div>
+        <div class="stat-label">Total em Carteira</div>
+      </div>
+    </div>
+
+    ${pending.length > 0 ? `
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Ação</th></tr></thead>
+        <tbody>
+        ${pending.map(p=>`<tr>
+          <td><strong>${clientName(p.clientId)}</strong></td>
+          <td class="td-muted">${p.name}</td>
+          <td style="color:var(--yellow);font-weight:600">${fmt(p.price)}</td>
+          <td><button class="btn btn-primary btn-sm" onclick="markPaid('${p.id}')">Marcar como pago</button></td>
+        </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>` : ''}
+
+    <div class="card">
+      <div class="section-header"><div class="section-title">✅ Pagamentos Confirmados</div></div>
+      ${paid.length === 0
+        ? `<div class="empty" style="padding:20px"><p>Nenhum pagamento confirmado ainda</p></div>`
+        : `<div class="table-wrap"><table>
+            <thead><tr><th>Cliente</th><th>Pacote</th><th>Sessões</th><th>Valor</th><th>Ação</th></tr></thead>
+            <tbody>
+            ${paid.map(p=>{
+              const stats = pkgStats(p);
+              return `<tr>
+                <td><strong>${clientName(p.clientId)}</strong></td>
+                <td class="td-muted">${p.name}</td>
+                <td class="td-muted">${stats.used}/${p.totalSessions}</td>
+                <td style="color:var(--green);font-weight:600">${fmt(p.price)}</td>
+                <td><button class="btn btn-ghost btn-sm" onclick="markPending('${p.id}')">Reverter</button></td>
+              </tr>`;
+            }).join('')}
+            </tbody>
+          </table></div>`}
+    </div>
+  </div>`;
+
+  document.getElementById('page-content').innerHTML = html;
+}
+
+window.markPaid = function(id) {
+  const db = getDB();
+  const idx = db.packages.findIndex(p=>p.id===id);
+  db.packages[idx].paymentStatus = 'paid';
+  saveDB(db);
+  renderFinancial();
+  showToast('✅ Pagamento confirmado!');
+};
+
+window.markPending = function(id) {
+  const db = getDB();
+  const idx = db.packages.findIndex(p=>p.id===id);
+  db.packages[idx].paymentStatus = 'pending';
+  saveDB(db);
+  renderFinancial();
+  showToast('↩️ Revertido para pendente');
+};
+
+// ═══════════════════════════════════════════════════
+
+// SETTINGS
+function renderSettings() {
+  const db = getDB();
+  const html = `<div class="page">
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-header"><div class="section-title">🔐 Alterar Acesso</div></div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:18px;">Altere seu nome, email e senha de login.</p>
+        <div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="${db.credentials.name}" placeholder="Seu nome"/></div>
+        <div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="${db.credentials.email}" placeholder="seu@email.com"/></div>
+        <div class="form-group"><label>Senha Atual *</label><input type="password" id="st-current" placeholder="Digite a senha atual"/></div>
+        <div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>
+        <div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>
+        <div id="st-error" class="alert alert-red" style="display:none"></div>
+        <div id="st-success" class="alert alert-green" style="display:none"></div>
+        <button class="btn btn-primary" onclick="saveSettings()">Salvar Alterações</button>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-header"><div class="section-title">💾 Backup dos Dados</div></div>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:16px;">Faça backup regularmente. Para usar em outro dispositivo, exporte e importe o arquivo .json.</p>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button>
+        </div>
+        <div class="card">
+          <div class="section-header"><div class="section-title" style="color:var(--red)">⚠️ Zona de Risco</div></div>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:14px;">Apaga todos os clientes, pacotes e sessões. Não pode ser desfeito.</p>
+          <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="resetAllData()">🗑️ Apagar Todos os Dados</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('page-content').innerHTML = html;
+}
+
+function saveSettings() {
+  const db = getDB();
+  const name = document.getElementById('st-name').value.trim();
+  const email = document.getElementById('st-email').value.trim();
+  const current = document.getElementById('st-current').value;
+  const newPass = document.getElementById('st-new').value;
+  const confirm2 = document.getElementById('st-confirm').value;
+  const err = document.getElementById('st-error');
+  const ok = document.getElementById('st-success');
+  err.style.display='none'; ok.style.display='none';
+  if (!name || !email) { err.textContent='Nome e email são obrigatórios'; err.style.display='flex'; return; }
+  if (!current) { err.textContent='Digite sua senha atual para confirmar'; err.style.display='flex'; return; }
+  if (current !== db.credentials.password) { err.textContent='Senha atual incorreta'; err.style.display='flex'; return; }
+  if (newPass && newPass !== confirm2) { err.textContent='As senhas novas não coincidem'; err.style.display='flex'; return; }
+  if (newPass && newPass.length < 4) { err.textContent='Nova senha deve ter pelo menos 4 caracteres'; err.style.display='flex'; return; }
+  db.credentials.name = name;
+  db.credentials.email = email;
+  if (newPass) db.credentials.password = newPass;
+  saveDB(db);
+  document.getElementById('sidebar-user-name').textContent = name;
+  ok.textContent = '✅ Configurações salvas!';
+  ok.style.display='flex';
+  document.getElementById('st-current').value='';
+  document.getElementById('st-new').value='';
+  document.getElementById('st-confirm').value='';
+}
+
+function resetAllData() {
+  showModal('Apagar Todos os Dados', `
+    <div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões permanentemente.</div>
+    <p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p>
+    <input type="text" id="reset-confirm" placeholder="APAGAR"/>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="doResetAll()">Apagar Tudo</button>
+    </div>`);
+}
+
+function doResetAll() {
+  const val = document.getElementById('reset-confirm').value;
+  if (val !== 'APAGAR') { showToast('Digite APAGAR para confirmar', true); return; }
+  const db = getDB();
+  db.clients = []; db.packages = []; db.sessions = [];
+  saveDB(db);
+  closeModal();
+  navigate('dashboard');
+  showToast('Todos os dados foram apagados');
+}
+
+// INIT
+// ═══════════════════════════════�
