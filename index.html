@@ -301,7 +301,7 @@ function getDB() {
   } catch { return defaultDB(); }
 }
 function defaultDB() {
-  return { clients:[], packages:[], sessions:[], credentials:{email:'admin@admin.com',password:'1234',name:'Profissional'} };
+  return { clients:[], packages:[], sessions:[], credentials:{email:'admin@admin.com',password:btoa(unescape(encodeURIComponent('1234'))),name:'Profissional'} };
 }
 function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -310,12 +310,19 @@ function today() { return new Date().toISOString().split('T')[0]; }
 // ═══════════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════════
+function hashPass(p) { return btoa(unescape(encodeURIComponent(p))); }
 function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
   const db = getDB();
   const err = document.getElementById('login-error');
-  if (email === db.credentials.email && pass === db.credentials.password) {
+  const storedPass = db.credentials.password;
+  // Support both plain (legacy) and hashed passwords
+  const isHashed = storedPass && storedPass.length > 8 && storedPass !== '1234' && !/^[0-9]{1,6}$/.test(storedPass);
+  const passMatch = isHashed ? hashPass(pass) === storedPass : pass === storedPass;
+  if (email === db.credentials.email && passMatch) {
+    // Migrate plaintext password to hashed on successful login
+    if(!isHashed){ db.credentials.password=hashPass(pass); saveDB(db); }
     localStorage.setItem(AUTH_KEY,'1');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='flex';
@@ -341,6 +348,26 @@ if (localStorage.getItem(AUTH_KEY)) {
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 let currentPage='dashboard';
+// Check if backup reminder needed
+function checkBackupReminder(){
+  const last=localStorage.getItem('last_backup_reminder');
+  const now=Date.now();
+  if(!last||now-parseInt(last)>7*24*60*60*1000){
+    const db=getDB();
+    if(db.clients.length>0){
+      localStorage.setItem('last_backup_reminder',now.toString());
+      setTimeout(()=>{
+        const t=document.createElement('div');
+        t.style.cssText='position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:14px 18px;border-radius:var(--radius);font-size:13px;z-index:999;animation:fadeIn 0.2s ease;box-shadow:0 4px 20px rgba(0,0,0,0.5);max-width:280px;';
+        t.innerHTML='<div style="font-weight:600;margin-bottom:6px">💾 Lembrete de Backup</div><div style="color:var(--text2);font-size:12px;margin-bottom:10px">Faça um backup dos seus dados para não perdê-los.</div><button onclick="exportBackup();this.parentElement.remove()" style="background:var(--green);color:#0a1a12;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">⬇️ Fazer backup agora</button><button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:var(--text3);font-size:18px;cursor:pointer;position:absolute;top:10px;right:12px;line-height:1">×</button>';
+        t.style.position='fixed';
+        document.body.appendChild(t);
+        setTimeout(()=>{if(t.parentElement)t.remove();},15000);
+      },2000);
+    }
+  }
+}
+
 function navigate(page) {
   currentPage=page; closeSidebar();
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
@@ -444,6 +471,7 @@ function showToast(msg,error=false){
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════
 function renderDashboard(){
+  checkBackupReminder();
   const db=getDB();
   const totalClients=db.clients.length;
   const totalDone=db.sessions.filter(s=>s.status==='realizada'||s.status==='completed').length;
@@ -710,6 +738,11 @@ function savePackage(id){
   const err=document.getElementById('pf-error');
   if(!name||!totalSessions||isNaN(price)){err.textContent='Preencha todos os campos obrigatórios';err.style.display='flex';return;}
   if(totalSessions<1){err.textContent='Sessões deve ser maior que 0';err.style.display='flex';return;}
+  // Validate first date for new packages
+  if(!id){
+    const fd=document.getElementById('pf-first-date')?.value;
+    if(!fd){err.textContent='Informe a data da 1ª sessão para gerar o agendamento automático';err.style.display='flex';return;}
+  }
   const db=getDB();
   if(id){
     const st=pkgStats(db.packages.find(p=>p.id===id));
@@ -889,6 +922,11 @@ function saveSessionEdit(id){
   const propagate=document.getElementById('se-propagate')?.checked||false;
   const err=document.getElementById('se-error');
   if(!date){err.textContent='Data é obrigatória';err.style.display='flex';return;}
+  // Confirm falta
+  const db0=getDB();const s0=db0.sessions.find(ss=>ss.id===id);
+  if(status==='falta'&&s0&&s0.status!=='falta'){
+    if(!window.confirm('Confirmar falta para esta sessão? Isso será registrado no histórico do paciente.')){return;}
+  }
   const db=getDB();
   const s=db.sessions.find(ss=>ss.id===id);
   const oldDate=s.date;
@@ -1015,9 +1053,10 @@ function buildMonthDay(dt,db,todayStr,other){
       const pkgSessions=pkg?db.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
       const sessNum=pkgSessions.findIndex(ss=>ss.id===s.id)+1;
       const total=pkg?pkg.totalSessions:0;
-      const label=pkg?`${clientName(s.clientId)} ${sessNum}/${total}`:`${clientName(s.clientId)}`;
-      return`<span class="cal-chip ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':s.status==='realizada'?'realizada':''}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
-        ${s.time?s.time.slice(0,5)+' ':''}${label}
+      const firstName=clientName(s.clientId).split(' ')[0];
+      const label=pkg?`${firstName} ${sessNum}/${total}`:`${firstName}`;
+      return`<span class="cal-chip ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':s.status==='realizada'?'realizada':''}" title="${clientName(s.clientId)} — Sessão ${sessNum}/${total}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
+        ${s.time?`<strong>${s.time.slice(0,5)}</strong> `:''}${label}
       </span>`;}).join('')}
     ${extra>0?`<div class="cal-more">+${extra} mais</div>`:''}
   </div>`;
@@ -1065,8 +1104,9 @@ function buildWeekGrid(db,todayStr){
         const pkgSess2=pkg2?db2.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
         const n2=pkgSess2.findIndex(ss=>ss.id===s.id)+1;
         const t2=pkg2?pkg2.totalSessions:0;
-        const lbl2=pkg2?`${clientName(s.clientId)} ${n2}/${t2}`:clientName(s.clientId);
-        return`<span class="week-event ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':''}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">${lbl2}</span>`;}).join('')}
+        const fn2=clientName(s.clientId).split(' ')[0];
+        const lbl2=pkg2?`${fn2} ${n2}/${t2}`:fn2;
+        return`<span class="week-event ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':''}" title="${clientName(s.clientId)} — Sessão ${n2}/${t2}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">${lbl2}</span>`;}).join('')}
       </div>`;
     });
     html+=`</div>`;
@@ -1202,7 +1242,7 @@ function saveSettings(){
   if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
   if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
   db.credentials.name=name;db.credentials.email=email;
-  if(np)db.credentials.password=np;
+  if(np)db.credentials.password=hashPass(np);
   saveDB(db);document.getElementById('sidebar-user-name').textContent=name;
   ok.textContent='✅ Salvo!';ok.style.display='flex';
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
