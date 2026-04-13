@@ -917,8 +917,11 @@ function showPackageForm(clientId=null,pkgId=null){
     <div id="pf-error" class="alert alert-red" style="display:none"></div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="(async()=>{await savePackage('${pkgId||''}');})()">Salvar</button>
+      <button class="btn btn-primary" onclick="window._savePkg()">Salvar</button>
     </div>`);
+  // Set global save function for this modal
+  const _pkgId = pkgId || '';
+  window._savePkg = async function() { await savePackage(_pkgId); };
 }
 
 async function savePackage(id){
