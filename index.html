@@ -578,8 +578,20 @@ function loadBackupFile(e){
     try{
       const data=JSON.parse(ev.target.result);
       if(!data.clients||!data.packages||!data.sessions)throw new Error();
-      saveDB(data);navigate(currentPage);showToast('✅ Backup restaurado!');
-    }catch{showToast('❌ Arquivo inválido',true);}
+      showToast('⏳ Restaurando backup na nuvem...');
+      // Push all data to Supabase
+      for(const c of data.clients){
+        await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()}).catch(()=>{});
+      }
+      for(const p of data.packages){
+        await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',created_at:p.createdAt||new Date().toISOString()}).catch(()=>{});
+      }
+      for(const s of data.sessions){
+        await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada',category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString()}).catch(()=>{});
+      }
+      await loadFromSupabase();
+      navigate(currentPage);showToast('✅ Backup restaurado na nuvem!');
+    }catch(e){console.error(e);showToast('❌ Arquivo inválido',true);}
   };
   reader.readAsText(file);e.target.value='';
 }
@@ -690,7 +702,7 @@ function showClientForm(id=null){
     <div id="cf-error" class="alert alert-red" style="display:none"></div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveClient('${id||''}')">Salvar</button>
+      <button class="btn btn-primary" onclick="(async()=>{await saveClient('${id||''}');})()">Salvar</button>
     </div>`);
 }
 
@@ -700,9 +712,11 @@ async function saveClient(id){
   if(!name){err.textContent='Nome é obrigatório';err.style.display='flex';return;}
   const data={name,phone:document.getElementById('cf-phone').value.trim()||null,email:document.getElementById('cf-email').value.trim()||null,notes:document.getElementById('cf-notes').value.trim()||null};
   closeModal();
-  if(id){await dbUpdateClient(id,data);}
-  else{await dbAddClient(data);}
-  renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
+  try{
+    if(id){await dbUpdateClient(id,data);}
+    else{await dbAddClient(data);}
+    renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
+  }catch(e){showToast('❌ Erro ao salvar. Verifique sua conexão.',true);}
 }
 
 function deleteClientConfirm(id){
@@ -711,7 +725,7 @@ function deleteClientConfirm(id){
     <div class="alert alert-red">⚠️ Isso irá excluir <strong>${c.name}</strong> e todos os seus dados.</div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-danger" onclick="deleteClientDo('${id}')">Excluir</button>
+      <button class="btn btn-danger" onclick="(async()=>{await deleteClientDo('${id}');})()">Excluir</button>
     </div>`);
 }
 async function deleteClientDo(id){
@@ -748,7 +762,7 @@ function showClientDetail(id){
         <td><span class="badge ${bc}">${bl}</span></td>
         <td><div style="display:flex;gap:6px">
           <button class="btn-icon" onclick="closeModal();showSessionEditForm('${s.id}')">✏️</button>
-          <button class="btn-icon" onclick="deleteSessionFromDetail('${s.id}','${id}')">🗑️</button>
+          <button class="btn-icon" onclick="(async()=>{await deleteSessionFromDetail('${s.id}','${id}');})()">🗑️</button>
         </div></td>
       </tr>`;}).join('')}</tbody></table>`;
 
@@ -788,7 +802,7 @@ function renderPackages(){
             <td><span style="color:var(--green)">${st.used}</span><span style="color:var(--text3)"> / ${p.totalSessions}</span><span style="color:${st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--text2)'}"> (${st.remaining} rest.)</span></td>
             <td style="min-width:100px"><div class="progress-bar"><div class="progress-fill ${bc}" style="width:${Math.min(st.pct,100)}%"></div></div></td>
             <td>${fmt(p.price)}</td>
-            <td><span class="badge ${p.paymentStatus==='paid'?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="togglePayment('${p.id}')">${p.paymentStatus==='paid'?'💰 Pago':'⏳ Pendente'}</span></td>
+            <td><span class="badge ${p.paymentStatus==='paid'?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="(async()=>{await togglePayment('${p.id}');})()">${p.paymentStatus==='paid'?'💰 Pago':'⏳ Pendente'}</span></td>
             <td><div style="display:flex;gap:6px">
               <button class="btn-icon" onclick="showPackageForm(null,'${p.id}')">✏️</button>
               <button class="btn-icon" onclick="deletePackageConfirm('${p.id}')">🗑️</button>
@@ -844,7 +858,7 @@ function showPackageForm(clientId=null,pkgId=null){
     <div id="pf-error" class="alert alert-red" style="display:none"></div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="savePackage('${pkgId||''}')">Salvar</button>
+      <button class="btn btn-primary" onclick="(async()=>{await savePackage('${pkgId||''}');})()">Salvar</button>
     </div>`);
 }
 
@@ -895,7 +909,7 @@ async function togglePayment(id){
 function deletePackageConfirm(id){
   const p=getDB().packages.find(p=>p.id===id);
   showModal('Excluir Pacote',`<div class="alert alert-red">⚠️ Excluir <strong>${p.name}</strong> e todas as sessões?</div>
-    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="deletePackageDo('${id}')">Excluir</button></div>`);
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async()=>{await deletePackageDo('${id}');})()">Excluir</button></div>`);
 }
 async function deletePackageDo(id){
   closeModal();
@@ -964,7 +978,7 @@ function showSessionForm(preClientId=null,preDate=null){
     <div id="sf-error" class="alert alert-red" style="display:none"></div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveSession()">Salvar</button>
+      <button class="btn btn-primary" onclick="(async()=>{await saveSession();})()">Salvar</button>
     </div>`);
   if(preClientId)setTimeout(()=>updatePkgOpts(preClientId),50);
 }
@@ -1031,7 +1045,7 @@ function showSessionEditForm(id){
     <div id="se-error" class="alert alert-red" style="display:none"></div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveSessionEdit('${id}')">Salvar</button>
+      <button class="btn btn-primary" onclick="(async()=>{await saveSessionEdit('${id}');})()">Salvar</button>
     </div>`);
 }
 
@@ -1068,7 +1082,7 @@ async function saveSessionEdit(id){
 
 function deleteSessionConfirm(id){
   showModal('Excluir Sessão',`<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p>
-    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="deleteSessionDo('${id}')">Excluir</button></div>`);
+    <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async()=>{await deleteSessionDo('${id}');})()">Excluir</button></div>`);
 }
 async function deleteSessionDo(id){
   closeModal();
@@ -1292,7 +1306,7 @@ function renderFinancial(){
           <td><strong>${clientName(p.clientId)}</strong></td>
           <td class="td-muted">${p.name}</td>
           <td style="color:var(--yellow);font-weight:600">${fmt(p.price)}</td>
-          <td><button class="btn btn-primary btn-sm" onclick="markPaid('${p.id}')">Marcar como pago</button></td>
+          <td><button class="btn btn-primary btn-sm" onclick="(async()=>{await markPaid('${p.id}');})()">Marcar como pago</button></td>
         </tr>`).join('')}</tbody>
       </table></div>
     </div>`:''}
@@ -1306,7 +1320,7 @@ function renderFinancial(){
             <td class="td-muted">${p.name}</td>
             <td class="td-muted">${st.used}/${p.totalSessions}</td>
             <td style="color:var(--green);font-weight:600">${fmt(p.price)}</td>
-            <td><button class="btn btn-ghost btn-sm" onclick="markPending('${p.id}')">Reverter</button></td>
+            <td><button class="btn btn-ghost btn-sm" onclick="(async()=>{await markPending('${p.id}');})()">Reverter</button></td>
           </tr>`;}).join('')}</tbody>
         </table></div>`}
     </div>
@@ -1319,13 +1333,13 @@ window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'p
 // SETTINGS
 // ═══════════════════════════════════════════════════════════════
 function renderSettings(){
-  const db=getDB();
+  const creds2=getCreds();
   document.getElementById('page-content').innerHTML=`<div class="page"><div class="grid-2">
     <div class="card">
       <div class="section-header"><div class="section-title">🔐 Alterar Acesso</div></div>
       <p style="color:var(--text2);font-size:13px;margin-bottom:18px">Altere seu nome, email e senha de login.</p>
-      <div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="${db.credentials.name}"/></div>
-      <div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="${db.credentials.email}"/></div>
+      <div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="${creds2.name}"/></div>
+      <div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="${creds2.email}"/></div>
       <div class="form-group"><label>Senha Atual *</label><input type="password" id="st-current" placeholder="Digite a senha atual"/></div>
       <div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>
       <div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>
@@ -1378,7 +1392,7 @@ function resetAllData(){
     <input type="text" id="reset-confirm" placeholder="APAGAR"/>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-danger" onclick="doResetAll()">Apagar Tudo</button>
+      <button class="btn btn-danger" onclick="(async()=>{await doResetAll();})()">Apagar Tudo</button>
     </div>`);
 }
 async function doResetAll(){
