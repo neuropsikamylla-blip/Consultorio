@@ -343,6 +343,7 @@ async function loadFromSupabase() {
   } catch(e) {
     console.error('Load error:', e);
     _cache = _cache || { clients:[], packages:[], sessions:[] };
+    showToast('⚠️ Erro ao conectar. Verifique sua internet.', true);
   }
   showLoadingOverlay(false);
   return _cache;
@@ -446,8 +447,9 @@ async function doLogin() {
     document.getElementById('app').style.display='flex';
     document.getElementById('sidebar-user-name').textContent=creds.name;
     err.style.display='none';
-    await loadFromSupabase();
     navigate('dashboard');
+    // Load data after showing app (non-blocking)
+    loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>navigate('dashboard'));
   } else { err.style.display='flex'; }
 }
 function doLogout() {
@@ -460,7 +462,8 @@ if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('sidebar-user-name').textContent=getCreds().name;
-  loadFromSupabase().then(()=>navigate('dashboard'));
+  navigate('dashboard');
+  loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>{});
 }
 
 // ═══════════════════════════════════════════════════════════════
