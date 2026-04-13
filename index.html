@@ -295,38 +295,21 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const AUTH_KEY = 'consultorio_auth';
 const CREDS_KEY = 'consultorio_creds';
 
-// ═══════════════════════════════════════════════════════════════
-// FIX: Timeout wrapper for fetch requests
-// ═══════════════════════════════════════════════════════════════
-function fetchWithTimeout(url, options, timeoutMs = 10000) {
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout: servidor não respondeu')), timeoutMs)
-    )
-  ]);
-}
-
 async function supaFetch(method, table, body=null, query='') {
   const url = `${SUPA_URL}/rest/v1/${table}${query}`;
-  try {
-    const res = await fetchWithTimeout(url, {
-      method,
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': method==='POST' ? 'return=representation' : method==='PATCH'||method==='DELETE' ? 'return=representation' : ''
-      },
-      body: body ? JSON.stringify(body) : null
-    }, 10000);
-    if (!res.ok) { const e = await res.text(); console.error('Supabase error:', e); return null; }
-    const text = await res.text();
-    return text ? JSON.parse(text) : null;
-  } catch(e) {
-    console.error('supaFetch error:', e.message);
-    return null;
-  }
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method==='POST' ? 'return=representation' : method==='PATCH'||method==='DELETE' ? 'return=representation' : ''
+    },
+    body: body ? JSON.stringify(body) : null
+  });
+  if (!res.ok) { const e = await res.text(); console.error('Supabase error:', e); return null; }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 // Local cache for speed
@@ -344,9 +327,6 @@ function getDB() {
   return _cache || { clients:[], packages:[], sessions:[] };
 }
 
-// ═══════════════════════════════════════════════════════════════
-// FIX: loadFromSupabase with guaranteed overlay removal + timeout
-// ═══════════════════════════════════════════════════════════════
 async function loadFromSupabase() {
   showLoadingOverlay(true);
   try {
@@ -364,10 +344,8 @@ async function loadFromSupabase() {
     console.error('Load error:', e);
     _cache = _cache || { clients:[], packages:[], sessions:[] };
     showToast('⚠️ Erro ao conectar. Verifique sua internet.', true);
-  } finally {
-    // FIX: ALWAYS remove the overlay, even on error
-    showLoadingOverlay(false);
   }
+  showLoadingOverlay(false);
   return _cache;
 }
 
@@ -379,13 +357,7 @@ function showLoadingOverlay(show) {
     el.style.cssText = 'position:fixed;inset:0;background:rgba(15,17,23,0.7);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;';
     el.innerHTML = '<div style="text-align:center"><div style="font-size:28px;margin-bottom:12px">🔄</div><div style="color:var(--text2);font-size:14px">Sincronizando dados...</div></div>';
     document.body.appendChild(el);
-    // FIX: Safety timeout — remove overlay after 12s no matter what
-    el._safetyTimeout = setTimeout(() => {
-      const still = document.getElementById('loading-overlay');
-      if (still) { still.remove(); console.warn('Loading overlay removed by safety timeout'); }
-    }, 12000);
   } else if (!show && el) {
-    if (el._safetyTimeout) clearTimeout(el._safetyTimeout);
     el.remove();
   }
 }
@@ -452,6 +424,7 @@ async function dbUpdateSession(id, data) {
   await loadFromSupabase();
 }
 async function dbUpdateSessionsBatch(updates) {
+  // Update each session individually
   await Promise.all(updates.map(u => supaFetch('PATCH','sessions',u.data,`?id=eq.${u.id}`)));
   await loadFromSupabase();
 }
@@ -461,7 +434,7 @@ async function dbDeleteSession(id) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUTH — FIX: Corrected login flow to prevent hanging
+// AUTH
 // ═══════════════════════════════════════════════════════════════
 function doLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -474,44 +447,31 @@ function doLogin() {
     document.getElementById('app').style.display='flex';
     document.getElementById('sidebar-user-name').textContent=creds.name;
     err.style.display='none';
-    // FIX: Show dashboard immediately with empty data, then load from Supabase
     navigate('dashboard');
-    // FIX: Load data in background, then re-render. Use .catch to never hang.
-    loadFromSupabase()
-      .then(() => { navigate(currentPage); })
-      .catch((e) => { console.error('Login load error:', e); showLoadingOverlay(false); });
+    setTimeout(()=>loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>{}), 100);
   } else {
     err.style.display='flex';
   }
 }
-
 function doLogout() {
   localStorage.removeItem(AUTH_KEY);
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
 }
-
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-
-// ═══════════════════════════════════════════════════════════════
-// FIX: Auto-login — load data first, then navigate (no double call)
-// ═══════════════════════════════════════════════════════════════
 if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('sidebar-user-name').textContent=getCreds().name;
-  // FIX: Show dashboard with empty data first so user sees the UI
   navigate('dashboard');
-  // FIX: Then load from Supabase and re-render. Catch errors to prevent hang.
-  loadFromSupabase()
-    .then(() => { navigate(currentPage); })
-    .catch((e) => { console.error('Auto-login load error:', e); showLoadingOverlay(false); });
+  setTimeout(()=>loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>{}), 100);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 let currentPage='dashboard';
+// Check if backup reminder needed
 function checkBackupReminder(){
   const last=localStorage.getItem('last_backup_reminder');
   const now=Date.now();
@@ -533,6 +493,7 @@ function checkBackupReminder(){
 
 function navigate(page) {
   currentPage=page; closeSidebar();
+  // Reset main padding
   const main=document.querySelector('.main');
   if(main) main.style.padding = page==='agenda' ? '20px 16px' : '28px 32px';
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
@@ -930,6 +891,7 @@ async function savePackage(id){
     const interval=parseInt(document.getElementById('pf-interval')?.value||'7');
     const category=document.getElementById('pf-category')?.value||'psicoterapia';
     const newPkg=await dbAddPackage({clientId,name,totalSessions,price,paymentStatus});
+    // Auto-generate sessions in batch
     const sessionsList=[];
     for(let i=0;i<totalSessions;i++){
       const d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+i*interval);
@@ -1140,6 +1102,7 @@ let calDate=new Date();
 
 function renderAgenda(){
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
+  // Wider layout for agenda
   document.querySelector('.main').style.padding='20px 16px';
   renderCalendar();
 }
@@ -1147,6 +1110,8 @@ function renderAgenda(){
 function renderCalendar(){
   const db=getDB();
   const todayStr=today();
+
+  // Title
   let title='';
   if(calView==='month'){
     title=calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -1197,11 +1162,14 @@ function buildMonthGrid(db,todayStr){
   const days=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
   let html=`<div class="month-grid">`;
   days.forEach(d=>html+=`<div class="month-header">${d}</div>`);
+  // prev month
   for(let i=0;i<startDow;i++){
     const d=new Date(year,month,1-startDow+i);
     html+=buildMonthDay(d,db,todayStr,true);
   }
+  // current
   for(let d=1;d<=last.getDate();d++)html+=buildMonthDay(new Date(year,month,d),db,todayStr,false);
+  // next
   const total=startDow+last.getDate();
   const rem=total%7===0?0:7-(total%7);
   for(let i=1;i<=rem;i++)html+=buildMonthDay(new Date(year,month+1,i),db,todayStr,true);
@@ -1240,6 +1208,7 @@ function buildWeekGrid(db,todayStr){
   const hours=[];for(let h=7;h<=21;h++)hours.push(h);
 
   let html=`<div style="overflow-x:auto"><div style="min-width:600px">`;
+  // Header row
   html+=`<div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border)">`;
   html+=`<div style="border-right:1px solid var(--border)"></div>`;
   weekDays.forEach((d,i)=>{
@@ -1252,12 +1221,14 @@ function buildWeekGrid(db,todayStr){
   });
   html+=`</div>`;
 
+  // Time rows
   html+=`<div class="week-wrap">`;
   html+=`<div class="week-time-col">`;
   hours.forEach(h=>html+=`<div class="week-time-cell">${h}:00</div>`);
   html+=`</div>`;
 
   html+=`<div class="week-days" style="grid-template-columns:repeat(7,1fr)">`;
+  // Headers spacer
   weekDays.forEach((d,i)=>{
     const ds=d.toISOString().split('T')[0];
     html+=`<div style="grid-row:span ${hours.length}">`;
@@ -1430,6 +1401,7 @@ function resetAllData(){
 async function doResetAll(){
   if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}
   closeModal();
+  // Delete all from Supabase
   await supaFetch('DELETE','sessions',null,'?id=neq.none');
   await supaFetch('DELETE','packages',null,'?id=neq.none');
   await supaFetch('DELETE','clients',null,'?id=neq.none');
