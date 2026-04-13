@@ -375,7 +375,11 @@ function showLoadingOverlay(show) {
   }
 }
 
-function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+let _idCounter = 0;
+function genId() {
+  _idCounter++;
+  return Date.now().toString(36) + '_' + _idCounter.toString(36) + '_' + Math.random().toString(36).slice(2,8);
+}
 function today() { return new Date().toISOString().split('T')[0]; }
 
 // ── CRUD OPERATIONS ──────────────────────────────────────────
@@ -422,21 +426,6 @@ async function dbAddSession(data) {
   return row;
 }
 async function dbAddSessionsBatch(sessions) {
-  // Build all rows first
-  const rows = sessions.map(s => ({
-    id: genId(),
-    client_id: s.clientId,
-    package_id: s.packageId,
-    date: s.date,
-    time: s.time || null,
-    status: 'agendada',
-    category: s.category || 'psicoterapia',
-    notes: '',
-    interval_days: s.intervalDays || null,
-    created_at: new Date().toISOString()
-  }));
-
-  // Insert ALL at once in a single request
   const url = SUPA_URL + '/rest/v1/sessions';
   const headers = {
     'apikey': SUPA_KEY,
@@ -444,30 +433,38 @@ async function dbAddSessionsBatch(sessions) {
     'Content-Type': 'application/json',
     'Prefer': 'return=minimal'
   };
-  
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(rows)
-    });
-    if(!res.ok) {
-      const err = await res.text();
-      console.error('Batch insert failed:', err);
-      // Fallback: insert one by one without loadFromSupabase in between
-      for(const row of rows) {
-        await fetch(url, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(row)
-        });
+
+  // Insert each session sequentially with unique IDs
+  for(let i = 0; i < sessions.length; i++) {
+    const s = sessions[i];
+    const row = {
+      id: genId(),
+      client_id: s.clientId,
+      package_id: s.packageId,
+      date: s.date,
+      time: s.time || null,
+      status: 'agendada',
+      category: s.category || 'psicoterapia',
+      notes: '',
+      interval_days: s.intervalDays || null,
+      created_at: new Date(Date.now() + i).toISOString()
+    };
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(row)
+      });
+      if(!res.ok) {
+        const err = await res.text();
+        console.error('Session', i+1, 'failed:', err);
       }
+    } catch(e) {
+      console.error('Session', i+1, 'error:', e.message);
     }
-  } catch(e) {
-    console.error('Session insert error:', e);
   }
-  
-  // Reload ONCE after everything is done
+
+  // Reload ONCE after all done
   await loadFromSupabase();
 }
 async function dbUpdateSession(id, data) {
