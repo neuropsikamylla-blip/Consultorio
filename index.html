@@ -297,19 +297,24 @@ const CREDS_KEY = 'consultorio_creds';
 
 async function supaFetch(method, table, body=null, query='') {
   const url = `${SUPA_URL}/rest/v1/${table}${query}`;
-  const res = await fetch(url, {
-    method,
-    headers: {
-      'apikey': SUPA_KEY,
-      'Authorization': `Bearer ${SUPA_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': method==='POST' ? 'return=representation' : method==='PATCH'||method==='DELETE' ? 'return=representation' : ''
-    },
-    body: body ? JSON.stringify(body) : null
-  });
-  if (!res.ok) { const e = await res.text(); console.error('Supabase error:', e); return null; }
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': method==='POST' ? 'return=representation' : method==='PATCH'||method==='DELETE' ? 'return=representation' : ''
+      },
+      body: body ? JSON.stringify(body) : null
+    });
+    if (!res.ok) { const e = await res.text(); console.error('Supabase error:', e); return null; }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch(e) {
+    console.error('Supabase fetch error:', e.message);
+    return null;
+  }
 }
 
 // Local cache for speed
@@ -343,7 +348,10 @@ async function loadFromSupabase() {
   } catch(e) {
     console.error('Load error:', e);
     _cache = _cache || { clients:[], packages:[], sessions:[] };
-    showToast('⚠️ Erro ao conectar. Verifique sua internet.', true);
+    // Show subtle error only if we have no data at all
+    if(!_cache.clients.length) {
+      showToast('⚠️ Sem conexão com o servidor. Tente novamente.', true);
+    }
   }
   showLoadingOverlay(false);
   return _cache;
@@ -603,6 +611,14 @@ function showToast(msg,error=false){
 // ═══════════════════════════════════════════════════════════════
 function renderDashboard(){
   const db=getDB();
+  // If no data and online, try to reload
+  if(!db.clients.length && !db.packages.length && navigator.onLine) {
+    // Show reload option after 1s
+    setTimeout(()=>{
+      const el = document.getElementById('dash-reload-btn');
+      if(el) el.style.display='inline-flex';
+    }, 1500);
+  }
   const totalClients=db.clients.length;
   const totalDone=db.sessions.filter(s=>s.status==='realizada'||s.status==='completed').length;
   const totalPending=db.sessions.filter(s=>s.status==='agendada').length;
