@@ -140,6 +140,9 @@ select option{background:var(--bg3);}
 .modal-close:hover{background:var(--bg3);color:var(--text);}
 .modal-body{padding:24px;}
 
+.badge-agendada{background:rgba(96,165,250,0.12);color:#60a5fa;border:1px solid rgba(96,165,250,0.25);}
+.badge-realizada{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
+.badge-falta{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
 .badge-psico{background:var(--cat-psico-bg);color:var(--cat-psico);border:1px solid rgba(96,165,250,0.25);}
 .badge-reab{background:var(--cat-reab-bg);color:var(--cat-reab);border:1px solid rgba(167,139,250,0.25);}
 .badge-aval{background:var(--cat-aval-bg);color:var(--cat-aval);border:1px solid rgba(52,217,138,0.25);}
@@ -212,6 +215,37 @@ select option{background:var(--bg3);}
 /* SECTION HEADER */
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .section-title{font-size:15px;font-weight:700;color:var(--text);}
+
+/* CALENDAR */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.cal-nav{display:flex;align-items:center;gap:10px;}
+.cal-nav button{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif;}
+.cal-nav button:hover{background:#252b3b;}
+.cal-title{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;color:var(--text);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.cal-day-header{background:var(--bg3);padding:8px 4px;text-align:center;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+.cal-day{background:var(--bg2);min-height:90px;padding:6px;position:relative;cursor:pointer;transition:background 0.1s;}
+.cal-day:hover{background:var(--bg3);}
+.cal-day.other-month{background:#13161f;opacity:0.5;}
+.cal-day.today{background:rgba(52,217,138,0.06);}
+.cal-day.today .cal-day-num{background:var(--green);color:#0a1a12;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;}
+.cal-day-num{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;}
+.cal-event{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.cal-event:hover{opacity:0.85;}
+.cal-event.psicoterapia{background:rgba(96,165,250,0.25);color:#93c5fd;border-left:2px solid #60a5fa;}
+.cal-event.reabilitacao{background:rgba(167,139,250,0.25);color:#c4b5fd;border-left:2px solid #a78bfa;}
+.cal-event.avaliacao{background:rgba(52,217,138,0.2);color:#6ee7b7;border-left:2px solid #34d98a;}
+.cal-event.status-realizada{opacity:0.6;}
+.cal-event.status-falta{background:rgba(240,96,96,0.2);color:#fca5a5;border-left:2px solid #f06060;}
+/* WEEK VIEW */
+.week-grid{display:grid;grid-template-columns:50px repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.week-header{background:var(--bg3);padding:10px 4px;text-align:center;}
+.week-header .wh-day{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;}
+.week-header .wh-num{font-size:18px;font-weight:700;font-family:'Sora',sans-serif;color:var(--text);}
+.week-header.today .wh-num{color:var(--green);}
+.week-time{background:var(--bg2);padding:4px 6px;text-align:right;font-size:10px;color:var(--text3);}
+.week-cell{background:var(--bg2);min-height:36px;padding:2px;border-top:1px solid var(--border);position:relative;}
+.week-cell:hover{background:var(--bg3);}
 
 /* TABS */
 .tabs{display:flex;gap:4px;background:var(--bg3);border-radius:var(--radius-sm);padding:4px;margin-bottom:20px;}
@@ -411,7 +445,7 @@ function getInitials(name) {
 }
 function pkgStats(pkg) {
   const db = getDB();
-  const used = db.sessions.filter(s => s.packageId === pkg.id && s.status === 'completed').length;
+  const used = db.sessions.filter(s => s.packageId === pkg.id && (s.status === 'completed' || s.status === 'realizada')).length;
   const total = db.sessions.filter(s => s.packageId === pkg.id).length;
   return {
     used,
@@ -798,7 +832,7 @@ function markSessionDone(sessionId, clientId) {
   const stats = pkgStats(pkg);
   if (stats.isExhausted) { showToast('❌ Pacote esgotado!', true); return; }
   const idx = db.sessions.findIndex(s=>s.id===sessionId);
-  db.sessions[idx].status = 'completed';
+  db.sessions[idx].status = 'realizada';
   saveDB(db);
   showToast('✅ Sessão marcada como realizada!');
   showClientDetail(clientId);
@@ -869,6 +903,7 @@ function showPackageForm(clientId=null, pkgId=null) {
     return;
   }
 
+  const isEdit = !!pkgId;
   showModal(pkgId ? 'Editar Pacote' : 'Novo Pacote', `
     <div class="form-group">
       <label>Cliente *</label>
@@ -881,6 +916,33 @@ function showPackageForm(clientId=null, pkgId=null) {
       <div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="${pkg?.totalSessions||''}" min="1" placeholder="Ex: 4, 8, 10"/></div>
       <div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="${pkg?.price||''}" min="0" step="0.01" placeholder="Ex: 800.00"/></div>
     </div>
+    ${!isEdit ? `
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">📅 Agendamento Automático</div>
+      <div class="form-row">
+        <div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="${today()}"/></div>
+        <div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Categoria</label>
+          <select id="pf-category">
+            <option value="psicoterapia">🔵 Psicoterapia</option>
+            <option value="reabilitacao">🟣 Reabilitação</option>
+            <option value="avaliacao">🟢 Avaliação</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Intervalo entre sessões</label>
+          <select id="pf-interval">
+            <option value="7">Semanal (7 dias)</option>
+            <option value="14">Quinzenal (14 dias)</option>
+            <option value="30">Mensal (30 dias)</option>
+            <option value="1">Diário (1 dia)</option>
+          </select>
+        </div>
+      </div>
+    </div>` : ''}
     <div class="form-group">
       <label>Status de Pagamento</label>
       <select id="pf-payment">
@@ -923,10 +985,38 @@ function savePackage(id) {
     db.packages.push({id:genId(), createdAt:new Date().toISOString(), clientId, name, totalSessions, price, paymentStatus});
   }
 
+  if (!id) {
+    // Auto-generate sessions
+    const firstDate = document.getElementById('pf-first-date')?.value;
+    const time = document.getElementById('pf-time')?.value || '09:00';
+    const interval = parseInt(document.getElementById('pf-interval')?.value || '7');
+    const category = document.getElementById('pf-category')?.value || 'psicoterapia';
+    const newPkg = db.packages[db.packages.length - 1];
+    if (firstDate && newPkg) {
+      for (let i = 0; i < totalSessions; i++) {
+        const d = new Date(firstDate + 'T12:00:00');
+        d.setDate(d.getDate() + i * interval);
+        const dateStr = d.toISOString().split('T')[0];
+        db.sessions.push({
+          id: genId(),
+          createdAt: new Date().toISOString(),
+          clientId,
+          packageId: newPkg.id,
+          date: dateStr,
+          time,
+          status: 'agendada',
+          notes: '',
+          category,
+          intervalDays: interval
+        });
+      }
+    }
+  }
+
   saveDB(db);
   closeModal();
   renderPackages();
-  showToast(id ? '✅ Pacote atualizado!' : '✅ Pacote criado!');
+  showToast(id ? '✅ Pacote atualizado!' : `✅ Pacote criado com ${totalSessions} sessões agendadas!`);
 }
 
 function togglePayment(id) {
@@ -972,19 +1062,19 @@ function renderSessions() {
     ${sorted.length === 0
       ? `<div class="card"><div class="empty"><div class="empty-icon">📅</div><p>Nenhuma sessão registrada</p><small>Clique em "Nova Sessão" para adicionar</small></div></div>`
       : `<div class="card"><div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Notas</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data</th><th>Horário</th><th>Cliente</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Notas</th><th>Ações</th></tr></thead>
           <tbody>
           ${sorted.map(s=>`<tr>
             <td><strong>${fmtDate(s.date)}</strong></td>
+            <td class="td-muted">${s.time||'—'}</td>
             <td>${clientName(s.clientId)}</td>
             <td><span class="badge ${catBadgeClass(s.category)}">${catLabelShort(s.category)}</span></td>
             <td class="td-muted">${pkgName(s.packageId)}</td>
-            <td><span class="badge ${s.status==='completed'?'badge-green':'badge-yellow'}">${s.status==='completed'?'✅ Realizada':'⏳ Pendente'}</span></td>
-            <td class="td-muted" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes||'—'}</td>
+            <td><span class="badge ${statusBadgeClass(s.status)}">${statusLabel(s.status)}</span></td>
+            <td class="td-muted" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes||'—'}</td>
             <td>
-              <div style="display:flex;gap:6px">
-                ${s.status==='pending'?`<button class="btn-icon" title="Marcar realizada" onclick="markSessionCompleted('${s.id}')">✅</button>`:''}
-                <button class="btn-icon" title="Editar" onclick="showSessionEditForm('${s.id}')">✏️</button>
+              <div style="display:flex;gap:4px">
+                <button class="btn-icon" title="Editar / Reagendar" onclick="showSessionEditForm('${s.id}')">✏️</button>
                 <button class="btn-icon" title="Excluir" onclick="deleteSessionConfirm('${s.id}')">🗑️</button>
               </div>
             </td>
@@ -994,7 +1084,11 @@ function renderSessions() {
   document.getElementById('page-content').innerHTML = html;
 }
 
-function showSessionForm(preClientId=null) {
+function showSessionFormDate(dateStr) {
+  showSessionForm(null, dateStr);
+}
+
+function showSessionForm(preClientId=null, preDate=null) {
   const db = getDB();
   if (db.clients.length === 0) { showToast('❌ Cadastre um cliente primeiro!', true); return; }
   if (db.packages.length === 0) { showToast('❌ Crie um pacote primeiro!', true); return; }
@@ -1022,14 +1116,16 @@ function showSessionForm(preClientId=null) {
       </select>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="${today()}"/></div>
-      <div class="form-group">
-        <label>Status</label>
-        <select id="sf-status">
-          <option value="pending">⏳ Pendente</option>
-          <option value="completed">✅ Realizada</option>
-        </select>
-      </div>
+      <div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="${preDate||today()}"/></div>
+      <div class="form-group"><label>Horário</label><input type="time" id="sf-time" value="09:00"/></div>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="sf-status">
+        <option value="agendada">📅 Agendada</option>
+        <option value="realizada">✅ Realizada</option>
+        <option value="falta">❌ Falta</option>
+      </select>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="sf-notes" placeholder="Observações sobre a sessão..."></textarea></div>
     <div id="sf-warn" class="alert alert-yellow" style="display:none"></div>
@@ -1075,6 +1171,7 @@ function saveSession() {
   const status = document.getElementById('sf-status').value;
   const notes = document.getElementById('sf-notes').value.trim();
   const category = document.getElementById('sf-category').value;
+  const time = document.getElementById('sf-time')?.value || '09:00';
   const err = document.getElementById('sf-error');
 
   if (!clientId || !packageId || !date) {
@@ -1093,7 +1190,7 @@ function saveSession() {
     err.textContent='Pacote já esgotado! Não é possível adicionar sessão realizada.'; err.style.display='flex'; return;
   }
 
-  db.sessions.push({id:genId(), createdAt:new Date().toISOString(), clientId, packageId, date, status, notes, category});
+  db.sessions.push({id:genId(), createdAt:new Date().toISOString(), clientId, packageId, date, time, status, notes, category});
   saveDB(db);
   closeModal();
   renderSessions();
@@ -1104,6 +1201,7 @@ function showSessionEditForm(id) {
   const db = getDB();
   const s = db.sessions.find(s=>s.id===id);
   if (!s) return;
+  const futureSessions = db.sessions.filter(ss => ss.packageId === s.packageId && ss.date > s.date).length;
 
   showModal('Editar Sessão', `
     <div class="form-group">
@@ -1116,15 +1214,25 @@ function showSessionEditForm(id) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>Data *</label><input type="date" id="se-date" value="${s.date}"/></div>
-      <div class="form-group">
-        <label>Status</label>
-        <select id="se-status">
-          <option value="pending" ${s.status==='pending'?'selected':''}>⏳ Pendente</option>
-          <option value="completed" ${s.status==='completed'?'selected':''}>✅ Realizada</option>
-        </select>
-      </div>
+      <div class="form-group"><label>Horário</label><input type="time" id="se-time" value="${s.time||'09:00'}"/></div>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="se-status">
+        <option value="agendada" ${(s.status==='agendada'||s.status==='pending')?'selected':''}>📅 Agendada</option>
+        <option value="realizada" ${(s.status==='realizada'||s.status==='completed')?'selected':''}>✅ Realizada</option>
+        <option value="falta" ${s.status==='falta'?'selected':''}>❌ Falta</option>
+      </select>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="se-notes">${s.notes||''}</textarea></div>
+    ${futureSessions > 0 ? `
+    <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;">
+      <label style="margin-bottom:8px">Reagendamento</label>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="se-propagate" style="width:auto"/> 
+        Propagar mudança de data/hora para as ${futureSessions} sessão(ões) futuras deste pacote
+      </label>
+    </div>` : ''}
     <div id="se-error" class="alert alert-red" style="display:none"></div>
     <div class="form-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -1134,42 +1242,60 @@ function showSessionEditForm(id) {
 
 function saveSessionEdit(id) {
   const date = document.getElementById('se-date').value;
+  const time = document.getElementById('se-time')?.value || '09:00';
   const status = document.getElementById('se-status').value;
   const notes = document.getElementById('se-notes').value.trim();
   const category = document.getElementById('se-category').value;
+  const propagate = document.getElementById('se-propagate')?.checked || false;
   const err = document.getElementById('se-error');
   if (!date) { err.textContent='Data é obrigatória'; err.style.display='flex'; return; }
 
   const db = getDB();
-  const s = db.sessions.find(s=>s.id===id);
-  if (status === 'completed' && s.status !== 'completed') {
-    const pkg = db.packages.find(p=>p.id===s.packageId);
-    const stats = pkgStats(pkg);
-    if (stats.isExhausted) {
-      err.textContent='Pacote esgotado! Não é possível marcar como realizada.'; err.style.display='flex'; return;
-    }
+  const s = db.sessions.find(ss=>ss.id===id);
+  const oldDate = s.date;
+  const oldTime = s.time || '09:00';
+  const idx = db.sessions.findIndex(ss=>ss.id===id);
+  db.sessions[idx] = {...db.sessions[idx], date, time, status, notes, category};
+
+  // Propagate date/time change to future sessions
+  if (propagate && (date !== oldDate || time !== oldTime)) {
+    const dateDiff = (new Date(date+'T12:00:00') - new Date(oldDate+'T12:00:00')) / (1000*60*60*24);
+    const futureSessions = db.sessions
+      .filter(ss => ss.packageId === s.packageId && ss.date > oldDate && ss.id !== id)
+      .sort((a,b) => a.date.localeCompare(b.date));
+    futureSessions.forEach(ss => {
+      const fi = db.sessions.findIndex(x=>x.id===ss.id);
+      const newD = new Date(ss.date+'T12:00:00');
+      newD.setDate(newD.getDate() + dateDiff);
+      db.sessions[fi].date = newD.toISOString().split('T')[0];
+      db.sessions[fi].time = time;
+    });
   }
 
-  const idx = db.sessions.findIndex(s=>s.id===id);
-  db.sessions[idx] = {...db.sessions[idx], date, status, notes, category};
   saveDB(db);
   closeModal();
   renderSessions();
-  showToast('✅ Sessão atualizada!');
+  showToast(propagate ? '✅ Sessão e futuras atualizadas!' : '✅ Sessão atualizada!');
 }
 
 function markSessionCompleted(id) {
   const db = getDB();
-  const s = db.sessions.find(s=>s.id===id);
-  if (!s) return;
-  const pkg = db.packages.find(p=>p.id===s.packageId);
-  const stats = pkgStats(pkg);
-  if (stats.isExhausted) { showToast('❌ Pacote já esgotado!', true); return; }
   const idx = db.sessions.findIndex(s=>s.id===id);
-  db.sessions[idx].status = 'completed';
+  db.sessions[idx].status = 'realizada';
   saveDB(db);
   renderSessions();
   showToast('✅ Sessão marcada como realizada!');
+}
+
+function statusBadgeClass(s) {
+  if (s==='realizada'||s==='completed') return 'badge-realizada';
+  if (s==='falta') return 'badge-falta';
+  return 'badge-agendada';
+}
+function statusLabel(s) {
+  if (s==='realizada'||s==='completed') return '✅ Realizada';
+  if (s==='falta') return '❌ Falta';
+  return '📅 Agendada';
 }
 
 function deleteSessionConfirm(id) {
@@ -1191,74 +1317,180 @@ function deleteSessionDo(id) {
 }
 
 // ═══════════════════════════════════════════════════
-// AGENDA
+// AGENDA — CALENDAR VIEW
 // ═══════════════════════════════════════════════════
+let calView = 'month'; // 'month' | 'week'
+let calDate = new Date();
+
 function renderAgenda() {
   const db = getDB();
   document.getElementById('topbar-actions').innerHTML = `<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
-
-  const sorted = [...db.sessions].sort((a,b)=>a.date.localeCompare(b.date));
-
-  // Group by date
-  const groups = {};
-  sorted.forEach(s => {
-    if (!groups[s.date]) groups[s.date] = [];
-    groups[s.date].push(s);
-  });
-
-  const todayStr = today();
-
-  const html = `<div class="page">
-    <div class="tabs">
-      <button class="tab active" id="tab-all" onclick="agendaTab('all')">Todas</button>
-      <button class="tab" id="tab-upcoming" onclick="agendaTab('upcoming')">Próximas</button>
-      <button class="tab" id="tab-past" onclick="agendaTab('past')">Passadas</button>
-    </div>
-    <div id="agenda-content">
-    ${Object.keys(groups).length === 0
-      ? `<div class="card"><div class="empty"><div class="empty-icon">🗓️</div><p>Nenhuma sessão na agenda</p></div></div>`
-      : Object.entries(groups).map(([date, sessions]) => {
-          const isToday = date === todayStr;
-          const isPast = date < todayStr;
-          const d = new Date(date + 'T12:00:00');
-          const weekday = d.toLocaleDateString('pt-BR',{weekday:'long'});
-          const dateLabel = isToday ? '📍 Hoje' : `${weekday.charAt(0).toUpperCase()+weekday.slice(1)}, ${fmtDate(date)}`;
-          return `<div class="agenda-day" data-date="${date}">
-            <div class="agenda-day-title">${dateLabel}</div>
-            ${sessions.map(s=>{
-              const barColor = catColor(s.category);
-              return `<div class="agenda-item">
-                <div class="agenda-item-left" style="background:${barColor}"></div>
-                <div style="flex:1">
-                  <div class="agenda-item-name">${clientName(s.clientId)}</div>
-                  <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap">
-                    <span class="badge ${catBadgeClass(s.category)}" style="font-size:10px">${catLabelShort(s.category)}</span>
-                    <span class="agenda-item-pkg">${pkgName(s.packageId)}${s.notes?` · ${s.notes}`:''}</span>
-                  </div>
-                </div>
-                <span class="badge ${s.status==='completed'?'badge-green':isPast?'badge-red':'badge-gray'}">
-                  ${s.status==='completed'?'Realizada':isPast?'Não realizada':'Pendente'}
-                </span>
-              </div>`;
-            }).join('')}
-          </div>`;
-        }).join('')}
-    </div>
-  </div>`;
-
-  document.getElementById('page-content').innerHTML = html;
+  renderCalendar();
 }
 
-window.agendaTab = function(tab) {
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById(`tab-${tab}`).classList.add('active');
+function renderCalendar() {
+  const container = document.getElementById('page-content');
+  const viewLabel = calView === 'month'
+    ? calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).replace(/^\w/,c=>c.toUpperCase())
+    : (() => {
+        const mon = getWeekStart(calDate);
+        const sun = new Date(mon); sun.setDate(sun.getDate()+6);
+        return `${fmtDate(mon.toISOString().split('T')[0])} – ${fmtDate(sun.toISOString().split('T')[0])}`;
+      })();
+
+  const html = `<div class="page">
+    <div class="cal-header">
+      <div class="cal-nav">
+        <button onclick="calNav(-1)">‹</button>
+        <button onclick="calGoToday()">Hoje</button>
+        <button onclick="calNav(1)">›</button>
+        <span class="cal-title" style="margin-left:8px">${viewLabel}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="setCalView('month')" class="btn ${calView==='month'?'btn-primary':'btn-secondary'} btn-sm">Mês</button>
+        <button onclick="setCalView('week')" class="btn ${calView==='week'?'btn-primary':'btn-secondary'} btn-sm">Semana</button>
+      </div>
+    </div>
+    <div id="cal-body">${calView==='month' ? renderMonthGrid() : renderWeekGrid()}</div>
+  </div>`;
+  container.innerHTML = html;
+}
+
+function getWeekStart(d) {
+  const dt = new Date(d);
+  const day = dt.getDay(); // 0=sun
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  return dt;
+}
+
+function renderMonthGrid() {
+  const db = getDB();
   const todayStr = today();
-  document.querySelectorAll('.agenda-day').forEach(el=>{
-    const date = el.dataset.date;
-    if (tab === 'all') el.style.display='';
-    else if (tab === 'upcoming') el.style.display = date >= todayStr ? '' : 'none';
-    else if (tab === 'past') el.style.display = date < todayStr ? '' : 'none';
-  });
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month+1, 0);
+  // Start on Monday
+  let startDay = firstDay.getDay(); // 0=sun
+  startDay = startDay === 0 ? 6 : startDay - 1;
+
+  const days = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  let html = `<div class="cal-grid">`;
+  days.forEach(d => html += `<div class="cal-day-header">${d}</div>`);
+
+  // Prev month fill
+  for (let i = 0; i < startDay; i++) {
+    const d = new Date(year, month, 1 - startDay + i);
+    html += renderMonthDay(d, db, todayStr, true);
+  }
+  // Current month
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dt = new Date(year, month, d);
+    html += renderMonthDay(dt, db, todayStr, false);
+  }
+  // Next month fill
+  const total = startDay + lastDay.getDate();
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 1; i <= remaining; i++) {
+    const d = new Date(year, month+1, i);
+    html += renderMonthDay(d, db, todayStr, true);
+  }
+  html += `</div>`;
+  return html;
+}
+
+function renderMonthDay(dt, db, todayStr, otherMonth) {
+  const dateStr = dt.toISOString().split('T')[0];
+  const isToday = dateStr === todayStr;
+  const sessions = db.sessions.filter(s => s.date === dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const extra = sessions.length > 3 ? sessions.length - 3 : 0;
+  return `<div class="cal-day ${otherMonth?'other-month':''} ${isToday?'today':''}" onclick="calDayClick('${dateStr}')">
+    <div class="cal-day-num">${dt.getDate()}</div>
+    ${sessions.slice(0,3).map(s=>`
+      <div class="cal-event ${s.category||'psicoterapia'} status-${s.status}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
+        ${s.time?s.time+' ':''} ${clientName(s.clientId)}
+      </div>`).join('')}
+    ${extra > 0 ? `<div style="font-size:10px;color:var(--text3);padding:1px 4px">+${extra} mais</div>` : ''}
+  </div>`;
+}
+
+function renderWeekGrid() {
+  const db = getDB();
+  const todayStr = today();
+  const mon = getWeekStart(calDate);
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon);
+    d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+  const dayNames = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const hours = [];
+  for (let h = 7; h <= 21; h++) hours.push(h);
+
+  let html = `<div class="week-grid">
+    <div class="cal-day-header" style="background:var(--bg3)"></div>
+    ${days.map((d,i) => {
+      const ds = d.toISOString().split('T')[0];
+      const isToday = ds === todayStr;
+      return `<div class="week-header ${isToday?'today':''}">
+        <div class="wh-day">${dayNames[i]}</div>
+        <div class="wh-num">${d.getDate()}</div>
+      </div>`;
+    }).join('')}
+    ${hours.map(h => `
+      <div class="week-time">${h}:00</div>
+      ${days.map(d => {
+        const ds = d.toISOString().split('T')[0];
+        const hStr = h < 10 ? '0'+h : ''+h;
+        const sessions = db.sessions.filter(s => s.date === ds && (s.time||'').startsWith(hStr));
+        return `<div class="week-cell" onclick="calDayClick('${ds}')">
+          ${sessions.map(s=>`
+            <div class="cal-event ${s.category||'psicoterapia'} status-${s.status}" style="margin:1px 0" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
+              ${clientName(s.clientId)}
+            </div>`).join('')}
+        </div>`;
+      }).join('')}
+    `).join('')}
+  </div>`;
+  return html;
+}
+
+window.setCalView = function(v) { calView = v; renderCalendar(); };
+window.calNav = function(dir) {
+  if (calView === 'month') {
+    calDate.setMonth(calDate.getMonth() + dir);
+  } else {
+    calDate.setDate(calDate.getDate() + dir * 7);
+  }
+  renderCalendar();
+};
+window.calGoToday = function() { calDate = new Date(); renderCalendar(); };
+window.calDayClick = function(dateStr) {
+  // Show day sessions in a modal
+  const db = getDB();
+  const sessions = db.sessions.filter(s=>s.date===dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const html = sessions.length === 0
+    ? `<div class="empty" style="padding:20px"><p>Nenhuma sessão neste dia</p></div>
+       <div style="text-align:center;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionFormDate('${dateStr}')">+ Agendar sessão aqui</button></div>`
+    : sessions.map(s=>`
+      <div class="agenda-item" style="margin-bottom:8px">
+        <div class="agenda-item-left" style="background:${catColor(s.category)}"></div>
+        <div style="flex:1">
+          <div class="agenda-item-name">${clientName(s.clientId)}</div>
+          <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;align-items:center">
+            <span class="badge ${catBadgeClass(s.category)}" style="font-size:10px">${catLabelShort(s.category)}</span>
+            <span style="font-size:12px;color:var(--text2)">${s.time||''} · ${pkgName(s.packageId)}</span>
+          </div>
+        </div>
+        <span class="badge ${statusBadgeClass(s.status)}">${statusLabel(s.status)}</span>
+        <button class="btn-icon" onclick="closeModal();showSessionEditForm('${s.id}')">✏️</button>
+      </div>`).join('') +
+    `<div style="text-align:right;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-primary btn-sm" onclick="closeModal();showSessionFormDate('${dateStr}')">+ Agendar neste dia</button>
+    </div>`;
+  showModal(`📅 ${fmtDate(dateStr)}`, html);
 };
 
 // ═══════════════════════════════════════════════════
