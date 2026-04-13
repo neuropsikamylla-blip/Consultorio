@@ -288,39 +288,165 @@ select option{background:var(--bg3);}
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// STORAGE
+// SUPABASE CONFIG
 // ═══════════════════════════════════════════════════════════════
-const DB_KEY = 'consultorio_v2';
+const SUPA_URL = 'https://zrjrzorspfnohjzzykog.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanJ6b3JzcGZub2hqenp5a29nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTA4NTIsImV4cCI6MjA5MTY2Njg1Mn0.Y8vDMSqzV9IosWMltnA8j5zTZYRXB_OjUsIhdSdq-HI';
 const AUTH_KEY = 'consultorio_auth';
+const CREDS_KEY = 'consultorio_creds';
+
+async function supaFetch(method, table, body=null, query='') {
+  const url = `${SUPA_URL}/rest/v1/${table}${query}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method==='POST' ? 'return=representation' : method==='PATCH'||method==='DELETE' ? 'return=representation' : ''
+    },
+    body: body ? JSON.stringify(body) : null
+  });
+  if (!res.ok) { const e = await res.text(); console.error('Supabase error:', e); return null; }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// Local cache for speed
+let _cache = null;
+
+function getCreds() {
+  const raw = localStorage.getItem(CREDS_KEY);
+  if (raw) return JSON.parse(raw);
+  return {email:'admin@admin.com', password:'1234', name:'Profissional'};
+}
+function saveCreds(c) { localStorage.setItem(CREDS_KEY, JSON.stringify(c)); }
 
 function getDB() {
+  // Return cache or empty
+  return _cache || { clients:[], packages:[], sessions:[] };
+}
+
+async function loadFromSupabase() {
+  showLoadingOverlay(true);
   try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (!raw) return defaultDB();
-    return JSON.parse(raw);
-  } catch { return defaultDB(); }
+    const [clients, packages, sessions] = await Promise.all([
+      supaFetch('GET', 'clients', null, '?order=name'),
+      supaFetch('GET', 'packages', null, '?order=created_at'),
+      supaFetch('GET', 'sessions', null, '?order=date,time')
+    ]);
+    _cache = {
+      clients: clients||[],
+      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status})),
+      sessions: (sessions||[]).map(s=>({...s, clientId:s.client_id, packageId:s.package_id, intervalDays:s.interval_days}))
+    };
+  } catch(e) {
+    console.error('Load error:', e);
+    _cache = _cache || { clients:[], packages:[], sessions:[] };
+  }
+  showLoadingOverlay(false);
+  return _cache;
 }
-function defaultDB() {
-  return { clients:[], packages:[], sessions:[], credentials:{email:'admin@admin.com',password:'1234',name:'Profissional'} };
+
+function showLoadingOverlay(show) {
+  let el = document.getElementById('loading-overlay');
+  if (show && !el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(15,17,23,0.7);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;';
+    el.innerHTML = '<div style="text-align:center"><div style="font-size:28px;margin-bottom:12px">🔄</div><div style="color:var(--text2);font-size:14px">Sincronizando dados...</div></div>';
+    document.body.appendChild(el);
+  } else if (!show && el) {
+    el.remove();
+  }
 }
-function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function today() { return new Date().toISOString().split('T')[0]; }
+
+// ── CRUD OPERATIONS ──────────────────────────────────────────
+async function dbAddClient(data) {
+  const row = { id:genId(), ...data, created_at:new Date().toISOString() };
+  await supaFetch('POST', 'clients', row);
+  await loadFromSupabase();
+  return row;
+}
+async function dbUpdateClient(id, data) {
+  await supaFetch('PATCH', 'clients', data, `?id=eq.${id}`);
+  await loadFromSupabase();
+}
+async function dbDeleteClient(id) {
+  await supaFetch('DELETE', 'clients', null, `?id=eq.${id}`);
+  await loadFromSupabase();
+}
+
+async function dbAddPackage(data) {
+  const row = { id:genId(), client_id:data.clientId, name:data.name, total_sessions:data.totalSessions, price:data.price, payment_status:data.paymentStatus||'pending', created_at:new Date().toISOString() };
+  await supaFetch('POST', 'packages', row);
+  await loadFromSupabase();
+  return row;
+}
+async function dbUpdatePackage(id, data) {
+  const row = {};
+  if(data.name) row.name=data.name;
+  if(data.totalSessions) row.total_sessions=data.totalSessions;
+  if(data.price!==undefined) row.price=data.price;
+  if(data.paymentStatus) row.payment_status=data.paymentStatus;
+  if(data.clientId) row.client_id=data.clientId;
+  await supaFetch('PATCH', 'packages', row, `?id=eq.${id}`);
+  await loadFromSupabase();
+}
+async function dbDeletePackage(id) {
+  await supaFetch('DELETE', 'packages', null, `?id=eq.${id}`);
+  await loadFromSupabase();
+}
+
+async function dbAddSession(data) {
+  const row = { id:genId(), client_id:data.clientId, package_id:data.packageId, date:data.date, time:data.time||null, status:data.status||'agendada', category:data.category||'psicoterapia', notes:data.notes||null, interval_days:data.intervalDays||null, created_at:new Date().toISOString() };
+  await supaFetch('POST', 'sessions', row);
+  await loadFromSupabase();
+  return row;
+}
+async function dbAddSessionsBatch(sessions) {
+  const rows = sessions.map(s=>({ id:genId(), client_id:s.clientId, package_id:s.packageId, date:s.date, time:s.time||null, status:'agendada', category:s.category||'psicoterapia', notes:'', interval_days:s.intervalDays||null, created_at:new Date().toISOString() }));
+  await supaFetch('POST', 'sessions', rows);
+  await loadFromSupabase();
+}
+async function dbUpdateSession(id, data) {
+  const row = {};
+  if(data.date) row.date=data.date;
+  if(data.time!==undefined) row.time=data.time;
+  if(data.status) row.status=data.status;
+  if(data.notes!==undefined) row.notes=data.notes;
+  if(data.category) row.category=data.category;
+  await supaFetch('PATCH', 'sessions', row, `?id=eq.${id}`);
+  await loadFromSupabase();
+}
+async function dbUpdateSessionsBatch(updates) {
+  // Update each session individually
+  await Promise.all(updates.map(u => supaFetch('PATCH','sessions',u.data,`?id=eq.${u.id}`)));
+  await loadFromSupabase();
+}
+async function dbDeleteSession(id) {
+  await supaFetch('DELETE', 'sessions', null, `?id=eq.${id}`);
+  await loadFromSupabase();
+}
 
 // ═══════════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════════
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
-  const db = getDB();
+  const creds = getCreds();
   const err = document.getElementById('login-error');
-  if (email === db.credentials.email && pass === db.credentials.password) {
+  if (email === creds.email && pass === creds.password) {
     localStorage.setItem(AUTH_KEY,'1');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='flex';
-    document.getElementById('sidebar-user-name').textContent=db.credentials.name;
+    document.getElementById('sidebar-user-name').textContent=creds.name;
     err.style.display='none';
+    await loadFromSupabase();
     navigate('dashboard');
   } else { err.style.display='flex'; }
 }
@@ -333,8 +459,8 @@ document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key===
 if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
-  document.getElementById('sidebar-user-name').textContent=getDB().credentials.name;
-  setTimeout(()=>navigate('dashboard'),10);
+  document.getElementById('sidebar-user-name').textContent=getCreds().name;
+  loadFromSupabase().then(()=>navigate('dashboard'));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -467,7 +593,6 @@ function showToast(msg,error=false){
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════
 function renderDashboard(){
-  checkBackupReminder();
   const db=getDB();
   const totalClients=db.clients.length;
   const totalDone=db.sessions.filter(s=>s.status==='realizada'||s.status==='completed').length;
@@ -569,15 +694,15 @@ function showClientForm(id=null){
     </div>`);
 }
 
-function saveClient(id){
+async function saveClient(id){
   const name=document.getElementById('cf-name').value.trim();
   const err=document.getElementById('cf-error');
   if(!name){err.textContent='Nome é obrigatório';err.style.display='flex';return;}
-  const db=getDB();
-  const data={name,phone:document.getElementById('cf-phone').value.trim(),email:document.getElementById('cf-email').value.trim(),notes:document.getElementById('cf-notes').value.trim()};
-  if(id){const idx=db.clients.findIndex(c=>c.id===id);db.clients[idx]={...db.clients[idx],...data};}
-  else db.clients.push({id:genId(),createdAt:new Date().toISOString(),...data});
-  saveDB(db);closeModal();renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
+  const data={name,phone:document.getElementById('cf-phone').value.trim()||null,email:document.getElementById('cf-email').value.trim()||null,notes:document.getElementById('cf-notes').value.trim()||null};
+  closeModal();
+  if(id){await dbUpdateClient(id,data);}
+  else{await dbAddClient(data);}
+  renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
 }
 
 function deleteClientConfirm(id){
@@ -589,12 +714,10 @@ function deleteClientConfirm(id){
       <button class="btn btn-danger" onclick="deleteClientDo('${id}')">Excluir</button>
     </div>`);
 }
-function deleteClientDo(id){
-  const db=getDB();
-  db.clients=db.clients.filter(c=>c.id!==id);
-  db.packages=db.packages.filter(p=>p.clientId!==id);
-  db.sessions=db.sessions.filter(s=>s.clientId!==id);
-  saveDB(db);closeModal();renderClients();showToast('🗑️ Cliente excluído');
+async function deleteClientDo(id){
+  closeModal();
+  await dbDeleteClient(id);
+  renderClients();showToast('🗑️ Cliente excluído');
 }
 
 function showClientDetail(id){
@@ -643,8 +766,8 @@ function showClientDetail(id){
     <div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>${sessHTML}`,true);
 }
 
-function deleteSessionFromDetail(sessionId,clientId){
-  const db=getDB();db.sessions=db.sessions.filter(s=>s.id!==sessionId);saveDB(db);showToast('🗑️ Sessão removida');showClientDetail(clientId);
+async function deleteSessionFromDetail(sessionId,clientId){
+  await dbDeleteSession(sessionId);showToast('🗑️ Sessão removida');showClientDetail(clientId);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -725,7 +848,7 @@ function showPackageForm(clientId=null,pkgId=null){
     </div>`);
 }
 
-function savePackage(id){
+async function savePackage(id){
   const clientId=document.getElementById('pf-client').value;
   const name=document.getElementById('pf-name').value.trim();
   const totalSessions=parseInt(document.getElementById('pf-sessions').value);
@@ -734,49 +857,50 @@ function savePackage(id){
   const err=document.getElementById('pf-error');
   if(!name||!totalSessions||isNaN(price)){err.textContent='Preencha todos os campos obrigatórios';err.style.display='flex';return;}
   if(totalSessions<1){err.textContent='Sessões deve ser maior que 0';err.style.display='flex';return;}
-  // Validate first date for new packages
   if(!id){
     const fd=document.getElementById('pf-first-date')?.value;
-    if(!fd){err.textContent='Informe a data da 1ª sessão para gerar o agendamento automático';err.style.display='flex';return;}
+    if(!fd){err.textContent='Informe a data da 1ª sessão';err.style.display='flex';return;}
   }
   const db=getDB();
+  closeModal();
   if(id){
     const st=pkgStats(db.packages.find(p=>p.id===id));
-    if(totalSessions<st.used){err.textContent=`Não pode reduzir abaixo de ${st.used} (já realizadas)`;err.style.display='flex';return;}
-    const idx=db.packages.findIndex(p=>p.id===id);
-    db.packages[idx]={...db.packages[idx],clientId,name,totalSessions,price,paymentStatus};
+    if(totalSessions<st.used){showToast(`Não pode reduzir abaixo de ${st.used}`,true);return;}
+    await dbUpdatePackage(id,{clientId,name,totalSessions,price,paymentStatus});
+    showToast('✅ Pacote atualizado!');
   } else {
-    const newPkg={id:genId(),createdAt:new Date().toISOString(),clientId,name,totalSessions,price,paymentStatus};
-    db.packages.push(newPkg);
-    // Auto-generate sessions
     const firstDate=document.getElementById('pf-first-date')?.value;
     const time=document.getElementById('pf-time')?.value||'09:00';
     const interval=parseInt(document.getElementById('pf-interval')?.value||'7');
     const category=document.getElementById('pf-category')?.value||'psicoterapia';
-    if(firstDate){
-      for(let i=0;i<totalSessions;i++){
-        const d=new Date(firstDate+'T12:00:00');
-        d.setDate(d.getDate()+i*interval);
-        db.sessions.push({id:genId(),createdAt:new Date().toISOString(),clientId,packageId:newPkg.id,date:d.toISOString().split('T')[0],time,status:'agendada',notes:'',category,intervalDays:interval});
-      }
+    const newPkg=await dbAddPackage({clientId,name,totalSessions,price,paymentStatus});
+    // Auto-generate sessions in batch
+    const sessionsList=[];
+    for(let i=0;i<totalSessions;i++){
+      const d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+i*interval);
+      sessionsList.push({clientId,packageId:newPkg.id,date:d.toISOString().split('T')[0],time,category,intervalDays:interval});
     }
+    await dbAddSessionsBatch(sessionsList);
+    showToast(`✅ Pacote criado com ${totalSessions} sessões!`);
   }
-  saveDB(db);closeModal();renderPackages();showToast(id?'✅ Pacote atualizado!':`✅ Pacote criado com ${totalSessions} sessões!`);
+  renderPackages();
 }
 
-function togglePayment(id){
-  const db=getDB();const idx=db.packages.findIndex(p=>p.id===id);
-  db.packages[idx].paymentStatus=db.packages[idx].paymentStatus==='paid'?'pending':'paid';
-  saveDB(db);renderPackages();showToast('✅ Pagamento atualizado!');
+async function togglePayment(id){
+  const db=getDB();const pkg=db.packages.find(p=>p.id===id);
+  const newStatus=pkg.paymentStatus==='paid'?'pending':'paid';
+  await dbUpdatePackage(id,{paymentStatus:newStatus});
+  renderPackages();showToast('✅ Pagamento atualizado!');
 }
 function deletePackageConfirm(id){
   const p=getDB().packages.find(p=>p.id===id);
   showModal('Excluir Pacote',`<div class="alert alert-red">⚠️ Excluir <strong>${p.name}</strong> e todas as sessões?</div>
     <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="deletePackageDo('${id}')">Excluir</button></div>`);
 }
-function deletePackageDo(id){
-  const db=getDB();db.packages=db.packages.filter(p=>p.id!==id);db.sessions=db.sessions.filter(s=>s.packageId!==id);
-  saveDB(db);closeModal();renderPackages();showToast('🗑️ Pacote excluído');
+async function deletePackageDo(id){
+  closeModal();
+  await dbDeletePackage(id);
+  renderPackages();showToast('🗑️ Pacote excluído');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -855,7 +979,7 @@ window.updatePkgOpts=function(forceId=null){
   if(warn){const ae=pkgs.length>0&&pkgs.every(p=>pkgStats(p).isExhausted);warn.style.display=ae?'flex':'none';if(ae)warn.textContent='⚠️ Todos os pacotes estão esgotados.';}
 };
 
-function saveSession(){
+async function saveSession(){
   const clientId=document.getElementById('sf-client').value;
   const packageId=document.getElementById('sf-package').value;
   const date=document.getElementById('sf-date').value;
@@ -867,9 +991,11 @@ function saveSession(){
   if(!clientId||!packageId||!date){err.textContent='Preencha todos os campos';err.style.display='flex';return;}
   const db=getDB();const pkg=db.packages.find(p=>p.id===packageId);
   const st=pkgStats(pkg);
-  if(!st.canAdd){err.textContent=`Pacote esgotado!`;err.style.display='flex';return;}
-  db.sessions.push({id:genId(),createdAt:new Date().toISOString(),clientId,packageId,date,time,status,notes,category});
-  saveDB(db);closeModal();renderSessions();showToast('✅ Sessão registrada!');
+  if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
+  closeModal();
+  await dbAddSession({clientId,packageId,date,time,status,notes,category});
+  if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
+  showToast('✅ Sessão registrada!');
 }
 
 function showSessionEditForm(id){
@@ -909,7 +1035,7 @@ function showSessionEditForm(id){
     </div>`);
 }
 
-function saveSessionEdit(id){
+async function saveSessionEdit(id){
   const date=document.getElementById('se-date').value;
   const time=document.getElementById('se-time').value;
   const status=document.getElementById('se-status').value;
@@ -918,28 +1044,23 @@ function saveSessionEdit(id){
   const propagate=document.getElementById('se-propagate')?.checked||false;
   const err=document.getElementById('se-error');
   if(!date){err.textContent='Data é obrigatória';err.style.display='flex';return;}
-  // Confirm falta
-  const db0=getDB();const s0=db0.sessions.find(ss=>ss.id===id);
-  if(status==='falta'&&s0&&s0.status!=='falta'){
-    if(!window.confirm('Confirmar falta para esta sessão? Isso será registrado no histórico do paciente.')){return;}
-  }
   const db=getDB();
   const s=db.sessions.find(ss=>ss.id===id);
-  const oldDate=s.date;
-  const idx=db.sessions.findIndex(ss=>ss.id===id);
-  db.sessions[idx]={...db.sessions[idx],date,time,status,notes,category};
-  if(propagate&&date!==oldDate){
-    const diff=(new Date(date+'T12:00:00')-new Date(oldDate+'T12:00:00'))/(1000*60*60*24);
-    db.sessions.filter(ss=>ss.packageId===s.packageId&&ss.date>oldDate&&ss.id!==id)
-      .sort((a,b)=>a.date.localeCompare(b.date))
-      .forEach(ss=>{
-        const fi=db.sessions.findIndex(x=>x.id===ss.id);
-        const nd=new Date(ss.date+'T12:00:00');nd.setDate(nd.getDate()+diff);
-        db.sessions[fi].date=nd.toISOString().split('T')[0];
-        db.sessions[fi].time=time;
-      });
+  if(status==='falta'&&s&&s.status!=='falta'){
+    if(!window.confirm('Confirmar falta para esta sessão?')){return;}
   }
-  saveDB(db);closeModal();
+  closeModal();
+  await dbUpdateSession(id,{date,time,status,notes,category});
+  if(propagate&&date!==s.date){
+    const diff=(new Date(date+'T12:00:00')-new Date(s.date+'T12:00:00'))/(1000*60*60*24);
+    const futures=db.sessions.filter(ss=>ss.packageId===s.packageId&&ss.date>s.date&&ss.id!==id).sort((a,b)=>a.date.localeCompare(b.date));
+    if(futures.length>0){
+      await dbUpdateSessionsBatch(futures.map(ss=>{
+        const nd=new Date(ss.date+'T12:00:00');nd.setDate(nd.getDate()+diff);
+        return{id:ss.id,data:{date:nd.toISOString().split('T')[0],time}};
+      }));
+    }
+  }
   if(currentPage==='sessions')renderSessions();
   else if(currentPage==='agenda')renderCalendar();
   showToast(propagate?'✅ Sessão e futuras atualizadas!':'✅ Sessão atualizada!');
@@ -949,8 +1070,9 @@ function deleteSessionConfirm(id){
   showModal('Excluir Sessão',`<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p>
     <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="deleteSessionDo('${id}')">Excluir</button></div>`);
 }
-function deleteSessionDo(id){
-  const db=getDB();db.sessions=db.sessions.filter(s=>s.id!==id);saveDB(db);closeModal();
+async function deleteSessionDo(id){
+  closeModal();
+  await dbDeleteSession(id);
   if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
   showToast('🗑️ Sessão excluída');
 }
@@ -1190,8 +1312,8 @@ function renderFinancial(){
     </div>
   </div>`;
 }
-window.markPaid=function(id){const db=getDB();const i=db.packages.findIndex(p=>p.id===id);db.packages[i].paymentStatus='paid';saveDB(db);renderFinancial();showToast('✅ Pago!');};
-window.markPending=function(id){const db=getDB();const i=db.packages.findIndex(p=>p.id===id);db.packages[i].paymentStatus='pending';saveDB(db);renderFinancial();showToast('↩️ Revertido');};
+window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pago!');};
+window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido');};
 
 // ═══════════════════════════════════════════════════════════════
 // SETTINGS
@@ -1228,7 +1350,7 @@ function renderSettings(){
 }
 
 function saveSettings(){
-  const db=getDB();
+  const creds=getCreds();
   const name=document.getElementById('st-name').value.trim();
   const email=document.getElementById('st-email').value.trim();
   const current=document.getElementById('st-current').value;
@@ -1238,12 +1360,13 @@ function saveSettings(){
   err.style.display='none';ok.style.display='none';
   if(!name||!email){err.textContent='Nome e email obrigatórios';err.style.display='flex';return;}
   if(!current){err.textContent='Digite a senha atual';err.style.display='flex';return;}
-  if(current!==db.credentials.password){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
+  if(current!==creds.password){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
   if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
   if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
-  db.credentials.name=name;db.credentials.email=email;
-  if(np)db.credentials.password=np;
-  saveDB(db);document.getElementById('sidebar-user-name').textContent=name;
+  creds.name=name;creds.email=email;
+  if(np)creds.password=np;
+  saveCreds(creds);
+  document.getElementById('sidebar-user-name').textContent=name;
   ok.textContent='✅ Salvo!';ok.style.display='flex';
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
 }
@@ -1258,9 +1381,15 @@ function resetAllData(){
       <button class="btn btn-danger" onclick="doResetAll()">Apagar Tudo</button>
     </div>`);
 }
-function doResetAll(){
+async function doResetAll(){
   if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}
-  const db=getDB();db.clients=[];db.packages=[];db.sessions=[];saveDB(db);closeModal();navigate('dashboard');showToast('Dados apagados');
+  closeModal();
+  // Delete all from Supabase
+  await supaFetch('DELETE','sessions',null,'?id=neq.none');
+  await supaFetch('DELETE','packages',null,'?id=neq.none');
+  await supaFetch('DELETE','clients',null,'?id=neq.none');
+  await loadFromSupabase();
+  navigate('dashboard');showToast('Dados apagados');
 }
 </script>
 </body>
