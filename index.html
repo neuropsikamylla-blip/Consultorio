@@ -1009,9 +1009,16 @@ function buildMonthDay(dt,db,todayStr,other){
   const extra=sessions.length-3;
   return`<div class="month-day ${other?'other':''} ${isToday?'today':''}" onclick="dayClick('${ds}')">
     <div class="month-day-num">${dt.getDate()}</div>
-    ${show.map(s=>`<span class="cal-chip ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':s.status==='realizada'?'realizada':''}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
-      ${s.time?s.time.slice(0,5)+' ':''}${clientName(s.clientId)}
-    </span>`).join('')}
+    ${show.map(s=>{
+      const db=getDB();
+      const pkg=db.packages.find(p=>p.id===s.packageId);
+      const pkgSessions=pkg?db.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
+      const sessNum=pkgSessions.findIndex(ss=>ss.id===s.id)+1;
+      const total=pkg?pkg.totalSessions:0;
+      const label=pkg?`${clientName(s.clientId)} ${sessNum}/${total}`:`${clientName(s.clientId)}`;
+      return`<span class="cal-chip ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':s.status==='realizada'?'realizada':''}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
+        ${s.time?s.time.slice(0,5)+' ':''}${label}
+      </span>`;}).join('')}
     ${extra>0?`<div class="cal-more">+${extra} mais</div>`:''}
   </div>`;
 }
@@ -1052,7 +1059,14 @@ function buildWeekGrid(db,todayStr){
       const hStr=String(h).padStart(2,'0');
       const sessions=db.sessions.filter(s=>s.date===ds&&(s.time||'').startsWith(hStr));
       html+=`<div class="week-cell" onclick="dayClick('${ds}')">
-        ${sessions.map(s=>`<span class="week-event ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':''}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">${clientName(s.clientId)}</span>`).join('')}
+        ${sessions.map(s=>{
+        const db2=getDB();
+        const pkg2=db2.packages.find(p=>p.id===s.packageId);
+        const pkgSess2=pkg2?db2.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
+        const n2=pkgSess2.findIndex(ss=>ss.id===s.id)+1;
+        const t2=pkg2?pkg2.totalSessions:0;
+        const lbl2=pkg2?`${clientName(s.clientId)} ${n2}/${t2}`:clientName(s.clientId);
+        return`<span class="week-event ${s.category||'psicoterapia'} ${s.status==='falta'?'falta':''}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">${lbl2}</span>`;}).join('')}
       </div>`;
     });
     html+=`</div>`;
