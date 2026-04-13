@@ -937,8 +937,14 @@ async function savePackage(id){
     const fd=document.getElementById('pf-first-date')?.value;
     if(!fd){err.textContent='Informe a data da 1ª sessão';err.style.display='flex';return;}
   }
+  // Read ALL form values BEFORE closing modal
+  const firstDate = document.getElementById('pf-first-date')?.value || '';
+  const time = document.getElementById('pf-time')?.value || '09:00';
+  const interval = parseInt(document.getElementById('pf-interval')?.value || '7');
+  const category = document.getElementById('pf-category')?.value || 'psicoterapia';
+
   const db=getDB();
-  closeModal();
+  closeModal(); // only close AFTER reading all values
 
   if(id){
     const st=pkgStats(db.packages.find(p=>p.id===id));
@@ -948,12 +954,6 @@ async function savePackage(id){
     renderPackages();
     return;
   }
-
-  // NEW PACKAGE — create package then sessions
-  const firstDate=document.getElementById('pf-first-date').value;
-  const time=document.getElementById('pf-time')?.value||'09:00';
-  const interval=parseInt(document.getElementById('pf-interval')?.value||'7');
-  const category=document.getElementById('pf-category')?.value||'psicoterapia';
 
   // Show progress toast
   showToast('⏳ Criando pacote e sessões...');
