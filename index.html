@@ -26,6 +26,12 @@
   --blue: #60a5fa;
   --blue-bg: rgba(96,165,250,0.12);
   --radius: 14px;
+  --cat-psico: #60a5fa;
+  --cat-psico-bg: rgba(96,165,250,0.12);
+  --cat-reab: #a78bfa;
+  --cat-reab-bg: rgba(167,139,250,0.12);
+  --cat-aval: #34d98a;
+  --cat-aval-bg: rgba(52,217,138,0.12);
   --radius-sm: 9px;
   --shadow: 0 4px 32px rgba(0,0,0,0.4);
 }
@@ -134,6 +140,10 @@ select option{background:var(--bg3);}
 .modal-close:hover{background:var(--bg3);color:var(--text);}
 .modal-body{padding:24px;}
 
+.badge-psico{background:var(--cat-psico-bg);color:var(--cat-psico);border:1px solid rgba(96,165,250,0.25);}
+.badge-reab{background:var(--cat-reab-bg);color:var(--cat-reab);border:1px solid rgba(167,139,250,0.25);}
+.badge-aval{background:var(--cat-aval-bg);color:var(--cat-aval);border:1px solid rgba(52,217,138,0.25);}
+
 /* PROGRESS BAR */
 .progress-bar{height:6px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:8px;}
 .progress-fill{height:100%;border-radius:99px;transition:width 0.4s ease;}
@@ -220,13 +230,13 @@ select option{background:var(--bg3);}
       <p>Área restrita — faça seu login</p>
     </div>
     <div class="login-hint">
-      Acesso padrão: <strong><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0c6d686165624c6f63627f796078637e6563226f6361">[email&#160;protected]</a></strong> / <strong>1234</strong><br>
+      Acesso padrão: <strong>admin@admin.com</strong> / <strong>1234</strong><br>
       <small style="font-size:11px;margin-top:4px;display:block;">Você pode alterar nas configurações depois.</small>
     </div>
     <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
     <div class="form-group">
       <label>Email</label>
-      <input type="email" id="login-email" placeholder="seu@email.com" value="admin@consultorio.com"/>
+      <input type="email" id="login-email" placeholder="seu@email.com" value="admin@admin.com"/>
     </div>
     <div class="form-group">
       <label>Senha</label>
@@ -301,7 +311,7 @@ const AUTH_KEY = 'consultorio_auth';
 
 function getDB() {
   const raw = localStorage.getItem(DB_KEY);
-  if (!raw) return { clients:[], packages:[], sessions:[], credentials:{email:'admin@consultorio.com',password:'1234',name:'Profissional'} };
+  if (!raw) return { clients:[], packages:[], sessions:[], credentials:{email:'admin@admin.com',password:'1234',name:'Profissional'} };
   return JSON.parse(raw);
 }
 
@@ -962,14 +972,15 @@ function renderSessions() {
     ${sorted.length === 0
       ? `<div class="card"><div class="empty"><div class="empty-icon">📅</div><p>Nenhuma sessão registrada</p><small>Clique em "Nova Sessão" para adicionar</small></div></div>`
       : `<div class="card"><div class="table-wrap"><table>
-          <thead><tr><th>Data</th><th>Cliente</th><th>Pacote</th><th>Status</th><th>Notas</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Data</th><th>Cliente</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Notas</th><th>Ações</th></tr></thead>
           <tbody>
           ${sorted.map(s=>`<tr>
             <td><strong>${fmtDate(s.date)}</strong></td>
             <td>${clientName(s.clientId)}</td>
+            <td><span class="badge ${catBadgeClass(s.category)}">${catLabelShort(s.category)}</span></td>
             <td class="td-muted">${pkgName(s.packageId)}</td>
             <td><span class="badge ${s.status==='completed'?'badge-green':'badge-yellow'}">${s.status==='completed'?'✅ Realizada':'⏳ Pendente'}</span></td>
-            <td class="td-muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes||'—'}</td>
+            <td class="td-muted" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.notes||'—'}</td>
             <td>
               <div style="display:flex;gap:6px">
                 ${s.status==='pending'?`<button class="btn-icon" title="Marcar realizada" onclick="markSessionCompleted('${s.id}')">✅</button>`:''}
@@ -1001,6 +1012,14 @@ function showSessionForm(preClientId=null) {
     <div class="form-group">
       <label>Pacote *</label>
       <select id="sf-package"><option value="">Selecione o cliente primeiro...</option></select>
+    </div>
+    <div class="form-group">
+      <label>Categoria *</label>
+      <select id="sf-category">
+        <option value="psicoterapia">🔵 Psicoterapia</option>
+        <option value="reabilitacao">🟣 Reabilitação</option>
+        <option value="avaliacao">🟢 Avaliação</option>
+      </select>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="${today()}"/></div>
@@ -1055,6 +1074,7 @@ function saveSession() {
   const date = document.getElementById('sf-date').value;
   const status = document.getElementById('sf-status').value;
   const notes = document.getElementById('sf-notes').value.trim();
+  const category = document.getElementById('sf-category').value;
   const err = document.getElementById('sf-error');
 
   if (!clientId || !packageId || !date) {
@@ -1073,7 +1093,7 @@ function saveSession() {
     err.textContent='Pacote já esgotado! Não é possível adicionar sessão realizada.'; err.style.display='flex'; return;
   }
 
-  db.sessions.push({id:genId(), createdAt:new Date().toISOString(), clientId, packageId, date, status, notes});
+  db.sessions.push({id:genId(), createdAt:new Date().toISOString(), clientId, packageId, date, status, notes, category});
   saveDB(db);
   closeModal();
   renderSessions();
@@ -1086,6 +1106,14 @@ function showSessionEditForm(id) {
   if (!s) return;
 
   showModal('Editar Sessão', `
+    <div class="form-group">
+      <label>Categoria</label>
+      <select id="se-category">
+        <option value="psicoterapia" ${(s.category||'psicoterapia')==='psicoterapia'?'selected':''}>🔵 Psicoterapia</option>
+        <option value="reabilitacao" ${s.category==='reabilitacao'?'selected':''}>🟣 Reabilitação</option>
+        <option value="avaliacao" ${s.category==='avaliacao'?'selected':''}>🟢 Avaliação</option>
+      </select>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Data *</label><input type="date" id="se-date" value="${s.date}"/></div>
       <div class="form-group">
@@ -1108,6 +1136,7 @@ function saveSessionEdit(id) {
   const date = document.getElementById('se-date').value;
   const status = document.getElementById('se-status').value;
   const notes = document.getElementById('se-notes').value.trim();
+  const category = document.getElementById('se-category').value;
   const err = document.getElementById('se-error');
   if (!date) { err.textContent='Data é obrigatória'; err.style.display='flex'; return; }
 
@@ -1122,7 +1151,7 @@ function saveSessionEdit(id) {
   }
 
   const idx = db.sessions.findIndex(s=>s.id===id);
-  db.sessions[idx] = {...db.sessions[idx], date, status, notes};
+  db.sessions[idx] = {...db.sessions[idx], date, status, notes, category};
   saveDB(db);
   closeModal();
   renderSessions();
@@ -1197,14 +1226,17 @@ function renderAgenda() {
           return `<div class="agenda-day" data-date="${date}">
             <div class="agenda-day-title">${dateLabel}</div>
             ${sessions.map(s=>{
-              const color = s.status==='completed' ? 'var(--green)' : isPast ? 'var(--red)' : 'var(--blue)';
+              const barColor = catColor(s.category);
               return `<div class="agenda-item">
-                <div class="agenda-item-left" style="background:${color}"></div>
+                <div class="agenda-item-left" style="background:${barColor}"></div>
                 <div style="flex:1">
                   <div class="agenda-item-name">${clientName(s.clientId)}</div>
-                  <div class="agenda-item-pkg">${pkgName(s.packageId)}${s.notes?` · ${s.notes}`:''}</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap">
+                    <span class="badge ${catBadgeClass(s.category)}" style="font-size:10px">${catLabelShort(s.category)}</span>
+                    <span class="agenda-item-pkg">${pkgName(s.packageId)}${s.notes?` · ${s.notes}`:''}</span>
+                  </div>
                 </div>
-                <span class="badge ${s.status==='completed'?'badge-green':isPast?'badge-red':'badge-blue'}">
+                <span class="badge ${s.status==='completed'?'badge-green':isPast?'badge-red':'badge-gray'}">
                   ${s.status==='completed'?'Realizada':isPast?'Não realizada':'Pendente'}
                 </span>
               </div>`;
@@ -1319,6 +1351,32 @@ window.markPending = function(id) {
 };
 
 // ═══════════════════════════════════════════════════
+
+
+function catColor(cat) {
+  if (!cat || cat === 'psicoterapia') return 'var(--cat-psico)';
+  if (cat === 'reabilitacao') return 'var(--cat-reab)';
+  if (cat === 'avaliacao') return 'var(--cat-aval)';
+  return 'var(--blue)';
+}
+function catBadgeClass(cat) {
+  if (!cat || cat === 'psicoterapia') return 'badge-psico';
+  if (cat === 'reabilitacao') return 'badge-reab';
+  if (cat === 'avaliacao') return 'badge-aval';
+  return 'badge-blue';
+}
+function catLabel(cat) {
+  if (!cat || cat === 'psicoterapia') return '🔵 Psicoterapia';
+  if (cat === 'reabilitacao') return '🟣 Reabilitação';
+  if (cat === 'avaliacao') return '🟢 Avaliação';
+  return cat;
+}
+function catLabelShort(cat) {
+  if (!cat || cat === 'psicoterapia') return 'Psicoterapia';
+  if (cat === 'reabilitacao') return 'Reabilitação';
+  if (cat === 'avaliacao') return 'Avaliação';
+  return cat;
+}
 
 // SETTINGS
 function renderSettings() {
