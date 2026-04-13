@@ -249,7 +249,7 @@ select option{background:var(--bg3);}
     <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
     <div class="form-group"><label>Email</label><input type="email" id="login-email" value="admin@admin.com" placeholder="seu@email.com"/></div>
     <div class="form-group"><label>Senha</label><input type="password" id="login-pass" value="1234" placeholder="••••••"/></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="(async()=>{await doLogin();})()">Entrar →</button>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="doLogin()">Entrar →</button>
   </div>
 </div>
 
@@ -436,7 +436,7 @@ async function dbDeleteSession(id) {
 // ═══════════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════════
-async function doLogin() {
+function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
   const creds = getCreds();
@@ -448,22 +448,23 @@ async function doLogin() {
     document.getElementById('sidebar-user-name').textContent=creds.name;
     err.style.display='none';
     navigate('dashboard');
-    // Load data after showing app (non-blocking)
-    loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>navigate('dashboard'));
-  } else { err.style.display='flex'; }
+    setTimeout(()=>loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>{}), 100);
+  } else {
+    err.style.display='flex';
+  }
 }
 function doLogout() {
   localStorage.removeItem(AUTH_KEY);
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
 }
-document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')(async()=>{await doLogin();})();});
+document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('sidebar-user-name').textContent=getCreds().name;
   navigate('dashboard');
-  loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>{});
+  setTimeout(()=>loadFromSupabase().then(()=>navigate('dashboard')).catch(()=>{}), 100);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -577,12 +578,11 @@ function importBackup(){document.getElementById('import-file').click();}
 function loadBackupFile(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=(ev)=>{
+  reader.onload=async(ev)=>{
     try{
       const data=JSON.parse(ev.target.result);
       if(!data.clients||!data.packages||!data.sessions)throw new Error();
       showToast('⏳ Restaurando backup na nuvem...');
-      // Push all data to Supabase
       for(const c of data.clients){
         await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()}).catch(()=>{});
       }
