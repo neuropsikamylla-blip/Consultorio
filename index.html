@@ -396,12 +396,9 @@ async function dbDeleteClient(id) {
 
 async function dbAddPackage(data) {
   const row = { id:genId(), client_id:data.clientId, name:data.name, total_sessions:data.totalSessions, price:data.price, payment_status:data.paymentStatus||'pending', created_at:new Date().toISOString() };
-  console.log('Creating package:', row);
   const result = await supaFetch('POST', 'packages', row);
-  console.log('Package result:', result);
-  // Always use our generated id since we set it
-  await loadFromSupabase();
-  return row; // row.id is reliable since we generated it
+  // Don't reload here - let caller reload after sessions are created
+  return row;
 }
 async function dbUpdatePackage(id, data) {
   const row = {};
@@ -425,8 +422,6 @@ async function dbAddSession(data) {
   return row;
 }
 async function dbAddSessionsBatch(sessions) {
-  console.log('Inserting', sessions.length, 'sessions...');
-  let ok = 0, fail = 0;
   for(const s of sessions) {
     const row = {
       id: genId(),
@@ -440,16 +435,9 @@ async function dbAddSessionsBatch(sessions) {
       interval_days: s.intervalDays || null,
       created_at: new Date().toISOString()
     };
-    console.log('Inserting session:', row.date, 'pkg:', row.package_id);
-    const result = await supaFetch('POST', 'sessions', row);
-    if(result && (Array.isArray(result) ? result.length > 0 : result.id)) {
-      ok++;
-    } else {
-      fail++;
-      console.error('Failed session insert, result:', result);
-    }
+    await supaFetch('POST', 'sessions', row);
   }
-  console.log('Sessions done:', ok, 'ok,', fail, 'failed');
+  // Reload once after all sessions inserted
   await loadFromSupabase();
 }
 async function dbUpdateSession(id, data) {
@@ -934,12 +922,19 @@ async function savePackage(id){
     const newPkg=await dbAddPackage({clientId,name,totalSessions,price,paymentStatus});
     // Auto-generate sessions in batch
     const sessionsList=[];
-    console.log('Package created:', newPkg);
+    // Generate all session dates
     for(let i=0;i<totalSessions;i++){
-      const d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+i*interval);
-      sessionsList.push({clientId,packageId:newPkg.id,date:d.toISOString().split('T')[0],time,category,intervalDays:interval});
+      const d=new Date(firstDate+'T12:00:00');
+      d.setDate(d.getDate()+(i*interval));
+      sessionsList.push({
+        clientId: clientId,
+        packageId: newPkg.id,
+        date: d.toISOString().split('T')[0],
+        time: time,
+        category: category,
+        intervalDays: interval
+      });
     }
-    console.log('Creating sessions:', sessionsList.length, 'packageId:', newPkg.id);
     await dbAddSessionsBatch(sessionsList);
     showToast(`✅ Pacote criado com ${totalSessions} sessões!`);
   }
