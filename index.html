@@ -264,7 +264,7 @@ select option{background:var(--bg3);}
       <p>Área restrita — faça seu login</p>
     </div>
     <div class="login-hint">
-      Acesso padrão: <strong>admin@admin.com</strong> / <strong>1234</strong><br>
+      Acesso padrão: <strong><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2b4a4f4642456b4a4f46424505484446">[email&#160;protected]</a></strong> / <strong>1234</strong><br>
       <small style="font-size:11px;margin-top:4px;display:block;">Você pode alterar nas configurações depois.</small>
     </div>
     <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
@@ -336,7 +336,7 @@ select option{background:var(--bg3);}
 <div id="modal-container"></div>
 <input type="file" id="import-file" accept=".json" style="display:none" onchange="loadBackupFile(event)"/>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ═══════════════════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════════════════
@@ -1371,48 +1371,43 @@ function renderMonthGrid() {
   const month = calDate.getMonth();
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month+1, 0);
-  // Start on Monday
-  let startDay = firstDay.getDay(); // 0=sun
+  let startDay = firstDay.getDay();
   startDay = startDay === 0 ? 6 : startDay - 1;
-
-  const days = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
-  let html = `<div class="cal-grid">`;
-  days.forEach(d => html += `<div class="cal-day-header">${d}</div>`);
-
-  // Prev month fill
+  const dayNames = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  let html = "<div class=\"cal-grid\">";
+  dayNames.forEach(function(d) { html += "<div class=\"cal-day-header\">" + d + "</div>"; });
   for (let i = 0; i < startDay; i++) {
-    const d = new Date(year, month, 1 - startDay + i);
-    html += renderMonthDay(d, db, todayStr, true);
+    html += renderMonthDay(new Date(year, month, 1 - startDay + i), db, todayStr, true);
   }
-  // Current month
   for (let d = 1; d <= lastDay.getDate(); d++) {
-    const dt = new Date(year, month, d);
-    html += renderMonthDay(dt, db, todayStr, false);
+    html += renderMonthDay(new Date(year, month, d), db, todayStr, false);
   }
-  // Next month fill
   const total = startDay + lastDay.getDate();
   const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
   for (let i = 1; i <= remaining; i++) {
-    const d = new Date(year, month+1, i);
-    html += renderMonthDay(d, db, todayStr, true);
+    html += renderMonthDay(new Date(year, month+1, i), db, todayStr, true);
   }
-  html += `</div>`;
+  html += "</div>";
   return html;
 }
 
 function renderMonthDay(dt, db, todayStr, otherMonth) {
-  const dateStr = dt.toISOString().split('T')[0];
+  const dateStr = dt.toISOString().split("T")[0];
   const isToday = dateStr === todayStr;
-  const sessions = db.sessions.filter(s => s.date === dateStr).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const sessions = db.sessions.filter(s => s.date === dateStr).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
   const extra = sessions.length > 3 ? sessions.length - 3 : 0;
-  return `<div class="cal-day ${otherMonth?'other-month':''} ${isToday?'today':''}" onclick="calDayClick('${dateStr}')">
-    <div class="cal-day-num">${dt.getDate()}</div>
-    ${sessions.slice(0,3).map(s=>`
-      <div class="cal-event ${s.category||'psicoterapia'} status-${s.status}" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
-        ${s.time?s.time+' ':''} ${clientName(s.clientId)}
-      </div>`).join('')}
-    ${extra > 0 ? `<div style="font-size:10px;color:var(--text3);padding:1px 4px">+${extra} mais</div>` : ''}
-  </div>`;
+  let cls = "cal-day" + (otherMonth?" other-month":"") + (isToday?" today":"");
+  let out = "<div class=\"" + cls + "\" onclick=\"calDayClick('" + dateStr + "')\">";
+  out += "<div class=\"cal-day-num\">" + dt.getDate() + "</div>";
+  sessions.slice(0,3).forEach(function(s) {
+    const cat = s.category || "psicoterapia";
+    out += "<div class=\"cal-event " + cat + " status-" + s.status + "\" onclick=\"event.stopPropagation();showSessionEditForm('" + s.id + "')\">";
+    out += (s.time ? s.time + " " : "") + clientName(s.clientId);
+    out += "</div>";
+  });
+  if (extra > 0) out += "<div style=\"font-size:10px;color:var(--text3);padding:1px 4px\">+" + extra + " mais</div>";
+  out += "</div>";
+  return out;
 }
 
 function renderWeekGrid() {
@@ -1421,39 +1416,39 @@ function renderWeekGrid() {
   const mon = getWeekStart(calDate);
   const days = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(mon);
-    d.setDate(d.getDate() + i);
-    days.push(d);
+    const d = new Date(mon); d.setDate(d.getDate() + i); days.push(d);
   }
-  const dayNames = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const dayNames = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
   const hours = [];
   for (let h = 7; h <= 21; h++) hours.push(h);
 
-  let html = `<div class="week-grid">
-    <div class="cal-day-header" style="background:var(--bg3)"></div>
-    ${days.map((d,i) => {
-      const ds = d.toISOString().split('T')[0];
-      const isToday = ds === todayStr;
-      return `<div class="week-header ${isToday?'today':''}">
-        <div class="wh-day">${dayNames[i]}</div>
-        <div class="wh-num">${d.getDate()}</div>
-      </div>`;
-    }).join('')}
-    ${hours.map(h => `
-      <div class="week-time">${h}:00</div>
-      ${days.map(d => {
-        const ds = d.toISOString().split('T')[0];
-        const hStr = h < 10 ? '0'+h : ''+h;
-        const sessions = db.sessions.filter(s => s.date === ds && (s.time||'').startsWith(hStr));
-        return `<div class="week-cell" onclick="calDayClick('${ds}')">
-          ${sessions.map(s=>`
-            <div class="cal-event ${s.category||'psicoterapia'} status-${s.status}" style="margin:1px 0" onclick="event.stopPropagation();showSessionEditForm('${s.id}')">
-              ${clientName(s.clientId)}
-            </div>`).join('')}
-        </div>`;
-      }).join('')}
-    `).join('')}
-  </div>`;
+  let html = "<div class=\"week-grid\">";
+  html += "<div class=\"cal-day-header\" style=\"background:var(--bg3)\"></div>";
+  days.forEach(function(d, i) {
+    const ds = d.toISOString().split("T")[0];
+    const tc = ds === todayStr ? " today" : "";
+    html += "<div class=\"week-header" + tc + "\">";
+    html += "<div class=\"wh-day\">" + dayNames[i] + "</div>";
+    html += "<div class=\"wh-num\">" + d.getDate() + "</div>";
+    html += "</div>";
+  });
+  hours.forEach(function(h) {
+    const hStr = (h < 10 ? "0" : "") + h;
+    html += "<div class=\"week-time\">" + h + ":00</div>";
+    days.forEach(function(d) {
+      const ds = d.toISOString().split("T")[0];
+      const sess = db.sessions.filter(s => s.date === ds && (s.time||"").startsWith(hStr));
+      html += "<div class=\"week-cell\" onclick=\"calDayClick('" + ds + "')\">";
+      sess.forEach(function(s) {
+        const cat = s.category || "psicoterapia";
+        html += "<div class=\"cal-event " + cat + " status-" + s.status + "\" style=\"margin:1px 0\" onclick=\"event.stopPropagation();showSessionEditForm('" + s.id + "')\">";
+        html += clientName(s.clientId);
+        html += "</div>";
+      });
+      html += "</div>";
+    });
+  });
+  html += "</div>";
   return html;
 }
 
@@ -1689,15 +1684,4 @@ function doResetAll() {
   const db = getDB();
   db.clients = []; db.packages = []; db.sessions = [];
   saveDB(db);
-  closeModal();
-  navigate('dashboard');
-  showToast('Todos os dados foram apagados');
-}
-
-// INIT
-if (!localStorage.getItem(AUTH_KEY)) {
-  document.getElementById('login-screen').style.display = 'flex';
-}
-</script>
-</body>
-</html>
+  cl
