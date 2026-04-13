@@ -301,7 +301,7 @@ function getDB() {
   } catch { return defaultDB(); }
 }
 function defaultDB() {
-  return { clients:[], packages:[], sessions:[], credentials:{email:'admin@admin.com',password:btoa(unescape(encodeURIComponent('1234'))),name:'Profissional'} };
+  return { clients:[], packages:[], sessions:[], credentials:{email:'admin@admin.com',password:'1234',name:'Profissional'} };
 }
 function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -310,19 +310,12 @@ function today() { return new Date().toISOString().split('T')[0]; }
 // ═══════════════════════════════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════════════════════════════
-function hashPass(p) { return btoa(unescape(encodeURIComponent(p))); }
 function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-pass').value;
   const db = getDB();
   const err = document.getElementById('login-error');
-  const storedPass = db.credentials.password;
-  // Support both plain (legacy) and hashed passwords
-  const isHashed = storedPass && storedPass.length > 8 && storedPass !== '1234' && !/^[0-9]{1,6}$/.test(storedPass);
-  const passMatch = isHashed ? hashPass(pass) === storedPass : pass === storedPass;
-  if (email === db.credentials.email && passMatch) {
-    // Migrate plaintext password to hashed on successful login
-    if(!isHashed){ db.credentials.password=hashPass(pass); saveDB(db); }
+  if (email === db.credentials.email && pass === db.credentials.password) {
     localStorage.setItem(AUTH_KEY,'1');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='flex';
@@ -1242,7 +1235,7 @@ function saveSettings(){
   if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
   if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
   db.credentials.name=name;db.credentials.email=email;
-  if(np)db.credentials.password=hashPass(np);
+  if(np)db.credentials.password=np;
   saveDB(db);document.getElementById('sidebar-user-name').textContent=name;
   ok.textContent='✅ Salvo!';ok.style.display='flex';
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
