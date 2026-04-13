@@ -342,8 +342,8 @@ async function loadFromSupabase() {
     ]);
     _cache = {
       clients: clients||[],
-      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status})),
-      sessions: (sessions||[]).map(s=>({...s, clientId:s.client_id, packageId:s.package_id, intervalDays:s.interval_days}))
+      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status, createdAt:p.created_at})),
+      sessions: (sessions||[]).map(s=>({...s, clientId:s.client_id, packageId:s.package_id, intervalDays:s.interval_days, createdAt:s.created_at}))
     };
   } catch(e) {
     console.error('Load error:', e);
@@ -391,9 +391,11 @@ async function dbDeleteClient(id) {
 
 async function dbAddPackage(data) {
   const row = { id:genId(), client_id:data.clientId, name:data.name, total_sessions:data.totalSessions, price:data.price, payment_status:data.paymentStatus||'pending', created_at:new Date().toISOString() };
-  await supaFetch('POST', 'packages', row);
+  const result = await supaFetch('POST', 'packages', row);
+  // Return the row with confirmed id (use result if available, fallback to row)
+  const savedPkg = (Array.isArray(result) && result[0]) ? result[0] : row;
   await loadFromSupabase();
-  return row;
+  return savedPkg;
 }
 async function dbUpdatePackage(id, data) {
   const row = {};
@@ -418,7 +420,14 @@ async function dbAddSession(data) {
 }
 async function dbAddSessionsBatch(sessions) {
   const rows = sessions.map(s=>({ id:genId(), client_id:s.clientId, package_id:s.packageId, date:s.date, time:s.time||null, status:'agendada', category:s.category||'psicoterapia', notes:'', interval_days:s.intervalDays||null, created_at:new Date().toISOString() }));
-  await supaFetch('POST', 'sessions', rows);
+  // Try batch insert first, fall back to individual inserts
+  const batchResult = await supaFetch('POST', 'sessions', rows);
+  if(!batchResult) {
+    // Fallback: insert one by one
+    for(const row of rows) {
+      await supaFetch('POST', 'sessions', row);
+    }
+  }
   await loadFromSupabase();
 }
 async function dbUpdateSession(id, data) {
@@ -903,6 +912,7 @@ async function savePackage(id){
     const newPkg=await dbAddPackage({clientId,name,totalSessions,price,paymentStatus});
     // Auto-generate sessions in batch
     const sessionsList=[];
+    const pkgId = newPkg.id || newPkg.client_id; // safety fallback
     for(let i=0;i<totalSessions;i++){
       const d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+i*interval);
       sessionsList.push({clientId,packageId:newPkg.id,date:d.toISOString().split('T')[0],time,category,intervalDays:interval});
