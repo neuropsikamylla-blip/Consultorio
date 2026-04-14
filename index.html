@@ -4,7 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Gestão do Consultório</title>
-<!-- San Francisco (Apple) + fallback stack -->
 <style>
 :root {
   --bg: #0f1117;
@@ -334,7 +333,6 @@ function getCreds() {
 function saveCreds(c) { localStorage.setItem(CREDS_KEY, JSON.stringify(c)); }
 
 function getDB() {
-  // Return cache or empty
   return _cache || { clients:[], packages:[], sessions:[] };
 }
 
@@ -354,7 +352,6 @@ async function loadFromSupabase() {
   } catch(e) {
     console.error('Load error:', e);
     _cache = _cache || { clients:[], packages:[], sessions:[] };
-    // Show subtle error only if we have no data at all
     if(!_cache.clients.length) {
       showToast('⚠️ Sem conexão com o servidor. Tente novamente.', true);
     }
@@ -383,7 +380,6 @@ function genId() {
 }
 function today() {
   const now = new Date();
-  // Use local device date — works correctly on iPhone/MacBook in Brazil
   const y = now.getFullYear();
   const m = String(now.getMonth()+1).padStart(2,'0');
   const d = String(now.getDate()).padStart(2,'0');
@@ -409,7 +405,6 @@ async function dbDeleteClient(id) {
 async function dbAddPackage(data) {
   const row = { id:genId(), client_id:data.clientId, name:data.name, total_sessions:data.totalSessions, price:data.price, payment_status:data.paymentStatus||'pending', created_at:new Date().toISOString() };
   const result = await supaFetch('POST', 'packages', row);
-  // Don't reload here - let caller reload after sessions are created
   return row;
 }
 async function dbUpdatePackage(id, data) {
@@ -421,7 +416,6 @@ async function dbUpdatePackage(id, data) {
   if(data.clientId) row.client_id=data.clientId;
   if(data.notes!==undefined) row.notes=data.notes;
   await supaFetch('PATCH', 'packages', row, `?id=eq.${id}`);
-  // If time change requested, update future sessions
   if(data.newTime) {
     const today2 = today();
     await supaFetch('PATCH', 'sessions', {time: data.newTime}, `?package_id=eq.${id}&date=gte.${today2}&status=eq.agendada`);
@@ -448,7 +442,6 @@ async function dbAddSessionsBatch(sessions) {
     'Prefer': 'return=minimal'
   };
 
-  // Insert each session sequentially with unique IDs
   for(let i = 0; i < sessions.length; i++) {
     const s = sessions[i];
     const row = {
@@ -478,7 +471,6 @@ async function dbAddSessionsBatch(sessions) {
     }
   }
 
-  // Reload ONCE after all done
   await loadFromSupabase();
 }
 async function dbUpdateSession(id, data) {
@@ -492,7 +484,6 @@ async function dbUpdateSession(id, data) {
   await loadFromSupabase();
 }
 async function dbUpdateSessionsBatch(updates) {
-  // Update each session individually
   await Promise.all(updates.map(u => supaFetch('PATCH','sessions',u.data,`?id=eq.${u.id}`)));
   await loadFromSupabase();
 }
@@ -527,13 +518,11 @@ function doLogout() {
   document.getElementById('login-screen').style.display='flex';
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-// auto-login handled at bottom
 
 // ═══════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 let currentPage='dashboard';
-// Check if backup reminder needed
 function checkBackupReminder(){
   const last=localStorage.getItem('last_backup_reminder');
   const now=Date.now();
@@ -555,7 +544,6 @@ function checkBackupReminder(){
 
 function navigate(page) {
   currentPage=page; closeSidebar();
-  // Reset main padding
   const main=document.querySelector('.main');
   if(main) main.style.padding = page==='agenda' ? '20px 16px' : '28px 32px';
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
@@ -682,9 +670,7 @@ function showToast(msg,error=false){
 // ═══════════════════════════════════════════════════════════════
 function renderDashboard(){
   const db=getDB();
-  // If no data and online, try to reload
   if(!db.clients.length && !db.packages.length && navigator.onLine) {
-    // Show reload option after 1s
     setTimeout(()=>{
       const el = document.getElementById('dash-reload-btn');
       if(el) el.style.display='inline-flex';
@@ -822,11 +808,12 @@ function showClientDetail(id){
   const db=getDB();const c=db.clients.find(c=>c.id===id);if(!c)return;
   const pkgs=db.packages.filter(p=>p.clientId===id);
   const sessions=db.sessions.filter(s=>s.clientId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  // ✅ BUG 2 FIXED: removed backslash before $ in ${paymentLabel(...)}
   const pkgsHTML=pkgs.length===0?`<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>`
     :pkgs.map(p=>{const st=pkgStats(p);const bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';
       return`<div class="package-card"><div class="package-header">
         <div><strong>${p.name}</strong>${st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':''}</div>
-        <span class="badge ${paymentBadgeClass(p.paymentStatus)}">\${paymentLabel(p.paymentStatus)}</span>
+        <span class="badge ${paymentBadgeClass(p.paymentStatus)}">${paymentLabel(p.paymentStatus)}</span>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">${p.totalSessions}</strong></span>
@@ -900,7 +887,6 @@ function showPackageForm(clientId=null,pkgId=null){
   const db=getDB();const pkg=pkgId?db.packages.find(p=>p.id===pkgId):null;
   if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
   const isNew=!pkgId;
-  // Get current package time from its sessions
   const pkgTime = pkgId ? (db.sessions.find(s=>s.packageId===pkgId)?.time||'09:00') : '09:00';
   showModal(pkgId?'Editar Pacote':'Novo Pacote',`
     <div class="form-group"><label>Cliente *</label>
@@ -959,7 +945,6 @@ function showPackageForm(clientId=null,pkgId=null){
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="window._savePkg()">Salvar</button>
     </div>`);
-  // Set global save function for this modal
   const _pkgId = pkgId || '';
   window._savePkg = async function() { await savePackage(_pkgId); };
 }
@@ -983,11 +968,12 @@ async function savePackage(id){
   const interval = parseInt(document.getElementById('pf-interval')?.value || '7');
   const category = document.getElementById('pf-category')?.value || 'psicoterapia';
 
-  const db=getDB();
-  closeModal(); // only close AFTER reading all values
+  // ✅ BUG 1 FIXED: removed duplicate `const db` declaration — use getDB() directly below
+  closeModal();
 
   if(id){
-    const st=pkgStats(db.packages.find(p=>p.id===id));
+    const currentDb = getDB();
+    const st=pkgStats(currentDb.packages.find(p=>p.id===id));
     if(totalSessions<st.used){showToast('Não pode reduzir abaixo das já realizadas',true);return;}
     const editTime = document.getElementById('pf-edit-time')?.value;
     const propagateTime = document.getElementById('pf-propagate-time')?.checked;
@@ -1036,13 +1022,13 @@ async function savePackage(id){
   }
 
   // Step 2: Check for scheduling conflicts
-  const db = getDB();
+  const dbForConflicts = getDB();
   const conflicts = [];
   for(let i = 0; i < totalSessions; i++){
     const d = new Date(firstDate + 'T12:00:00');
     d.setDate(d.getDate() + (i * interval));
     const dateStr = d.toISOString().split('T')[0];
-    const conflict = db.sessions.find(s => s.date === dateStr && s.time === time && s.clientId !== clientId);
+    const conflict = dbForConflicts.sessions.find(s => s.date === dateStr && s.time === time && s.clientId !== clientId);
     if(conflict) conflicts.push({ date: fmtDate(dateStr), client: clientName(conflict.clientId) });
   }
   if(conflicts.length > 0) {
@@ -1091,7 +1077,7 @@ async function savePackage(id){
     }
   }
 
-  // Step 3: Reload and show result
+  // Step 4: Reload and show result
   await loadFromSupabase();
   renderPackages();
   
@@ -1145,7 +1131,7 @@ function showProntuario(clientId) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div>
           <div style="font-weight:700;font-size:14px">${pkgLabel}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${paymentBadgeClass(pkg.paymentStatus)}">\${paymentLabel(pkg.paymentStatus)}</span></div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${paymentBadgeClass(pkg.paymentStatus)}">${paymentLabel(pkg.paymentStatus)}</span></div>
         </div>
       </div>
       <textarea
@@ -1170,9 +1156,7 @@ window.saveProntuario = async function(pkgId) {
   showToast('✅ Prontuário salvo!');
 };
 
-// Quick status change - click on badge to cycle status
 window.quickStatusMenu = function(sessionId, el) {
-  // Remove any existing menu
   document.querySelectorAll('.quick-status-menu').forEach(m => m.remove());
 
   const menu = document.createElement('div');
@@ -1203,13 +1187,11 @@ window.quickStatusMenu = function(sessionId, el) {
     menu.appendChild(item);
   });
 
-  // Position menu near the badge
   const rect = el.getBoundingClientRect();
   menu.style.top = (rect.bottom + 4) + 'px';
   menu.style.left = rect.left + 'px';
   document.body.appendChild(menu);
 
-  // Close on outside click
   setTimeout(() => {
     document.addEventListener('click', function handler(e) {
       if(!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', handler); }
@@ -1357,7 +1339,6 @@ async function saveSession(){
   const db=getDB();const pkg=db.packages.find(p=>p.id===packageId);
   const st=pkgStats(pkg);
   if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
-  // Check time conflict
   if(time && date) {
     const conflict = db.sessions.find(s => s.date === date && s.time === time && s.clientId !== clientId);
     if(conflict) {
@@ -1421,9 +1402,7 @@ async function saveSessionEdit(id){
   if(status==='falta'&&s&&s.status!=='falta'){
     if(!window.confirm('Confirmar falta para esta sessão?')){return;}
   }
-  // Check conflict on reschedule
-  const dbCheck = getDB();
-  const conflictEdit = dbCheck.sessions.find(s => s.date === date && s.time === time && s.clientId !== dbCheck.sessions.find(ss=>ss.id===id)?.clientId && s.id !== id);
+  const conflictEdit = db.sessions.find(s => s.date === date && s.time === time && s.clientId !== db.sessions.find(ss=>ss.id===id)?.clientId && s.id !== id);
   if(conflictEdit) {
     if(!window.confirm(`⚠️ Já existe um atendimento com ${clientName(conflictEdit.clientId)} às ${time} do dia ${fmtDate(date)}. Deseja reagendar mesmo assim?`)) return;
   }
@@ -1463,7 +1442,6 @@ let calDate=new Date();
 
 function renderAgenda(){
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
-  // Wider layout for agenda
   document.querySelector('.main').style.padding='20px 16px';
   renderCalendar();
 }
@@ -1472,7 +1450,6 @@ function renderCalendar(){
   const db=getDB();
   const todayStr=today();
 
-  // Title
   let title='';
   if(calView==='month'){
     title=calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -1523,14 +1500,11 @@ function buildMonthGrid(db,todayStr){
   const days=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
   let html=`<div class="month-grid">`;
   days.forEach(d=>html+=`<div class="month-header">${d}</div>`);
-  // prev month
   for(let i=0;i<startDow;i++){
     const d=new Date(year,month,1-startDow+i);
     html+=buildMonthDay(d,db,todayStr,true);
   }
-  // current
   for(let d=1;d<=last.getDate();d++)html+=buildMonthDay(new Date(year,month,d),db,todayStr,false);
-  // next
   const total=startDow+last.getDate();
   const rem=total%7===0?0:7-(total%7);
   for(let i=1;i<=rem;i++)html+=buildMonthDay(new Date(year,month+1,i),db,todayStr,true);
@@ -1546,9 +1520,9 @@ function buildMonthDay(dt,db,todayStr,other){
   return`<div class="month-day ${other?'other':''} ${isToday?'today':''}" onclick="dayClick('${ds}')">
     <div class="month-day-num">${dt.getDate()}</div>
     ${show.map(s=>{
-      const db=getDB();
-      const pkg=db.packages.find(p=>p.id===s.packageId);
-      const pkgSessions=pkg?db.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
+      const db2=getDB();
+      const pkg=db2.packages.find(p=>p.id===s.packageId);
+      const pkgSessions=pkg?db2.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
       const sessNum=pkgSessions.findIndex(ss=>ss.id===s.id)+1;
       const total=pkg?pkg.totalSessions:0;
       const nameParts=clientName(s.clientId).split(' ');
@@ -1569,7 +1543,6 @@ function buildWeekGrid(db,todayStr){
   const hours=[];for(let h=7;h<=21;h++)hours.push(h);
 
   let html=`<div style="overflow-x:auto"><div style="min-width:600px">`;
-  // Header row
   html+=`<div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border)">`;
   html+=`<div style="border-right:1px solid var(--border)"></div>`;
   weekDays.forEach((d,i)=>{
@@ -1582,14 +1555,12 @@ function buildWeekGrid(db,todayStr){
   });
   html+=`</div>`;
 
-  // Time rows
   html+=`<div class="week-wrap">`;
   html+=`<div class="week-time-col">`;
   hours.forEach(h=>html+=`<div class="week-time-cell">${h}:00</div>`);
   html+=`</div>`;
 
   html+=`<div class="week-days" style="grid-template-columns:repeat(7,1fr)">`;
-  // Headers spacer
   weekDays.forEach((d,i)=>{
     const ds=d.toISOString().split('T')[0];
     html+=`<div style="grid-row:span ${hours.length}">`;
@@ -1766,7 +1737,6 @@ function resetAllData(){
 async function doResetAll(){
   if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}
   closeModal();
-  // Delete all from Supabase
   await supaFetch('DELETE','sessions',null,'?id=neq.none');
   await supaFetch('DELETE','packages',null,'?id=neq.none');
   await supaFetch('DELETE','clients',null,'?id=neq.none');
@@ -1774,7 +1744,7 @@ async function doResetAll(){
   navigate('dashboard');showToast('Dados apagados');
 }
 
-// ── AUTO LOGIN CHECK (must be at end after all functions defined) ──
+// ── AUTO LOGIN CHECK ──
 if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
