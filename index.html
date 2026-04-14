@@ -1320,7 +1320,7 @@ function renderSessions(){
             <span class="badge ${bc}" style="cursor:pointer" onclick="quickStatusMenu('${s.id}',this)">${bl}</span>
           </div>
         </td>
-        ${isPaidPerSession ? `<td><span class="badge ${s.sessionPaid?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="toggleSessionPaid('${s.id}')">${s.sessionPaid?'💰 Pago':'⏳ A pagar'}</span></td>` : '<td></td>'}
+        ${isPaidPerSession ? `<td><span class="badge ${s.sessionPaid?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="(async()=>{await toggleSessionPaid('${s.id}');})()">${s.sessionPaid?'💰 Pago':'⏳ A pagar'}</span></td>` : '<td></td>'}
         <td><div style="display:flex;gap:4px">
           <button class="btn-icon" onclick="showSessionEditForm('${s.id}')">✏️</button>
           <button class="btn-icon" onclick="deleteSessionConfirm('${s.id}')">🗑️</button>
