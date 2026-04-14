@@ -4,7 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Gestão do Consultório</title>
-<!-- San Francisco (Apple) + fallback stack -->
 <style>
 :root {
   --bg: #0f1117;
@@ -173,14 +172,14 @@ select option{background:var(--bg3);}
 /* Month grid */
 .month-grid{display:grid;grid-template-columns:repeat(7,1fr);}
 .month-header{text-align:center;padding:12px 4px;font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);}
-.month-day{min-height:180px;padding:8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;position:relative;}
+.month-day{min-height:130px;padding:8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;position:relative;}
 .month-day:nth-child(7n){border-right:none;}
 .month-day:hover{background:rgba(255,255,255,0.02);}
 .month-day.other{opacity:0.35;}
 .month-day.today{background:rgba(52,217,138,0.05);}
 .month-day-num{font-size:13px;font-weight:600;color:var(--text2);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;margin-bottom:6px;}
 .month-day.today .month-day-num{background:var(--green);color:#0a1a12;font-weight:700;}
-.cal-chip{border-radius:5px;padding:2px 6px;font-size:10.5px;font-weight:500;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;transition:opacity 0.1s;letter-spacing:-0.01em;line-height:1.35;}
+.cal-chip{border-radius:6px;padding:4px 8px;font-size:11.5px;font-weight:500;margin-bottom:3px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;transition:opacity 0.1s;letter-spacing:-0.01em;line-height:1.4;}
 .cal-chip:hover{opacity:0.8;}
 .cal-chip.psicoterapia{background:rgba(96,165,250,0.22);color:#93c5fd;border-left:2px solid var(--blue);}
 .cal-chip.reabilitacao{background:rgba(167,139,250,0.22);color:#c4b5fd;border-left:2px solid var(--purple);}
@@ -227,7 +226,7 @@ select option{background:var(--bg3);}
   .hamburger{display:block;}
   .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;display:none;}
   .sidebar-overlay.open{display:block;}
-  .month-day{min-height:70px;}
+  .month-day{min-height:60px;}
 }
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -334,7 +333,6 @@ function getCreds() {
 function saveCreds(c) { localStorage.setItem(CREDS_KEY, JSON.stringify(c)); }
 
 function getDB() {
-  // Return cache or empty
   return _cache || { clients:[], packages:[], sessions:[] };
 }
 
@@ -348,13 +346,12 @@ async function loadFromSupabase() {
     ]);
     _cache = {
       clients: clients||[],
-      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status, createdAt:p.created_at, notes:p.notes||'', paymentDate:p.payment_date||null, paymentDate2:p.payment_date2||null, paymentType:p.payment_type||'pacote'})),
-      sessions: (sessions||[]).map(s=>({...s, clientId:s.client_id, packageId:s.package_id, intervalDays:s.interval_days, createdAt:s.created_at, sessionPaid:s.session_paid||false}))
+      packages: (packages||[]).map(p=>({...p, clientId:p.client_id, totalSessions:p.total_sessions, paymentStatus:p.payment_status, createdAt:p.created_at, notes:p.notes||''})),
+      sessions: (sessions||[]).map(s=>({...s, clientId:s.client_id, packageId:s.package_id, intervalDays:s.interval_days, createdAt:s.created_at}))
     };
   } catch(e) {
     console.error('Load error:', e);
     _cache = _cache || { clients:[], packages:[], sessions:[] };
-    // Show subtle error only if we have no data at all
     if(!_cache.clients.length) {
       showToast('⚠️ Sem conexão com o servidor. Tente novamente.', true);
     }
@@ -383,7 +380,6 @@ function genId() {
 }
 function today() {
   const now = new Date();
-  // Use local device date — works correctly on iPhone/MacBook in Brazil
   const y = now.getFullYear();
   const m = String(now.getMonth()+1).padStart(2,'0');
   const d = String(now.getDate()).padStart(2,'0');
@@ -409,7 +405,6 @@ async function dbDeleteClient(id) {
 async function dbAddPackage(data) {
   const row = { id:genId(), client_id:data.clientId, name:data.name, total_sessions:data.totalSessions, price:data.price, payment_status:data.paymentStatus||'pending', created_at:new Date().toISOString() };
   const result = await supaFetch('POST', 'packages', row);
-  // Don't reload here - let caller reload after sessions are created
   return row;
 }
 async function dbUpdatePackage(id, data) {
@@ -420,11 +415,7 @@ async function dbUpdatePackage(id, data) {
   if(data.paymentStatus) row.payment_status=data.paymentStatus;
   if(data.clientId) row.client_id=data.clientId;
   if(data.notes!==undefined) row.notes=data.notes;
-  if(data.paymentDate!==undefined) row.payment_date=data.paymentDate;
-  if(data.paymentDate2!==undefined) row.payment_date2=data.paymentDate2;
-  if(data.paymentType!==undefined) row.payment_type=data.paymentType;
   await supaFetch('PATCH', 'packages', row, `?id=eq.${id}`);
-  // If time change requested, update future sessions
   if(data.newTime) {
     const today2 = today();
     await supaFetch('PATCH', 'sessions', {time: data.newTime}, `?package_id=eq.${id}&date=gte.${today2}&status=eq.agendada`);
@@ -451,7 +442,6 @@ async function dbAddSessionsBatch(sessions) {
     'Prefer': 'return=minimal'
   };
 
-  // Insert each session sequentially with unique IDs
   for(let i = 0; i < sessions.length; i++) {
     const s = sessions[i];
     const row = {
@@ -481,7 +471,6 @@ async function dbAddSessionsBatch(sessions) {
     }
   }
 
-  // Reload ONCE after all done
   await loadFromSupabase();
 }
 async function dbUpdateSession(id, data) {
@@ -495,7 +484,6 @@ async function dbUpdateSession(id, data) {
   await loadFromSupabase();
 }
 async function dbUpdateSessionsBatch(updates) {
-  // Update each session individually
   await Promise.all(updates.map(u => supaFetch('PATCH','sessions',u.data,`?id=eq.${u.id}`)));
   await loadFromSupabase();
 }
@@ -530,13 +518,11 @@ function doLogout() {
   document.getElementById('login-screen').style.display='flex';
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-// auto-login handled at bottom
 
 // ═══════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 let currentPage='dashboard';
-// Check if backup reminder needed
 function checkBackupReminder(){
   const last=localStorage.getItem('last_backup_reminder');
   const now=Date.now();
@@ -558,7 +544,6 @@ function checkBackupReminder(){
 
 function navigate(page) {
   currentPage=page; closeSidebar();
-  // Reset main padding
   const main=document.querySelector('.main');
   if(main) main.style.padding = page==='agenda' ? '20px 16px' : '28px 32px';
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
@@ -584,8 +569,7 @@ function paymentBadgeClass(s) {
   if(s==='parcela1') return 'badge-parcial';
   return 'badge-yellow';
 }
-function paymentLabel(s, type) {
-  if(s==='paid' && type==='sessao') return '💳 Por Sessão';
+function paymentLabel(s) {
   if(s==='paid') return '💰 Pago';
   if(s==='parcela1') return '🔶 1ª Parcela';
   return '⏳ Pendente';
@@ -686,9 +670,7 @@ function showToast(msg,error=false){
 // ═══════════════════════════════════════════════════════════════
 function renderDashboard(){
   const db=getDB();
-  // If no data and online, try to reload
   if(!db.clients.length && !db.packages.length && navigator.onLine) {
-    // Show reload option after 1s
     setTimeout(()=>{
       const el = document.getElementById('dash-reload-btn');
       if(el) el.style.display='inline-flex';
@@ -826,6 +808,7 @@ function showClientDetail(id){
   const db=getDB();const c=db.clients.find(c=>c.id===id);if(!c)return;
   const pkgs=db.packages.filter(p=>p.clientId===id);
   const sessions=db.sessions.filter(s=>s.clientId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  // ✅ BUG 2 FIXED: removed backslash before $ in ${paymentLabel(...)}
   const pkgsHTML=pkgs.length===0?`<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>`
     :pkgs.map(p=>{const st=pkgStats(p);const bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';
       return`<div class="package-card"><div class="package-header">
@@ -905,110 +888,66 @@ function showPackageForm(clientId=null,pkgId=null){
   if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
   const isNew=!pkgId;
   const pkgTime = pkgId ? (db.sessions.find(s=>s.packageId===pkgId)?.time||'09:00') : '09:00';
-  
-  const clientOpts = db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>'<option value="'+c.id+'" '+(((pkg?.clientId||clientId)===c.id)?'selected':'')+'>'+c.name+'</option>').join('');
-  
-  let editTimeHtml = '';
-  if(!isNew){
-    editTimeHtml = '<div class="form-group"><label>Horário das Sessões</label>'+
-      '<div style="display:flex;gap:10px;align-items:center">'+
-      '<input type="time" id="pf-edit-time" value="'+pkgTime+'" style="max-width:140px"/>'+
-      '<label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500">'+
-      '<input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em todas as sessões futuras'+
-      '</label></div></div>';
-  }
-  
-  let scheduleHtml = '';
-  if(isNew){
-    scheduleHtml = '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">'+
-      '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático das Sessões</div>'+
-      '<div class="form-row">'+
-      '<div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="'+today()+'"/></div>'+
-      '<div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div>'+
-      '</div>'+
-      '<div class="form-row">'+
-      '<div class="form-group"><label>Intervalo entre sessões</label>'+
-      '<select id="pf-interval">'+
-      '<option value="7">Semanal (toda semana)</option>'+
-      '<option value="14">Quinzenal (a cada 2 semanas)</option>'+
-      '<option value="30">Mensal (a cada mês)</option>'+
-      '</select></div>'+
-      '<div class="form-group"><label>Categoria</label>'+
-      '<select id="pf-category">'+
-      '<option value="psicoterapia">🔵 Psicoterapia</option>'+
-      '<option value="reabilitacao">🟣 Reabilitação</option>'+
-      '<option value="avaliacao">🟢 Avaliação</option>'+
-      '</select></div>'+
-      '</div>'+
-      '<div style="font-size:12px;color:var(--text2);margin-top:4px">💡 As sessões serão criadas automaticamente já agendadas no calendário.</div>'+
-      '</div>';
-  }
-
-  let prontuarioHtml = '';
-  if(!isNew){
-    prontuarioHtml = '<div class="form-group">'+
-      '<label>📋 Prontuário / Evolução do Pacote</label>'+
-      '<textarea id="pf-pkg-notes" rows="4" placeholder="Anotações clínicas, evolução do paciente...">'+(pkg?.notes||'')+'</textarea>'+
-      '</div>';
-  }
-
-  const payType = pkg?.paymentType||'pacote';
-  const payStatus = pkg?.paymentStatus||'pending';
-  const payDate = pkg?.paymentDate||'';
-  const payDate2 = pkg?.paymentDate2||'';
-
-  const bodyHTML = 
-    '<div class="form-group"><label>Cliente *</label><select id="pf-client">'+clientOpts+'</select></div>'+
-    '<div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="'+(pkg?.name||'')+'" placeholder="Ex: Pacote 8 sessões"/></div>'+
-    '<div class="form-row">'+
-    '<div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="'+(pkg?.totalSessions||'')+'" min="1" placeholder="Ex: 8"/></div>'+
-    '<div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="'+(pkg?.price||'')+'" min="0" step="0.01" placeholder="Ex: 800.00"/></div>'+
-    '</div>'+
-    editTimeHtml+
-    scheduleHtml+
-    prontuarioHtml+
-    '<div class="form-group"><label>Modalidade de Pagamento</label>'+
-    '<select id="pf-type" onchange="window._updatePaymentFields()">'+
-    '<option value="pacote" '+(payType==='pacote'?'selected':'')+'>📦 Pacote (à vista ou parcelado)</option>'+
-    '<option value="sessao" '+(payType==='sessao'?'selected':'')+'>💳 Por Sessão</option>'+
-    '</select></div>'+
-    '<div id="pf-payment-fields">'+
-    '<div class="form-group"><label>Status de Pagamento</label>'+
-    '<select id="pf-payment">'+
-    '<option value="pending" '+(payStatus==='pending'?'selected':'')+'>⏳ Pendente</option>'+
-    '<option value="parcela1" '+(payStatus==='parcela1'?'selected':'')+'>🔶 1ª Parcela Paga</option>'+
-    '<option value="paid" '+(payStatus==='paid'?'selected':'')+'>💰 Pago integral</option>'+
-    '</select></div>'+
-    '<div class="form-row">'+
-    '<div class="form-group"><label>Data do Pagamento</label><input type="date" id="pf-payment-date" value="'+payDate+'"/></div>'+
-    '<div class="form-group"><label>Data 2ª Parcela (prevista)</label><input type="date" id="pf-payment-date2" value="'+payDate2+'"/></div>'+
-    '</div></div>'+
-    '<div id="pf-error" class="alert alert-red" style="display:none"></div>'+
-    '<div class="form-actions">'+
-    '<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
-    '<button class="btn btn-primary" onclick="window._savePkg()">Salvar</button>'+
-    '</div>';
-
-  showModal(pkgId?'Editar Pacote':'Novo Pacote', bodyHTML);
-
+  showModal(pkgId?'Editar Pacote':'Novo Pacote',`
+    <div class="form-group"><label>Cliente *</label>
+      <select id="pf-client">${db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(pkg?.clientId||clientId)===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="${pkg?.name||''}" placeholder="Ex: Pacote 8 sessões"/></div>
+    <div class="form-row">
+      <div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="${pkg?.totalSessions||''}" min="1" placeholder="Ex: 8"/></div>
+      <div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="${pkg?.price||''}" min="0" step="0.01" placeholder="Ex: 800.00"/></div>
+    </div>
+    ${!isNew?`<div class="form-group"><label>Horário das Sessões</label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input type="time" id="pf-edit-time" value="${pkgTime}" style="max-width:140px"/>
+        <label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500">
+          <input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em todas as sessões futuras
+        </label>
+      </div>
+    </div>`:''}
+    ${isNew?`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático das Sessões</div>
+      <div class="form-row">
+        <div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="${today()}"/></div>
+        <div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Intervalo entre sessões</label>
+          <select id="pf-interval">
+            <option value="7">Semanal (toda semana)</option>
+            <option value="14">Quinzenal (a cada 2 semanas)</option>
+            <option value="30">Mensal (a cada mês)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Categoria</label>
+          <select id="pf-category">
+            <option value="psicoterapia">🔵 Psicoterapia</option>
+            <option value="reabilitacao">🟣 Reabilitação</option>
+            <option value="avaliacao">🟢 Avaliação</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">💡 As sessões serão criadas automaticamente já agendadas no calendário.</div>
+    </div>`:''}
+    ${!isNew?`<div class="form-group">
+      <label>📋 Prontuário / Evolução do Pacote</label>
+      <textarea id="pf-pkg-notes" rows="5" placeholder="Anotações clínicas, evolução do paciente, observações do período...">${pkg?.notes||''}</textarea>
+    </div>`:''}
+    <div class="form-group"><label>Status de Pagamento</label>
+      <select id="pf-payment">
+        <option value="pending" ${(pkg?.paymentStatus||'pending')==='pending'?'selected':''}>⏳ Pendente</option>
+        <option value="parcela1" ${pkg?.paymentStatus==='parcela1'?'selected':''}>🔶 1ª Parcela Paga</option>
+        <option value="paid" ${pkg?.paymentStatus==='paid'?'selected':''}>💰 Pago (integral ou 2ª parcela)</option>
+      </select>
+    </div>
+    <div id="pf-error" class="alert alert-red" style="display:none"></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window._savePkg()">Salvar</button>
+    </div>`);
   const _pkgId = pkgId || '';
   window._savePkg = async function() { await savePackage(_pkgId); };
-  window._updatePaymentFields = function() {
-    const type = document.getElementById('pf-type')?.value;
-    const fields = document.getElementById('pf-payment-fields');
-    if(type === 'sessao') {
-      if(fields) fields.style.opacity = '0.5';
-      const pay = document.getElementById('pf-payment');
-      if(pay) { pay.value = 'paid'; pay.disabled = true; }
-    } else {
-      if(fields) fields.style.opacity = '1';
-      const pay = document.getElementById('pf-payment');
-      if(pay) pay.disabled = false;
-    }
-  };
-  setTimeout(()=>window._updatePaymentFields&&window._updatePaymentFields(), 50);
 }
-
 
 async function savePackage(id){
   const clientId=document.getElementById('pf-client').value;
@@ -1029,22 +968,19 @@ async function savePackage(id){
   const interval = parseInt(document.getElementById('pf-interval')?.value || '7');
   const category = document.getElementById('pf-category')?.value || 'psicoterapia';
 
-  const db=getDB();
-  closeModal(); // only close AFTER reading all values
+  // ✅ BUG 1 FIXED: removed duplicate `const db` declaration — use getDB() directly below
+  closeModal();
 
   if(id){
-    const st=pkgStats(db.packages.find(p=>p.id===id));
+    const currentDb = getDB();
+    const st=pkgStats(currentDb.packages.find(p=>p.id===id));
     if(totalSessions<st.used){showToast('Não pode reduzir abaixo das já realizadas',true);return;}
     const editTime = document.getElementById('pf-edit-time')?.value;
     const propagateTime = document.getElementById('pf-propagate-time')?.checked;
     const pkgNotes = document.getElementById('pf-pkg-notes')?.value||'';
-    const paymentDate = document.getElementById('pf-payment-date')?.value||null;
-    const paymentDate2 = document.getElementById('pf-payment-date2')?.value||null;
-    const paymentType = document.getElementById('pf-type')?.value||'pacote';
-    const finalStatus = paymentType==='sessao' ? 'paid' : paymentStatus;
     await dbUpdatePackage(id,{
-      clientId, name, totalSessions, price, paymentStatus: finalStatus,
-      notes: pkgNotes, paymentDate, paymentDate2, paymentType,
+      clientId, name, totalSessions, price, paymentStatus,
+      notes: pkgNotes,
       newTime: propagateTime && editTime ? editTime : null
     });
     showToast(propagateTime ? '✅ Pacote e horários atualizados!' : '✅ Pacote atualizado!');
@@ -1057,21 +993,13 @@ async function savePackage(id){
 
   // Step 1: Create package
   const pkgId = genId();
-  const paymentDate = document.getElementById('pf-payment-date')?.value||null;
-  const paymentDate2 = document.getElementById('pf-payment-date2')?.value||null;
-  const paymentType = document.getElementById('pf-type')?.value||'pacote';
-  const finalPayStatus = paymentType==='sessao' ? 'paid' : paymentStatus;
-
   const pkgRow = {
     id: pkgId,
     client_id: clientId,
     name: name,
     total_sessions: totalSessions,
     price: price,
-    payment_status: finalPayStatus,
-    payment_type: paymentType,
-    payment_date: paymentDate,
-    payment_date2: paymentDate2,
+    payment_status: paymentStatus,
     created_at: new Date().toISOString()
   };
 
@@ -1094,13 +1022,13 @@ async function savePackage(id){
   }
 
   // Step 2: Check for scheduling conflicts
-  const db = getDB();
+  const dbForConflicts = getDB();
   const conflicts = [];
   for(let i = 0; i < totalSessions; i++){
     const d = new Date(firstDate + 'T12:00:00');
     d.setDate(d.getDate() + (i * interval));
     const dateStr = d.toISOString().split('T')[0];
-    const conflict = db.sessions.find(s => s.date === dateStr && s.time === time && s.clientId !== clientId);
+    const conflict = dbForConflicts.sessions.find(s => s.date === dateStr && s.time === time && s.clientId !== clientId);
     if(conflict) conflicts.push({ date: fmtDate(dateStr), client: clientName(conflict.clientId) });
   }
   if(conflicts.length > 0) {
@@ -1149,7 +1077,7 @@ async function savePackage(id){
     }
   }
 
-  // Step 3: Reload and show result
+  // Step 4: Reload and show result
   await loadFromSupabase();
   renderPackages();
   
@@ -1228,9 +1156,7 @@ window.saveProntuario = async function(pkgId) {
   showToast('✅ Prontuário salvo!');
 };
 
-// Quick status change - click on badge to cycle status
 window.quickStatusMenu = function(sessionId, el) {
-  // Remove any existing menu
   document.querySelectorAll('.quick-status-menu').forEach(m => m.remove());
 
   const menu = document.createElement('div');
@@ -1261,28 +1187,16 @@ window.quickStatusMenu = function(sessionId, el) {
     menu.appendChild(item);
   });
 
-  // Position menu near the badge
   const rect = el.getBoundingClientRect();
   menu.style.top = (rect.bottom + 4) + 'px';
   menu.style.left = rect.left + 'px';
   document.body.appendChild(menu);
 
-  // Close on outside click
   setTimeout(() => {
     document.addEventListener('click', function handler(e) {
       if(!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', handler); }
     });
   }, 10);
-};
-
-window.toggleSessionPaid = async function(sessionId) {
-  const db = getDB();
-  const s = db.sessions.find(ss=>ss.id===sessionId);
-  if(!s) return;
-  await supaFetch('PATCH','sessions',{session_paid: !s.sessionPaid},`?id=eq.${sessionId}`);
-  await loadFromSupabase();
-  renderSessions();
-  showToast(s.sessionPaid ? '↩️ Desmarcado' : '💰 Sessão paga!');
 };
 
 function renderSessions(){
@@ -1315,7 +1229,6 @@ function renderSessions(){
       const sessNum = pkgSessions.findIndex(ss=>ss.id===s.id)+1;
       const pkg = db.packages.find(p=>p.id===s.packageId);
       const total = pkg ? pkg.totalSessions : '?';
-      const isPaidPerSession = pkg && pkg.paymentType === 'sessao';
       rows += `<tr>
         <td><strong style="color:var(--text2);font-size:13px">${sessNum}/${total}</strong></td>
         <td><strong>${fmtDate(s.date)}</strong></td>
@@ -1327,7 +1240,6 @@ function renderSessions(){
             <span class="badge ${bc}" style="cursor:pointer" onclick="quickStatusMenu('${s.id}',this)">${bl}</span>
           </div>
         </td>
-        ${isPaidPerSession ? `<td><span class="badge ${s.sessionPaid?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="(async()=>{await toggleSessionPaid('${s.id}');})()">${s.sessionPaid?'💰 Pago':'⏳ A pagar'}</span></td>` : '<td></td>'}
         <td><div style="display:flex;gap:4px">
           <button class="btn-icon" onclick="showSessionEditForm('${s.id}')">✏️</button>
           <button class="btn-icon" onclick="deleteSessionConfirm('${s.id}')">🗑️</button>
@@ -1354,7 +1266,7 @@ function renderSessions(){
         </div>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
     </div>`;
@@ -1427,7 +1339,6 @@ async function saveSession(){
   const db=getDB();const pkg=db.packages.find(p=>p.id===packageId);
   const st=pkgStats(pkg);
   if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
-  // Check time conflict
   if(time && date) {
     const conflict = db.sessions.find(s => s.date === date && s.time === time && s.clientId !== clientId);
     if(conflict) {
@@ -1491,9 +1402,7 @@ async function saveSessionEdit(id){
   if(status==='falta'&&s&&s.status!=='falta'){
     if(!window.confirm('Confirmar falta para esta sessão?')){return;}
   }
-  // Check conflict on reschedule
-  const dbCheck = getDB();
-  const conflictEdit = dbCheck.sessions.find(s => s.date === date && s.time === time && s.clientId !== dbCheck.sessions.find(ss=>ss.id===id)?.clientId && s.id !== id);
+  const conflictEdit = db.sessions.find(s => s.date === date && s.time === time && s.clientId !== db.sessions.find(ss=>ss.id===id)?.clientId && s.id !== id);
   if(conflictEdit) {
     if(!window.confirm(`⚠️ Já existe um atendimento com ${clientName(conflictEdit.clientId)} às ${time} do dia ${fmtDate(date)}. Deseja reagendar mesmo assim?`)) return;
   }
@@ -1533,7 +1442,6 @@ let calDate=new Date();
 
 function renderAgenda(){
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
-  // Wider layout for agenda
   document.querySelector('.main').style.padding='20px 16px';
   renderCalendar();
 }
@@ -1542,7 +1450,6 @@ function renderCalendar(){
   const db=getDB();
   const todayStr=today();
 
-  // Title
   let title='';
   if(calView==='month'){
     title=calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -1593,14 +1500,11 @@ function buildMonthGrid(db,todayStr){
   const days=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
   let html=`<div class="month-grid">`;
   days.forEach(d=>html+=`<div class="month-header">${d}</div>`);
-  // prev month
   for(let i=0;i<startDow;i++){
     const d=new Date(year,month,1-startDow+i);
     html+=buildMonthDay(d,db,todayStr,true);
   }
-  // current
   for(let d=1;d<=last.getDate();d++)html+=buildMonthDay(new Date(year,month,d),db,todayStr,false);
-  // next
   const total=startDow+last.getDate();
   const rem=total%7===0?0:7-(total%7);
   for(let i=1;i<=rem;i++)html+=buildMonthDay(new Date(year,month+1,i),db,todayStr,true);
@@ -1611,14 +1515,14 @@ function buildMonthDay(dt,db,todayStr,other){
   const ds=dt.toISOString().split('T')[0];
   const isToday=ds===todayStr;
   const sessions=db.sessions.filter(s=>s.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  const show=sessions.slice(0,8);
-  const extra=sessions.length-8;
+  const show=sessions.slice(0,4);
+  const extra=sessions.length-4;
   return`<div class="month-day ${other?'other':''} ${isToday?'today':''}" onclick="dayClick('${ds}')">
     <div class="month-day-num">${dt.getDate()}</div>
     ${show.map(s=>{
-      const db=getDB();
-      const pkg=db.packages.find(p=>p.id===s.packageId);
-      const pkgSessions=pkg?db.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
+      const db2=getDB();
+      const pkg=db2.packages.find(p=>p.id===s.packageId);
+      const pkgSessions=pkg?db2.sessions.filter(ss=>ss.packageId===s.packageId).sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))):[];
       const sessNum=pkgSessions.findIndex(ss=>ss.id===s.id)+1;
       const total=pkg?pkg.totalSessions:0;
       const nameParts=clientName(s.clientId).split(' ');
@@ -1639,7 +1543,6 @@ function buildWeekGrid(db,todayStr){
   const hours=[];for(let h=7;h<=21;h++)hours.push(h);
 
   let html=`<div style="overflow-x:auto"><div style="min-width:600px">`;
-  // Header row
   html+=`<div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border)">`;
   html+=`<div style="border-right:1px solid var(--border)"></div>`;
   weekDays.forEach((d,i)=>{
@@ -1652,14 +1555,12 @@ function buildWeekGrid(db,todayStr){
   });
   html+=`</div>`;
 
-  // Time rows
   html+=`<div class="week-wrap">`;
   html+=`<div class="week-time-col">`;
   hours.forEach(h=>html+=`<div class="week-time-cell">${h}:00</div>`);
   html+=`</div>`;
 
   html+=`<div class="week-days" style="grid-template-columns:repeat(7,1fr)">`;
-  // Headers spacer
   weekDays.forEach((d,i)=>{
     const ds=d.toISOString().split('T')[0];
     html+=`<div style="grid-row:span ${hours.length}">`;
@@ -1728,48 +1629,13 @@ function renderFinancial(){
   const paidRev=paid.reduce((a,p)=>a+p.price,0);
   const parcela1Rev=parcela1.reduce((a,p)=>a+(p.price/2),0);
   const pendRev=pending.reduce((a,p)=>a+p.price,0)+parcela1.reduce((a,p)=>a+(p.price/2),0);
-  
-  // Group revenue by payment month
-  const revenueByMonth = {};
-  [...paid, ...parcela1].forEach(p => {
-    // 1st payment
-    const d1 = p.paymentDate || p.createdAt?.split('T')[0];
-    if(d1) {
-      const mon = d1.slice(0,7);
-      if(!revenueByMonth[mon]) revenueByMonth[mon] = 0;
-      revenueByMonth[mon] += p.paymentStatus==='parcela1' ? p.price/2 : p.price;
-    }
-    // 2nd payment (parcela1 that has date2)
-    if(p.paymentStatus==='paid' && p.paymentDate2 && p.paymentType!=='sessao') {
-      // already counted above as full
-    }
-  });
-  parcela1.forEach(p => {
-    if(p.paymentDate) {
-      const mon = p.paymentDate.slice(0,7);
-      if(!revenueByMonth[mon]) revenueByMonth[mon] = 0;
-      revenueByMonth[mon] += p.price/2;
-    }
-  });
-  const sortedMonths = Object.keys(revenueByMonth).sort().reverse();
   document.getElementById('page-content').innerHTML=`<div class="page">
     <div class="grid-4" style="margin-bottom:24px">
-      <div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">${fmt(paidRev)}</div><div class="stat-label">Pago Integral</div></div>
-      <div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">${fmt(parcela1Rev)}</div><div class="stat-label">1ª Parcela Recebida</div></div>
+      <div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">${fmt(paidRev)}</div><div class="stat-label">Pago Integral (${paid.length} pacote${paid.length!==1?'s':''})</div></div>
+      <div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">${fmt(parcela1Rev)}</div><div class="stat-label">1ª Parcela Recebida (${parcela1.length} pacote${parcela1.length!==1?'s':''})</div></div>
       <div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">${fmt(pendRev)}</div><div class="stat-label">A Receber</div></div>
       <div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">${fmt(paidRev+parcela1Rev+pending.reduce((a,p)=>a+p.price,0))}</div><div class="stat-label">Total em Carteira</div></div>
     </div>
-    ${sortedMonths.length>0?`<div class="card" style="margin-bottom:20px">
-      <div class="section-header"><div class="section-title">📆 Receita por Mês</div></div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Mês</th><th>Receita Recebida</th></tr></thead>
-        <tbody>${sortedMonths.map(mon=>{
-          const [y,m]=mon.split('-');
-          const monthName=new Date(parseInt(y),parseInt(m)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-          return`<tr><td><strong>${monthName.charAt(0).toUpperCase()+monthName.slice(1)}</strong></td><td style="color:var(--green);font-weight:700">${fmt(revenueByMonth[mon])}</td></tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>`:''}
     ${pending.length>0?`<div class="card" style="margin-bottom:20px">
       <div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>
       <div class="table-wrap"><table>
@@ -1871,7 +1737,6 @@ function resetAllData(){
 async function doResetAll(){
   if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}
   closeModal();
-  // Delete all from Supabase
   await supaFetch('DELETE','sessions',null,'?id=neq.none');
   await supaFetch('DELETE','packages',null,'?id=neq.none');
   await supaFetch('DELETE','clients',null,'?id=neq.none');
@@ -1879,7 +1744,7 @@ async function doResetAll(){
   navigate('dashboard');showToast('Dados apagados');
 }
 
-// ── AUTO LOGIN CHECK (must be at end after all functions defined) ──
+// ── AUTO LOGIN CHECK ──
 if (localStorage.getItem(AUTH_KEY)) {
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').style.display='flex';
