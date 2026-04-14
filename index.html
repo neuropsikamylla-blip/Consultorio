@@ -405,7 +405,7 @@ function renderDashboard(){
   html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
   html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
   var notesPreview=localStorage.getItem('dashboard_notes')||'';var hasNotes=notesPreview.trim().length>0;
-  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer;'+(hasNotes?'':'border-color:var(--border2)')+'" onclick="document.getElementById('dash-notes')&&document.getElementById('dash-notes').focus()"><div class="stat-icon">📝</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;letter-spacing:-0.01em">'+(hasNotes?notesPreview.slice(0,60)+(notesPreview.length>60?'...':''):'Sem notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
+  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer;'+(hasNotes?'':'border-color:var(--border2)')+'" onclick="window.focusDashNotes()"><div class="stat-icon">📝</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;letter-spacing:-0.01em">'+(hasNotes?notesPreview.slice(0,60)+(notesPreview.length>60?'...':''):'Sem notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
   html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
   html+='</div>';
   if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
@@ -420,6 +420,7 @@ function renderDashboard(){
   document.getElementById('page-content').innerHTML=html;
 }
 
+window.focusDashNotes=function(){var el=document.getElementById('dash-notes');if(el)el.focus();};
 window.saveDashNotes=function(){var notes=document.getElementById('dash-notes')?document.getElementById('dash-notes').value:'';localStorage.setItem('dashboard_notes',notes);showToast('✅ Notas salvas!');};
 
 // ── CLIENTS ──
