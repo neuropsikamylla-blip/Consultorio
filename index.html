@@ -1132,6 +1132,53 @@ window.saveProntuario = async function(pkgId) {
   showToast('✅ Prontuário salvo!');
 };
 
+// Quick status change - click on badge to cycle status
+window.quickStatusMenu = function(sessionId, el) {
+  // Remove any existing menu
+  document.querySelectorAll('.quick-status-menu').forEach(m => m.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'quick-status-menu';
+  menu.style.cssText = 'position:fixed;z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:160px;animation:fadeIn 0.1s ease';
+
+  const options = [
+    { value: 'agendada',  label: '📅 Agendada',  cls: 'badge-agendada' },
+    { value: 'realizada', label: '✅ Realizada', cls: 'badge-realizada' },
+    { value: 'falta',     label: '❌ Falta',     cls: 'badge-falta' }
+  ];
+
+  options.forEach(opt => {
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:background 0.1s';
+    item.innerHTML = `<span class="badge ${opt.cls}" style="font-size:11px">${opt.label}</span>`;
+    item.onmouseenter = () => item.style.background = 'var(--bg3)';
+    item.onmouseleave = () => item.style.background = '';
+    item.onclick = async () => {
+      menu.remove();
+      if(opt.value === 'falta') {
+        if(!window.confirm('Confirmar falta para esta sessão?')) return;
+      }
+      await dbUpdateSession(sessionId, { status: opt.value });
+      renderSessions();
+      showToast(opt.value === 'realizada' ? '✅ Sessão realizada!' : opt.value === 'falta' ? '❌ Falta registrada' : '📅 Agendada');
+    };
+    menu.appendChild(item);
+  });
+
+  // Position menu near the badge
+  const rect = el.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = rect.left + 'px';
+  document.body.appendChild(menu);
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e) {
+      if(!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', handler); }
+    });
+  }, 10);
+};
+
 function renderSessions(){
   const db=getDB();
   document.getElementById('topbar-actions').innerHTML=`<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>`;
@@ -1168,7 +1215,11 @@ function renderSessions(){
         <td class="td-muted">${s.time||'—'}</td>
         <td><span class="badge ${catBadgeClass(s.category)}">${catLabelShort(s.category)}</span></td>
         <td class="td-muted">${pkgName(s.packageId)}</td>
-        <td><span class="badge ${bc}">${bl}</span></td>
+        <td>
+          <div style="position:relative;display:inline-block">
+            <span class="badge ${bc}" style="cursor:pointer" onclick="quickStatusMenu('${s.id}',this)">${bl}</span>
+          </div>
+        </td>
         <td><div style="display:flex;gap:4px">
           <button class="btn-icon" onclick="showSessionEditForm('${s.id}')">✏️</button>
           <button class="btn-icon" onclick="deleteSessionConfirm('${s.id}')">🗑️</button>
