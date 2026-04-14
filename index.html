@@ -904,85 +904,100 @@ function showPackageForm(clientId=null,pkgId=null){
   const db=getDB();const pkg=pkgId?db.packages.find(p=>p.id===pkgId):null;
   if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
   const isNew=!pkgId;
-  // Get current package time from its sessions
   const pkgTime = pkgId ? (db.sessions.find(s=>s.packageId===pkgId)?.time||'09:00') : '09:00';
-  showModal(pkgId?'Editar Pacote':'Novo Pacote',`
-    <div class="form-group"><label>Cliente *</label>
-      <select id="pf-client">${db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${c.id}" ${(pkg?.clientId||clientId)===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="${pkg?.name||''}" placeholder="Ex: Pacote 8 sessões"/></div>
-    <div class="form-row">
-      <div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="${pkg?.totalSessions||''}" min="1" placeholder="Ex: 8"/></div>
-      <div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="${pkg?.price||''}" min="0" step="0.01" placeholder="Ex: 800.00"/></div>
-    </div>
-    ${!isNew?`<div class="form-group"><label>Horário das Sessões</label>
-      <div style="display:flex;gap:10px;align-items:center">
-        <input type="time" id="pf-edit-time" value="${pkgTime}" style="max-width:140px"/>
-        <label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500">
-          <input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em todas as sessões futuras
-        </label>
-      </div>
-    </div>`:''}
-    ${isNew?`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático das Sessões</div>
-      <div class="form-row">
-        <div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="${today()}"/></div>
-        <div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label>Intervalo entre sessões</label>
-          <select id="pf-interval">
-            <option value="7">Semanal (toda semana)</option>
-            <option value="14">Quinzenal (a cada 2 semanas)</option>
-            <option value="30">Mensal (a cada mês)</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Categoria</label>
-          <select id="pf-category">
-            <option value="psicoterapia">🔵 Psicoterapia</option>
-            <option value="reabilitacao">🟣 Reabilitação</option>
-            <option value="avaliacao">🟢 Avaliação</option>
-          </select>
-        </div>
-      </div>
-      <div style="font-size:12px;color:var(--text2);margin-top:4px">💡 As sessões serão criadas automaticamente já agendadas no calendário.</div>
-    </div>`:''}
-    ${!isNew?`<div class="form-group">
-      <label>📋 Prontuário / Evolução do Pacote</label>
-      <textarea id="pf-pkg-notes" rows="5" placeholder="Anotações clínicas, evolução do paciente, observações do período...">${pkg?.notes||''}</textarea>
-    </div>`:''}
-    <div class="form-group"><label>Modalidade de Pagamento</label>
-      <select id="pf-type" onchange="window._updatePaymentFields()">
-        <option value="pacote" ${(pkg?.paymentType||'pacote')==='pacote'?'selected':''}>📦 Pacote (à vista ou parcelado)</option>
-        <option value="sessao" ${pkg?.paymentType==='sessao'?'selected':''}>💳 Por Sessão</option>
-      </select>
-    </div>
-    <div id="pf-payment-fields">
-    <div class="form-group"><label>Status de Pagamento</label>
-      <select id="pf-payment">
-        <option value="pending" ${(pkg?.paymentStatus||'pending')==='pending'?'selected':''}>⏳ Pendente</option>
-        <option value="parcela1" ${pkg?.paymentStatus==='parcela1'?'selected':''}>🔶 1ª Parcela Paga</option>
-        <option value="paid" ${pkg?.paymentStatus==='paid'?'selected':''}>💰 Pago integral</option>
-      </select>
-    </div>
-    <div class="form-row" id="pf-dates-row">
-      <div class="form-group"><label>Data do Pagamento</label><input type="date" id="pf-payment-date" value="${pkg?.paymentDate||''}"/></div>
-      <div class="form-group" id="pf-date2-group" style="${pkg?.paymentStatus==='parcela1'?'':'opacity:0.4'}"><label>Data 2ª Parcela (prevista)</label><input type="date" id="pf-payment-date2" value="${pkg?.paymentDate2||''}"/></div>
-    </div>
-    </div>
-    <div id="pf-error" class="alert alert-red" style="display:none"></div>
-    <div class="form-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="window._savePkg()">Salvar</button>
-    </div>`);
-  // Set global save function for this modal
+  
+  const clientOpts = db.clients.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>'<option value="'+c.id+'" '+(((pkg?.clientId||clientId)===c.id)?'selected':'')+'>'+c.name+'</option>').join('');
+  
+  let editTimeHtml = '';
+  if(!isNew){
+    editTimeHtml = '<div class="form-group"><label>Horário das Sessões</label>'+
+      '<div style="display:flex;gap:10px;align-items:center">'+
+      '<input type="time" id="pf-edit-time" value="'+pkgTime+'" style="max-width:140px"/>'+
+      '<label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500">'+
+      '<input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em todas as sessões futuras'+
+      '</label></div></div>';
+  }
+  
+  let scheduleHtml = '';
+  if(isNew){
+    scheduleHtml = '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático das Sessões</div>'+
+      '<div class="form-row">'+
+      '<div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="'+today()+'"/></div>'+
+      '<div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div>'+
+      '</div>'+
+      '<div class="form-row">'+
+      '<div class="form-group"><label>Intervalo entre sessões</label>'+
+      '<select id="pf-interval">'+
+      '<option value="7">Semanal (toda semana)</option>'+
+      '<option value="14">Quinzenal (a cada 2 semanas)</option>'+
+      '<option value="30">Mensal (a cada mês)</option>'+
+      '</select></div>'+
+      '<div class="form-group"><label>Categoria</label>'+
+      '<select id="pf-category">'+
+      '<option value="psicoterapia">🔵 Psicoterapia</option>'+
+      '<option value="reabilitacao">🟣 Reabilitação</option>'+
+      '<option value="avaliacao">🟢 Avaliação</option>'+
+      '</select></div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:4px">💡 As sessões serão criadas automaticamente já agendadas no calendário.</div>'+
+      '</div>';
+  }
+
+  let prontuarioHtml = '';
+  if(!isNew){
+    prontuarioHtml = '<div class="form-group">'+
+      '<label>📋 Prontuário / Evolução do Pacote</label>'+
+      '<textarea id="pf-pkg-notes" rows="4" placeholder="Anotações clínicas, evolução do paciente...">'+(pkg?.notes||'')+'</textarea>'+
+      '</div>';
+  }
+
+  const payType = pkg?.paymentType||'pacote';
+  const payStatus = pkg?.paymentStatus||'pending';
+  const payDate = pkg?.paymentDate||'';
+  const payDate2 = pkg?.paymentDate2||'';
+
+  const bodyHTML = 
+    '<div class="form-group"><label>Cliente *</label><select id="pf-client">'+clientOpts+'</select></div>'+
+    '<div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="'+(pkg?.name||'')+'" placeholder="Ex: Pacote 8 sessões"/></div>'+
+    '<div class="form-row">'+
+    '<div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="'+(pkg?.totalSessions||'')+'" min="1" placeholder="Ex: 8"/></div>'+
+    '<div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="'+(pkg?.price||'')+'" min="0" step="0.01" placeholder="Ex: 800.00"/></div>'+
+    '</div>'+
+    editTimeHtml+
+    scheduleHtml+
+    prontuarioHtml+
+    '<div class="form-group"><label>Modalidade de Pagamento</label>'+
+    '<select id="pf-type" onchange="window._updatePaymentFields()">'+
+    '<option value="pacote" '+(payType==='pacote'?'selected':'')+'>📦 Pacote (à vista ou parcelado)</option>'+
+    '<option value="sessao" '+(payType==='sessao'?'selected':'')+'>💳 Por Sessão</option>'+
+    '</select></div>'+
+    '<div id="pf-payment-fields">'+
+    '<div class="form-group"><label>Status de Pagamento</label>'+
+    '<select id="pf-payment">'+
+    '<option value="pending" '+(payStatus==='pending'?'selected':'')+'>⏳ Pendente</option>'+
+    '<option value="parcela1" '+(payStatus==='parcela1'?'selected':'')+'>🔶 1ª Parcela Paga</option>'+
+    '<option value="paid" '+(payStatus==='paid'?'selected':'')+'>💰 Pago integral</option>'+
+    '</select></div>'+
+    '<div class="form-row">'+
+    '<div class="form-group"><label>Data do Pagamento</label><input type="date" id="pf-payment-date" value="'+payDate+'"/></div>'+
+    '<div class="form-group"><label>Data 2ª Parcela (prevista)</label><input type="date" id="pf-payment-date2" value="'+payDate2+'"/></div>'+
+    '</div></div>'+
+    '<div id="pf-error" class="alert alert-red" style="display:none"></div>'+
+    '<div class="form-actions">'+
+    '<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="window._savePkg()">Salvar</button>'+
+    '</div>';
+
+  showModal(pkgId?'Editar Pacote':'Novo Pacote', bodyHTML);
+
   const _pkgId = pkgId || '';
   window._savePkg = async function() { await savePackage(_pkgId); };
   window._updatePaymentFields = function() {
     const type = document.getElementById('pf-type')?.value;
     const fields = document.getElementById('pf-payment-fields');
     if(type === 'sessao') {
-      if(fields) fields.style.opacity = '0.4';
+      if(fields) fields.style.opacity = '0.5';
       const pay = document.getElementById('pf-payment');
       if(pay) { pay.value = 'paid'; pay.disabled = true; }
     } else {
@@ -991,17 +1006,9 @@ function showPackageForm(clientId=null,pkgId=null){
       if(pay) pay.disabled = false;
     }
   };
-  // Init payment fields state
   setTimeout(()=>window._updatePaymentFields&&window._updatePaymentFields(), 50);
-  // Toggle date2 visibility based on status
-  setTimeout(()=>{
-    const pay = document.getElementById('pf-payment');
-    if(pay) pay.addEventListener('change', ()=>{
-      const d2 = document.getElementById('pf-date2-group');
-      if(d2) d2.style.opacity = pay.value==='parcela1' ? '1' : '0.4';
-    });
-  }, 100);
 }
+
 
 async function savePackage(id){
   const clientId=document.getElementById('pf-client').value;
