@@ -830,7 +830,7 @@ function showClientDetail(id){
     :pkgs.map(p=>{const st=pkgStats(p);const bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';
       return`<div class="package-card"><div class="package-header">
         <div><strong>${p.name}</strong>${st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':''}</div>
-        <span class="badge ${paymentBadgeClass(p.paymentStatus)}">\${paymentLabel(p.paymentStatus)}</span>
+        <span class="badge ${paymentBadgeClass(p.paymentStatus)}">${paymentLabel(p.paymentStatus)}</span>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">${p.totalSessions}</strong></span>
@@ -1196,7 +1196,7 @@ function showProntuario(clientId) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div>
           <div style="font-weight:700;font-size:14px">${pkgLabel}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${paymentBadgeClass(pkg.paymentStatus)}">\${paymentLabel(pkg.paymentStatus)}</span></div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${paymentBadgeClass(pkg.paymentStatus)}">${paymentLabel(pkg.paymentStatus)}</span></div>
         </div>
       </div>
       <textarea
