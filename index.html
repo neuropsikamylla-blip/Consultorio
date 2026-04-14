@@ -380,7 +380,9 @@ function genId() {
   _idCounter++;
   return Date.now().toString(36) + '_' + _idCounter.toString(36) + '_' + Math.random().toString(36).slice(2,8);
 }
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+}
 
 // ── CRUD OPERATIONS ──────────────────────────────────────────
 async function dbAddClient(data) {
