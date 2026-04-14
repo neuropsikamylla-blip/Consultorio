@@ -390,46 +390,69 @@ function loadBackupFile(e){
 // ── DASHBOARD ──
 function renderDashboard(){
   var db=getDB();
-  // If no data, show reload button
-  if(!db.clients.length && !db.packages.length){
-    document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados do servidor...</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar dados</button></div></div>';
-    loadFromSupabase().then(function(){
-      var db2=getDB();
-      if(db2.clients.length||db2.packages.length)renderDashboard();
-    });
+  if(!db.clients.length&&!db.packages.length){
+    document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados...</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar</button></div></div>';
+    loadFromSupabase().then(function(){var db2=getDB();if(db2.clients.length||db2.packages.length)renderDashboard();});
     return;
   }
   var totalClients=db.clients.length;
   var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
-  var totalPending=db.sessions.filter(function(s){return s.status==='agendada';}).length;
   var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var now=today();
   var in7=new Date();in7.setDate(in7.getDate()+7);
   var in7s=in7.toISOString().split('T')[0];
+
+  // Proximas 7 dias
   var upcoming=db.sessions.filter(function(s){return s.status==='agendada'&&s.date>=now&&s.date<=in7s;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,6);
   var upcomingHtml='';
-  upcoming.forEach(function(s){upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';});
-  var html='<div class="page"><div class="grid-4">';
+  if(upcoming.length===0){
+    upcomingHtml='<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>';
+  } else {
+    upcoming.forEach(function(s){upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';});
+  }
+
+  // Pacotes a encerrar (1 ou 2 sessoes restantes)
+  var expiringHtml='';
+  var expiringCount=0;
+  db.packages.forEach(function(p){
+    var st=pkgStats(p);
+    if(!st.isExhausted&&st.remaining<=2&&st.remaining>0){
+      expiringCount++;
+      expiringHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(p.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+p.name+' · <span style="color:var(--yellow)">'+st.remaining+' sessão'+(st.remaining!==1?'ões':'')+' restante'+(st.remaining!==1?'s':'')+'</span></div></div><button class="btn btn-ghost btn-sm" onclick="navigate('packages')">Ver →</button></div>';
+    }
+  });
+  if(expiringCount===0)expiringHtml='<div class="empty" style="padding:24px"><div class="empty-icon">✅</div><p>Nenhum pacote encerrando em breve</p></div>';
+
+  // Notas
+  var savedNotes=localStorage.getItem('dashboard_notes')||'';
+  var notesPreview=savedNotes.trim();
+  var hasNotes=notesPreview.length>0;
+
+  var html='<div class="page">';
+  html+='<div class="grid-4" style="margin-bottom:24px">';
   html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
   html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
-  var notesPreview=localStorage.getItem('dashboard_notes')||'';var hasNotes=notesPreview.trim().length>0;
-  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer;'+(hasNotes?'':'border-color:var(--border2)')+'" onclick="window.focusDashNotes()"><div class="stat-icon">📝</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;letter-spacing:-0.01em">'+(hasNotes?notesPreview.slice(0,60)+(notesPreview.length>60?'...':''):'Sem notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
+  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer" onclick="window.focusDashNotes()"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Clique para adicionar notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
   html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
   html+='</div>';
+
   if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
-  if(totalFalta>0)html+='<div class="alert alert-red" style="margin-bottom:20px">❌ <strong>'+totalFalta+'</strong> falta'+(totalFalta!==1?'s':'')+' registrada'+(totalFalta!==1?'s':'')+'</div>';
+
   html+='<div class="grid-2">';
-  html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>';
-  html+=upcoming.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>':upcomingHtml;
+  html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate('agenda')">Ver agenda →</button></div>'+upcomingHtml+'</div>';
+  html+='<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate('packages')">Ver pacotes →</button></div>'+expiringHtml+'</div>';
   html+='</div>';
-  html+='<div class="card"><div class="section-header"><div class="section-title">🕐 Sessões Recentes</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'sessions\')">Ver todas →</button></div>';
-  html+=recent.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão ainda</p></div>':recentHtml;
-  html+='</div></div></div>';
+
+  html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25)">';
+  html+='<div class="section-header"><div class="section-title">📝 Notas Importantes</div><button class="btn btn-sm" style="background:var(--yellow);color:#1a1000;font-weight:700" onclick="window.saveDashNotes()">💾 Salvar</button></div>';
+  html+='<textarea id="dash-notes" rows="4" placeholder="Anote lembretes importantes aqui... Ex: Emitir nota fiscal dia 30, Ligar para Maria sobre reagendamento..." style="width:100%;background:rgba(245,200,66,0.05);border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:13.5px;font-family:inherit;resize:vertical;outline:none;line-height:1.6">'+savedNotes+'</textarea>';
+  html+='</div>';
+  html+='</div>';
   document.getElementById('page-content').innerHTML=html;
 }
 
-window.focusDashNotes=function(){var el=document.getElementById('dash-notes');if(el)el.focus();};
+
 window.saveDashNotes=function(){var notes=document.getElementById('dash-notes')?document.getElementById('dash-notes').value:'';localStorage.setItem('dashboard_notes',notes);showToast('✅ Notas salvas!');};
 
 // ── CLIENTS ──
