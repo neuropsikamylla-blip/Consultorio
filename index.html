@@ -94,6 +94,7 @@ tr:hover td{background:var(--bg3);}
 .badge-agendada{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(96,165,250,0.25);}
 .badge-realizada{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
 .badge-falta{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
+.badge-parcial{background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.3);}
 .badge-psico{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(96,165,250,0.25);}
 .badge-reab{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(167,139,250,0.25);}
 .badge-aval{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
@@ -381,7 +382,12 @@ function genId() {
   return Date.now().toString(36) + '_' + _idCounter.toString(36) + '_' + Math.random().toString(36).slice(2,8);
 }
 function today() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const now = new Date();
+  // Use local device date — works correctly on iPhone/MacBook in Brazil
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + d;
 }
 
 // ── CRUD OPERATIONS ──────────────────────────────────────────
@@ -570,6 +576,17 @@ function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return`${day}/
 function fmtDateTime(d,t){return t?`${fmtDate(d)} às ${t}`:fmtDate(d);}
 function getInitials(name){if(!name)return'?';return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();}
 
+function paymentBadgeClass(s) {
+  if(s==='paid') return 'badge-green';
+  if(s==='parcela1') return 'badge-parcial';
+  return 'badge-yellow';
+}
+function paymentLabel(s) {
+  if(s==='paid') return '💰 Pago';
+  if(s==='parcela1') return '🔶 1ª Parcela';
+  return '⏳ Pendente';
+}
+
 function catColor(cat){
   if(!cat||cat==='psicoterapia')return'var(--blue)';
   if(cat==='reabilitacao')return'var(--purple)';
@@ -677,8 +694,8 @@ function renderDashboard(){
   const totalDone=db.sessions.filter(s=>s.status==='realizada'||s.status==='completed').length;
   const totalPending=db.sessions.filter(s=>s.status==='agendada').length;
   const totalFalta=db.sessions.filter(s=>s.status==='falta').length;
-  const paidRev=db.packages.filter(p=>p.paymentStatus==='paid').reduce((a,p)=>a+p.price,0);
-  const pendRev=db.packages.filter(p=>p.paymentStatus==='pending').reduce((a,p)=>a+p.price,0);
+  const paidRev=db.packages.filter(p=>p.paymentStatus==='paid').reduce((a,p)=>a+p.price,0) + db.packages.filter(p=>p.paymentStatus==='parcela1').reduce((a,p)=>a+(p.price/2),0);
+  const pendRev=db.packages.filter(p=>p.paymentStatus==='pending').reduce((a,p)=>a+p.price,0) + db.packages.filter(p=>p.paymentStatus==='parcela1').reduce((a,p)=>a+(p.price/2),0);
   const now=today();
   const in7=new Date();in7.setDate(in7.getDate()+7);
   const upcoming=db.sessions.filter(s=>s.status==='agendada'&&s.date>=now&&s.date<=in7.toISOString().split('T')[0]).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,6);
@@ -809,7 +826,7 @@ function showClientDetail(id){
     :pkgs.map(p=>{const st=pkgStats(p);const bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';
       return`<div class="package-card"><div class="package-header">
         <div><strong>${p.name}</strong>${st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':''}</div>
-        <span class="badge ${p.paymentStatus==='paid'?'badge-green':'badge-yellow'}">${p.paymentStatus==='paid'?'💰 Pago':'⏳ Pendente'}</span>
+        <span class="badge ${paymentBadgeClass(p.paymentStatus)}">\${paymentLabel(p.paymentStatus)}</span>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">${p.totalSessions}</strong></span>
@@ -869,7 +886,7 @@ function renderPackages(){
             <td><span style="color:var(--green)">${st.used}</span><span style="color:var(--text3)"> / ${p.totalSessions}</span><span style="color:${st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--text2)'}"> (${st.remaining} rest.)</span></td>
             <td style="min-width:100px"><div class="progress-bar"><div class="progress-fill ${bc}" style="width:${Math.min(st.pct,100)}%"></div></div></td>
             <td>${fmt(p.price)}</td>
-            <td><span class="badge ${p.paymentStatus==='paid'?'badge-green':'badge-yellow'}" style="cursor:pointer" onclick="(async()=>{await togglePayment('${p.id}');})()">${p.paymentStatus==='paid'?'💰 Pago':'⏳ Pendente'}</span></td>
+            <td><span class="badge ${paymentBadgeClass(p.paymentStatus)}" style="cursor:pointer" onclick="(async()=>{await cyclePayment('${p.id}');})()">${paymentLabel(p.paymentStatus)}</span></td>
             <td><div style="display:flex;gap:6px">
               <button class="btn-icon" onclick="showPackageForm(null,'${p.id}')">✏️</button>
               <button class="btn-icon" onclick="deletePackageConfirm('${p.id}')">🗑️</button>
@@ -932,8 +949,9 @@ function showPackageForm(clientId=null,pkgId=null){
     </div>`:''}
     <div class="form-group"><label>Status de Pagamento</label>
       <select id="pf-payment">
-        <option value="pending" ${pkg?.paymentStatus!=='paid'?'selected':''}>⏳ Pendente</option>
-        <option value="paid" ${pkg?.paymentStatus==='paid'?'selected':''}>💰 Pago</option>
+        <option value="pending" ${(pkg?.paymentStatus||'pending')==='pending'?'selected':''}>⏳ Pendente</option>
+        <option value="parcela1" ${pkg?.paymentStatus==='parcela1'?'selected':''}>🔶 1ª Parcela Paga</option>
+        <option value="paid" ${pkg?.paymentStatus==='paid'?'selected':''}>💰 Pago (integral ou 2ª parcela)</option>
       </select>
     </div>
     <div id="pf-error" class="alert alert-red" style="display:none"></div>
@@ -1017,7 +1035,24 @@ async function savePackage(id){
     return;
   }
 
-  // Step 2: Create sessions one by one
+  // Step 2: Check for scheduling conflicts
+  const db = getDB();
+  const conflicts = [];
+  for(let i = 0; i < totalSessions; i++){
+    const d = new Date(firstDate + 'T12:00:00');
+    d.setDate(d.getDate() + (i * interval));
+    const dateStr = d.toISOString().split('T')[0];
+    const conflict = db.sessions.find(s => s.date === dateStr && s.time === time && s.clientId !== clientId);
+    if(conflict) conflicts.push({ date: fmtDate(dateStr), client: clientName(conflict.clientId) });
+  }
+  if(conflicts.length > 0) {
+    const msg = conflicts.map(c => `${c.date} — ${c.client}`).join('\n');
+    if(!window.confirm(`⚠️ Conflito de horário detectado!\n\nJá existe atendimento às ${time} nas seguintes datas:\n${msg}\n\nDeseja criar o pacote mesmo assim?`)) {
+      return;
+    }
+  }
+
+  // Step 3: Create sessions one by one
   let successCount = 0;
   for(let i = 0; i < totalSessions; i++){
     const d = new Date(firstDate + 'T12:00:00');
@@ -1068,11 +1103,12 @@ async function savePackage(id){
 }
 
 
-async function togglePayment(id){
+async function cyclePayment(id){
   const db=getDB();const pkg=db.packages.find(p=>p.id===id);
-  const newStatus=pkg.paymentStatus==='paid'?'pending':'paid';
+  const cycle = {pending:'parcela1', parcela1:'paid', paid:'pending'};
+  const newStatus = cycle[pkg.paymentStatus] || 'parcela1';
   await dbUpdatePackage(id,{paymentStatus:newStatus});
-  renderPackages();showToast('✅ Pagamento atualizado!');
+  renderPackages();showToast('✅ ' + paymentLabel(newStatus));
 }
 function deletePackageConfirm(id){
   const p=getDB().packages.find(p=>p.id===id);
@@ -1109,7 +1145,7 @@ function showProntuario(clientId) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div>
           <div style="font-weight:700;font-size:14px">${pkgLabel}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${pkg.paymentStatus==='paid'?'badge-green':'badge-yellow'}">${pkg.paymentStatus==='paid'?'Pago':'Pendente'}</span></div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">${done}/${pkg.totalSessions} sessões realizadas · ${fmt(pkg.price)} · <span class="badge ${paymentBadgeClass(pkg.paymentStatus)}">\${paymentLabel(pkg.paymentStatus)}</span></div>
         </div>
       </div>
       <textarea
@@ -1321,6 +1357,13 @@ async function saveSession(){
   const db=getDB();const pkg=db.packages.find(p=>p.id===packageId);
   const st=pkgStats(pkg);
   if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
+  // Check time conflict
+  if(time && date) {
+    const conflict = db.sessions.find(s => s.date === date && s.time === time && s.clientId !== clientId);
+    if(conflict) {
+      if(!window.confirm(`⚠️ Já existe um atendimento com ${clientName(conflict.clientId)} às ${time} do dia ${fmtDate(date)}. Deseja agendar mesmo assim?`)) return;
+    }
+  }
   closeModal();
   await dbAddSession({clientId,packageId,date,time,status,notes,category});
   if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
@@ -1377,6 +1420,12 @@ async function saveSessionEdit(id){
   const s=db.sessions.find(ss=>ss.id===id);
   if(status==='falta'&&s&&s.status!=='falta'){
     if(!window.confirm('Confirmar falta para esta sessão?')){return;}
+  }
+  // Check conflict on reschedule
+  const dbCheck = getDB();
+  const conflictEdit = dbCheck.sessions.find(s => s.date === date && s.time === time && s.clientId !== dbCheck.sessions.find(ss=>ss.id===id)?.clientId && s.id !== id);
+  if(conflictEdit) {
+    if(!window.confirm(`⚠️ Já existe um atendimento com ${clientName(conflictEdit.clientId)} às ${time} do dia ${fmtDate(date)}. Deseja reagendar mesmo assim?`)) return;
   }
   closeModal();
   await dbUpdateSession(id,{date,time,status,notes,category});
@@ -1604,14 +1653,17 @@ window.dayClick=function(dateStr){
 function renderFinancial(){
   const db=getDB();
   const paid=db.packages.filter(p=>p.paymentStatus==='paid');
+  const parcela1=db.packages.filter(p=>p.paymentStatus==='parcela1');
   const pending=db.packages.filter(p=>p.paymentStatus==='pending');
   const paidRev=paid.reduce((a,p)=>a+p.price,0);
-  const pendRev=pending.reduce((a,p)=>a+p.price,0);
+  const parcela1Rev=parcela1.reduce((a,p)=>a+(p.price/2),0);
+  const pendRev=pending.reduce((a,p)=>a+p.price,0)+parcela1.reduce((a,p)=>a+(p.price/2),0);
   document.getElementById('page-content').innerHTML=`<div class="page">
-    <div class="grid-3" style="margin-bottom:24px">
-      <div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">${fmt(paidRev)}</div><div class="stat-label">Receita Confirmada (${paid.length} pacote${paid.length!==1?'s':''})</div></div>
-      <div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val">${fmt(pendRev)}</div><div class="stat-label">A Receber (${pending.length} pacote${pending.length!==1?'s':''})</div></div>
-      <div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val">${fmt(paidRev+pendRev)}</div><div class="stat-label">Total em Carteira</div></div>
+    <div class="grid-4" style="margin-bottom:24px">
+      <div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">${fmt(paidRev)}</div><div class="stat-label">Pago Integral (${paid.length} pacote${paid.length!==1?'s':''})</div></div>
+      <div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">${fmt(parcela1Rev)}</div><div class="stat-label">1ª Parcela Recebida (${parcela1.length} pacote${parcela1.length!==1?'s':''})</div></div>
+      <div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">${fmt(pendRev)}</div><div class="stat-label">A Receber</div></div>
+      <div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">${fmt(paidRev+parcela1Rev+pending.reduce((a,p)=>a+p.price,0))}</div><div class="stat-label">Total em Carteira</div></div>
     </div>
     ${pending.length>0?`<div class="card" style="margin-bottom:20px">
       <div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>
@@ -1641,8 +1693,9 @@ function renderFinancial(){
     </div>
   </div>`;
 }
-window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pago!');};
-window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido');};
+window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pagamento confirmado!');};
+window.markParcela1=async function(id){await dbUpdatePackage(id,{paymentStatus:'parcela1'});renderFinancial();showToast('🔶 1ª parcela registrada!');};
+window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido para pendente');};
 
 // ═══════════════════════════════════════════════════════════════
 // SETTINGS
