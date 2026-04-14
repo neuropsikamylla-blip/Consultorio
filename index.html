@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Gestão do Consultório</title>
 <style>
-:root{--bg:#0f1117;--bg2:#181c27;--bg3:#1e2333;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#9099b0;--text3:#5a6278;--green:#34d98a;--green-bg:rgba(52,217,138,0.10);--green-bg2:rgba(52,217,138,0.18);--red:#f06060;--red-bg:rgba(240,96,96,0.12);--yellow:#f5c842;--yellow-bg:rgba(245,200,66,0.12);--blue:#60a5fa;--blue-bg:rgba(96,165,250,0.12);--purple:#a78bfa;--purple-bg:rgba(167,139,250,0.12);--radius:14px;--radius-sm:9px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
+:root{--bg:#0f1117;--bg2:#181c27;--bg3:#1e2333;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#9099b0;--text3:#5a6278;--green:#34d98a;--green-bg:rgba(52,217,138,0.10);--green-bg2:rgba(52,217,138,0.18);--red:#f06060;--red-bg:rgba(240,96,96,0.12);--yellow:#f5c842;--yellow-bg:rgba(245,200,66,0.12);--blue:#60a5fa;--blue-bg:rgba(96,165,250,0.12);--purple:#a78bfa;--purple-bg:rgba(167,139,250,0.12);--orange:#fb923c;--orange-bg:rgba(251,146,60,0.12);--radius:14px;--radius-sm:9px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
 h1,h2,h3,h4{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;letter-spacing:-0.02em;font-weight:600;}
@@ -43,6 +43,9 @@ h1,h2,h3,h4{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helve
 .stat-card.green{border-color:rgba(52,217,138,0.2);background:linear-gradient(135deg,var(--bg2) 60%,rgba(52,217,138,0.04));}
 .stat-card.yellow{border-color:rgba(245,200,66,0.2);}
 .stat-card.blue{border-color:rgba(96,165,250,0.2);}
+.stat-card.note{border-color:rgba(245,200,66,0.3);background:linear-gradient(135deg,var(--bg2) 60%,rgba(245,200,66,0.04));display:flex;flex-direction:column;}
+.note-area{flex:1;background:transparent;border:none;border-top:1px solid var(--border);width:100%;color:var(--text);font-family:inherit;font-size:13px;line-height:1.6;resize:none;outline:none;padding-top:10px;min-height:90px;}
+.note-actions{display:flex;justify-content:flex-end;margin-top:8px;}
 .table-wrap{overflow-x:auto;}
 table{width:100%;border-collapse:collapse;}
 th{text-align:left;font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:11px 16px;border-bottom:1px solid var(--border);}
@@ -64,6 +67,7 @@ tr:hover td{background:var(--bg3);}
 .badge-psico{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(96,165,250,0.25);}
 .badge-reab{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(167,139,250,0.25);}
 .badge-aval{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
+.badge-avulsa{background:var(--orange-bg);color:var(--orange);border:1px solid rgba(251,146,60,0.25);}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;}
 .btn:active{transform:scale(0.97);}
 .btn-primary{background:var(--green);color:#0a1a12;}
@@ -83,6 +87,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0
 textarea{resize:vertical;min-height:80px;}
 select option{background:var(--bg3);}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
 .form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn 0.15s ease;}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:slideUp 0.2s ease;}
@@ -106,6 +111,7 @@ select option{background:var(--bg3);}
 .alert-red{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
 .alert-green{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
 .alert-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid rgba(245,200,66,0.25);}
+.alert-orange{background:var(--orange-bg);color:var(--orange);border:1px solid rgba(251,146,60,0.25);}
 .empty{text-align:center;padding:52px 20px;color:var(--text2);}
 .empty-icon{font-size:44px;margin-bottom:12px;opacity:0.4;}
 .search-input-wrap{position:relative;flex:1;}
@@ -136,6 +142,7 @@ select option{background:var(--bg3);}
 .cal-chip.psicoterapia{background:rgba(96,165,250,0.22);color:#93c5fd;border-left:2px solid var(--blue);}
 .cal-chip.reabilitacao{background:rgba(167,139,250,0.22);color:#c4b5fd;border-left:2px solid var(--purple);}
 .cal-chip.avaliacao{background:rgba(52,217,138,0.18);color:#6ee7b7;border-left:2px solid var(--green);}
+.cal-chip.avulsa{background:rgba(251,146,60,0.18);color:#fdba74;border-left:2px solid var(--orange);}
 .cal-chip.falta{background:rgba(240,96,96,0.18);color:#fca5a5;border-left:2px solid var(--red);text-decoration:line-through;}
 .cal-chip.realizada{opacity:0.55;}
 .cal-more{font-size:10px;color:var(--text3);padding:1px 6px;cursor:pointer;}
@@ -155,12 +162,18 @@ select option{background:var(--bg3);}
 .week-event.psicoterapia{background:rgba(96,165,250,0.25);color:#93c5fd;border-left:2px solid var(--blue);}
 .week-event.reabilitacao{background:rgba(167,139,250,0.25);color:#c4b5fd;border-left:2px solid var(--purple);}
 .week-event.avaliacao{background:rgba(52,217,138,0.2);color:#6ee7b7;border-left:2px solid var(--green);}
+.week-event.avulsa{background:rgba(251,146,60,0.2);color:#fdba74;border-left:2px solid var(--orange);}
 .week-event.falta{background:rgba(240,96,96,0.2);color:#fca5a5;border-left:2px solid var(--red);}
 .ds-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
 .ds-item:last-child{border-bottom:none;}
 .ds-bar{width:3px;height:36px;border-radius:99px;flex-shrink:0;}
+.expiring-pkg-card{background:var(--bg3);border:1px solid rgba(251,146,60,0.2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.expiring-pkg-card:last-child{margin-bottom:0;}
 .hamburger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;}
-@media(max-width:768px){.sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0);}.main{margin-left:0;padding:16px;}.grid-4{grid-template-columns:1fr 1fr;}.grid-2,.grid-3{grid-template-columns:1fr;}.form-row{grid-template-columns:1fr;}.hamburger{display:block;}.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;display:none;}.sidebar-overlay.open{display:block;}.month-day{min-height:70px;}}
+/* Form sections */
+.form-section{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:16px;}
+.form-section-title{font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+@media(max-width:768px){.sidebar{transform:translateX(-100%);}.sidebar.open{transform:translateX(0);}.main{margin-left:0;padding:16px;}.grid-4{grid-template-columns:1fr 1fr;}.grid-2,.grid-3{grid-template-columns:1fr;}.form-row,.form-row-3{grid-template-columns:1fr;}.hamburger{display:block;}.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99;display:none;}.sidebar-overlay.open{display:block;}.month-day{min-height:70px;}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 .page{animation:fadeIn 0.2s ease;}
@@ -216,6 +229,7 @@ const SUPA_URL='https://zrjrzorspfnohjzzykog.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanJ6b3JzcGZub2hqenp5a29nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTA4NTIsImV4cCI6MjA5MTY2Njg1Mn0.Y8vDMSqzV9IosWMltnA8j5zTZYRXB_OjUsIhdSdq-HI';
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
+const NOTES_KEY='consultorio_dashboard_notes';
 let _cache=null;
 let _idCounter=0;
 
@@ -226,8 +240,32 @@ function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return day+'/'
 function fmtDateTime(d,t){return t?fmtDate(d)+' às '+t:fmtDate(d);}
 function getInitials(name){if(!name)return'?';return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();}
 
+// Calculate age from birth date
+function calcAge(birthDate){
+  if(!birthDate)return null;
+  var today=new Date();var bd=new Date(birthDate+'T12:00:00');
+  var age=today.getFullYear()-bd.getFullYear();
+  var m=today.getMonth()-bd.getMonth();
+  if(m<0||(m===0&&today.getDate()<bd.getDate()))age--;
+  return age;
+}
+
+// Format CPF
+function fmtCpf(v){if(!v)return'—';var n=v.replace(/\D/g,'');if(n.length!==11)return v;return n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4');}
+
+// Mask CPF input
+function maskCpf(el){
+  var v=el.value.replace(/\D/g,'').slice(0,11);
+  if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
+  else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');
+  else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2');
+  el.value=v;
+}
+
 function getCreds(){const raw=localStorage.getItem(CREDS_KEY);if(raw)return JSON.parse(raw);return{email:'admin@admin.com',password:'1234',name:'Profissional'};}
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
+function getDashboardNotes(){return localStorage.getItem(NOTES_KEY)||'';}
+function saveDashboardNotes(v){localStorage.setItem(NOTES_KEY,v);}
 function getDB(){return _cache||{clients:[],packages:[],sessions:[]};}
 
 async function supaFetch(method,table,body,query){
@@ -261,7 +299,7 @@ async function loadFromSupabase(){
     _cache={
       clients:clients||[],
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
-      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false});})
+      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,isAvulsa:s.is_avulsa||false});})
     };
   }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};}
   showLoadingOverlay(false);
@@ -269,7 +307,10 @@ async function loadFromSupabase(){
 }
 
 // ── CRUD ──
-async function dbAddClient(data){const row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch('POST','clients',row);await loadFromSupabase();return row;}
+async function dbAddClient(data){
+  var row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);
+  await supaFetch('POST','clients',row);await loadFromSupabase();return row;
+}
 async function dbUpdateClient(id,data){await supaFetch('PATCH','clients',data,'?id=eq.'+id);await loadFromSupabase();}
 async function dbDeleteClient(id){await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();}
 
@@ -291,7 +332,19 @@ async function dbUpdatePackage(id,data){
 async function dbDeletePackage(id){await supaFetch('DELETE','packages',null,'?id=eq.'+id);await loadFromSupabase();}
 
 async function dbAddSession(data){
-  var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||'agendada',category:data.category||'psicoterapia',notes:data.notes||null,interval_days:data.intervalDays||null,created_at:new Date().toISOString()};
+  var row={
+    id:genId(),
+    client_id:data.clientId,
+    package_id:data.packageId||null,
+    date:data.date,
+    time:data.time||null,
+    status:data.status||'agendada',
+    category:data.category||'psicoterapia',
+    notes:data.notes||null,
+    interval_days:data.intervalDays||null,
+    created_at:new Date().toISOString(),
+    is_avulsa:data.isAvulsa||false
+  };
   await supaFetch('POST','sessions',row);await loadFromSupabase();return row;
 }
 async function dbUpdateSession(id,data){
@@ -302,6 +355,7 @@ async function dbUpdateSession(id,data){
   if(data.notes!==undefined)row.notes=data.notes;
   if(data.category)row.category=data.category;
   if(data.sessionPaid!==undefined)row.session_paid=data.sessionPaid;
+  if(data.isAvulsa!==undefined)row.is_avulsa=data.isAvulsa;
   await supaFetch('PATCH','sessions',row,'?id=eq.'+id);await loadFromSupabase();
 }
 async function dbDeleteSession(id){await supaFetch('DELETE','sessions',null,'?id=eq.'+id);await loadFromSupabase();}
@@ -346,13 +400,33 @@ function closeSidebar(){document.getElementById('sidebar').classList.remove('ope
 // ── HELPERS ──
 function paymentBadgeClass(s){if(s==='paid')return'badge-green';if(s==='parcela1')return'badge-parcial';return'badge-yellow';}
 function paymentLabel(s,t){if(s==='paid'&&t==='sessao')return'💳 Por Sessão';if(s==='paid')return'💰 Pago';if(s==='parcela1')return'🔶 1ª Parcela';return'⏳ Pendente';}
-function catColor(cat){if(!cat||cat==='psicoterapia')return'var(--blue)';if(cat==='reabilitacao')return'var(--purple)';if(cat==='avaliacao')return'var(--green)';return'var(--blue)';}
-function catBadgeClass(cat){if(!cat||cat==='psicoterapia')return'badge-psico';if(cat==='reabilitacao')return'badge-reab';if(cat==='avaliacao')return'badge-aval';return'badge-blue';}
-function catLabelShort(cat){if(!cat||cat==='psicoterapia')return'Psicoterapia';if(cat==='reabilitacao')return'Reabilitação';if(cat==='avaliacao')return'Avaliação';return cat||'—';}
+function catColor(cat){if(!cat||cat==='psicoterapia')return'var(--blue)';if(cat==='reabilitacao')return'var(--purple)';if(cat==='avaliacao')return'var(--green)';if(cat==='avulsa')return'var(--orange)';return'var(--blue)';}
+function catBadgeClass(cat){if(!cat||cat==='psicoterapia')return'badge-psico';if(cat==='reabilitacao')return'badge-reab';if(cat==='avaliacao')return'badge-aval';if(cat==='avulsa')return'badge-avulsa';return'badge-blue';}
+function catLabelShort(cat){if(!cat||cat==='psicoterapia')return'Psicoterapia';if(cat==='reabilitacao')return'Reabilitação';if(cat==='avaliacao')return'Avaliação';if(cat==='avulsa')return'Avulsa';return cat||'—';}
 function statusBadge(s){if(s==='realizada'||s==='completed')return['badge-realizada','✅ Realizada'];if(s==='falta')return['badge-falta','❌ Falta'];return['badge-agendada','📅 Agendada'];}
 function pkgStats(pkg){var db=getDB();var used=db.sessions.filter(function(s){return s.packageId===pkg.id&&(s.status==='realizada'||s.status==='completed');}).length;var total=db.sessions.filter(function(s){return s.packageId===pkg.id;}).length;return{used:used,remaining:pkg.totalSessions-used,totalRegistered:total,isExhausted:(pkg.totalSessions-used)<=0,canAdd:total<pkg.totalSessions,pct:Math.round((used/pkg.totalSessions)*100)};}
 function clientName(id){var c=getDB().clients.find(function(c){return c.id===id;});return c?c.name:'—';}
-function pkgName(id){var p=getDB().packages.find(function(p){return p.id===id;});return p?p.name:'—';}
+function pkgName(id){if(!id)return'Avulsa';var p=getDB().packages.find(function(p){return p.id===id;});return p?p.name:'—';}
+
+// ── EXPIRING PACKAGES (next 7 days) ──
+function getExpiringPackages(){
+  var db=getDB();
+  var result=[];
+  db.packages.forEach(function(pkg){
+    var st=pkgStats(pkg);
+    // find next session date
+    var futureSessions=db.sessions.filter(function(s){return s.packageId===pkg.id&&s.status==='agendada'&&s.date>=today();}).sort(function(a,b){return a.date.localeCompare(b.date);});
+    // package expires when remaining sessions <= 2 OR last session within 7 days
+    var lastSession=db.sessions.filter(function(s){return s.packageId===pkg.id;}).sort(function(a,b){return b.date.localeCompare(a.date);})[0];
+    var in7=new Date();in7.setDate(in7.getDate()+7);var in7s=in7.toISOString().split('T')[0];
+    var isExpiringSoon=lastSession&&lastSession.date>=today()&&lastSession.date<=in7s;
+    var hasLowRemaining=st.remaining<=2&&st.remaining>0&&futureSessions.length>0;
+    if((isExpiringSoon||hasLowRemaining)&&!st.isExhausted){
+      result.push({pkg:pkg,st:st,lastSession:lastSession,futureSessions:futureSessions});
+    }
+  });
+  return result;
+}
 
 // ── MODAL ──
 function showModal(title,bodyHTML,large){
@@ -378,9 +452,9 @@ function loadBackupFile(e){
       var data=JSON.parse(ev.target.result);
       if(!data.clients||!data.packages||!data.sessions)throw new Error();
       showToast('⏳ Restaurando...');
-      for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,cpf:c.cpf||null,birth_date:c.birthDate||null,education:c.education||null,address:c.address||null,created_at:c.createdAt||new Date().toISOString()});}
       for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',created_at:p.createdAt||new Date().toISOString()});}
-      for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId||null,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString(),is_avulsa:s.isAvulsa||false});}
       await loadFromSupabase();navigate(currentPage);showToast('✅ Backup restaurado!');
     }catch(err){console.error(err);showToast('❌ Arquivo inválido',true);}
   };
@@ -391,37 +465,54 @@ function loadBackupFile(e){
 function renderDashboard(){
   var db=getDB();
   var totalClients=db.clients.length;
-  var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
-  var totalPending=db.sessions.filter(function(s){return s.status==='agendada';}).length;
-  var totalFalta=db.sessions.filter(function(s){return s.status==='falta';}).length;
   var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var now=today();
   var in7=new Date();in7.setDate(in7.getDate()+7);
   var in7s=in7.toISOString().split('T')[0];
-  var upcoming=db.sessions.filter(function(s){return s.status==='agendada'&&s.date>=now&&s.date<=in7s;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,6);
-  var recent=db.sessions.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,5);
+  var upcoming=db.sessions.filter(function(s){return s.status==='agendada'&&s.date>=now&&s.date<=in7s;}).sort(function(a,b){return a.date.localeCompare(b.date)||( a.time||'').localeCompare(b.time||'');}).slice(0,8);
+  var expiringPkgs=getExpiringPackages();
+  var notes=getDashboardNotes();
+
   var upcomingHtml='';
-  upcoming.forEach(function(s){upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';});
-  var recentHtml='';
-  recent.forEach(function(s){var sb=statusBadge(s.status);recentHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDate(s.date)+'</div></div><span class="badge '+sb[0]+'">'+sb[1]+'</span></div>';});
+  upcoming.forEach(function(s){
+    upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';
+  });
+
+  var expiringHtml='';
+  if(expiringPkgs.length===0){
+    expiringHtml='<div class="empty" style="padding:24px"><div class="empty-icon">✅</div><p>Nenhum pacote encerrando em breve</p></div>';
+  }else{
+    expiringPkgs.forEach(function(item){
+      var lastDateFmt=item.lastSession?fmtDate(item.lastSession.date):'—';
+      var remaining=item.st.remaining;
+      var color=remaining<=1?'var(--red)':'var(--yellow)';
+      expiringHtml+='<div class="expiring-pkg-card"><div style="width:36px;height:36px;border-radius:10px;background:rgba(251,146,60,0.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📦</div><div style="flex:1"><div style="font-weight:700;font-size:13.5px">'+clientName(item.pkg.clientId)+'</div><div style="font-size:12px;color:var(--text2);margin-top:2px">'+item.pkg.name+' · Última: '+lastDateFmt+'</div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:18px;font-weight:700;color:'+color+';line-height:1">'+remaining+'</div><div style="font-size:10px;color:var(--text3)">restante'+(remaining!==1?'s':'')+'</div></div></div>';
+    });
+  }
+
   var html='<div class="page"><div class="grid-4">';
   html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
-  html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
-  html+='<div class="stat-card yellow"><div class="stat-icon">📅</div><div class="stat-val">'+totalPending+'</div><div class="stat-label">Agendadas</div></div>';
-  html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
+  html+='<div class="stat-card" style="border-color:rgba(52,217,138,0.2)"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
+  html+='<div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:20px">'+fmt(pendRev)+'</div><div class="stat-label">Pagamentos Pendentes</div></div>';
+  // Post-it Notes card
+  html+='<div class="stat-card note" style="min-height:140px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em">📌 Notas Importantes</div></div><textarea class="note-area" id="dashboard-note-area" placeholder="Adicione lembretes aqui...&#10;Ex: Emitir NF no dia 10...">'+escHtml(notes)+'</textarea><div class="note-actions"><button class="btn btn-sm" style="background:rgba(245,200,66,0.15);color:var(--yellow);border:1px solid rgba(245,200,66,0.3);font-size:11px;" onclick="saveNoteArea()">💾 Salvar</button></div></div>';
   html+='</div>';
+
   if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
-  if(totalFalta>0)html+='<div class="alert alert-red" style="margin-bottom:20px">❌ <strong>'+totalFalta+'</strong> falta'+(totalFalta!==1?'s':'')+' registrada'+(totalFalta!==1?'s':'')+'</div>';
+
   html+='<div class="grid-2">';
-  html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>';
+  html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas sessões (7 dias)</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>';
   html+=upcoming.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>':upcomingHtml;
   html+='</div>';
-  html+='<div class="card"><div class="section-header"><div class="section-title">🕐 Sessões Recentes</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'sessions\')">Ver todas →</button></div>';
-  html+=recent.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão ainda</p></div>':recentHtml;
+  html+='<div class="card"><div class="section-header"><div class="section-title">📦 Pacotes encerrando</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver pacotes →</button></div>';
+  html+=expiringHtml;
   html+='</div></div></div>';
   document.getElementById('page-content').innerHTML=html;
 }
+
+function escHtml(v){return(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+window.saveNoteArea=function(){var el=document.getElementById('dashboard-note-area');if(el){saveDashboardNotes(el.value);showToast('📌 Notas salvas!');}};
 
 // ── CLIENTS ──
 function renderClients(){
@@ -434,10 +525,11 @@ function renderClients(){
     filtered.forEach(function(c){
       var pkgs=db.packages.filter(function(p){return p.clientId===c.id;});
       var done=db.sessions.filter(function(s){return s.clientId===c.id&&(s.status==='realizada'||s.status==='completed');}).length;
-      rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0">'+getInitials(c.name)+'</div><div><div style="font-weight:600">'+c.name+'</div>'+(c.email?'<div style="font-size:12px;color:var(--text2)">'+c.email+'</div>':'')+'</div></div></td><td class="td-muted">'+(c.phone||'—')+'</td><td><span class="badge badge-blue">'+pkgs.length+' pacote'+(pkgs.length!==1?'s':'')+'</span></td><td><span class="badge badge-green">'+done+' realizada'+(done!==1?'s':'')+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showClientDetail(\''+c.id+'\')">👁️</button><button class="btn-icon" onclick="showSessionForm(\''+c.id+'\')">📝</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></td></tr>';
+      var age=calcAge(c.birth_date);
+      rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0">'+getInitials(c.name)+'</div><div><div style="font-weight:600">'+c.name+'</div>'+(c.email?'<div style="font-size:12px;color:var(--text2)">'+c.email+'</div>':'')+(age!==null?'<div style="font-size:11px;color:var(--text3)">'+age+' anos</div>':'')+'</div></div></td><td class="td-muted">'+(c.phone||'—')+'</td><td class="td-muted" style="font-size:12px">'+(c.cpf?fmtCpf(c.cpf):'—')+'</td><td><span class="badge badge-blue">'+pkgs.length+' pacote'+(pkgs.length!==1?'s':'')+'</span></td><td><span class="badge badge-green">'+done+' realizada'+(done!==1?'s':'')+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showClientDetail(\''+c.id+'\')">👁️</button><button class="btn-icon" onclick="showSessionForm(\''+c.id+'\')">📝</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></td></tr>';
     });
     var html='<div class="page"><div style="display:flex;gap:10px;margin-bottom:18px"><div class="search-input-wrap"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar cliente..." value="'+search+'" oninput="window._cs(this.value)" style="padding-left:36px"/></div></div>';
-    html+=filtered.length===0?'<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente encontrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>Pacotes</th><th>Sessões</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    html+=filtered.length===0?'<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente encontrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>CPF</th><th>Pacotes</th><th>Sessões</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
     html+='</div>';
     document.getElementById('page-content').innerHTML=html;
   }
@@ -445,15 +537,55 @@ function renderClients(){
   render();
 }
 
+function educationOptions(selected){
+  var opts=['','Não informado','Ensino Fundamental Incompleto','Ensino Fundamental Completo','Ensino Médio Incompleto','Ensino Médio Completo','Ensino Superior Incompleto','Ensino Superior Completo','Pós-graduação','Mestrado','Doutorado'];
+  return opts.map(function(o){return'<option value="'+o+'" '+(o===selected?'selected':'')+'>'+( o||'Selecione...')+'</option>';}).join('');
+}
+
 function showClientForm(id){
   var db=getDB();var c=id?db.clients.find(function(c){return c.id===id;}):null;
-  showModal(id?'Editar Cliente':'Novo Cliente','<div class="form-group"><label>Nome *</label><input type="text" id="cf-name" value="'+(c?c.name||'':'')+'" placeholder="Nome completo"/></div><div class="form-row"><div class="form-group"><label>Telefone</label><input type="tel" id="cf-phone" value="'+(c?c.phone||'':'')+'" placeholder="(11) 99999-9999"/></div><div class="form-group"><label>Email</label><input type="email" id="cf-email" value="'+(c?c.email||'':'')+'" placeholder="email@exemplo.com"/></div></div><div class="form-group"><label>Observações</label><textarea id="cf-notes">'+(c?c.notes||'':'')+'</textarea></div><div id="cf-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveClient(\''+( id||'')+'\');})()">Salvar</button></div>');
+  var body='';
+  body+='<div class="form-section"><div class="form-section-title">👤 Dados Básicos</div>';
+  body+='<div class="form-group"><label>Nome *</label><input type="text" id="cf-name" value="'+(c?c.name||'':'')+'" placeholder="Nome completo"/></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Telefone</label><input type="tel" id="cf-phone" value="'+(c?c.phone||'':'')+'" placeholder="(11) 99999-9999"/></div><div class="form-group"><label>Email</label><input type="email" id="cf-email" value="'+(c?c.email||'':'')+'" placeholder="email@exemplo.com"/></div></div>';
+  body+='</div>';
+
+  body+='<div class="form-section"><div class="form-section-title">📋 Dados Complementares (opcionais)</div>';
+  body+='<div class="form-row"><div class="form-group"><label>CPF</label><input type="text" id="cf-cpf" value="'+(c?fmtCpf(c.cpf||''):'').replace('—','')+'" placeholder="000.000.000-00" oninput="maskCpf(this)" maxlength="14"/></div><div class="form-group"><label>Data de Nascimento</label><input type="date" id="cf-birth" value="'+(c?c.birth_date||'':'')+'"/></div></div>';
+  body+='<div id="cf-age-display" style="font-size:12px;color:var(--text2);margin-top:-8px;margin-bottom:12px;">'+(c&&c.birth_date?'🎂 Idade calculada: <strong style="color:var(--text)">'+calcAge(c.birth_date)+' anos</strong>':'')+'</div>';
+  body+='<div class="form-group"><label>Escolaridade</label><select id="cf-education">'+educationOptions(c?c.education||'':'')+'</select></div>';
+  body+='<div class="form-group"><label>Endereço</label><input type="text" id="cf-address" value="'+(c?c.address||'':'')+'" placeholder="Rua, número, bairro, cidade..."/></div>';
+  body+='</div>';
+
+  body+='<div class="form-group"><label>Observações</label><textarea id="cf-notes">'+(c?c.notes||'':'')+'</textarea></div>';
+  body+='<div id="cf-error" class="alert alert-red" style="display:none"></div>';
+  body+='<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveClient(\''+( id||'')+'\');})()">Salvar</button></div>';
+
+  showModal(id?'Editar Cliente':'Novo Cliente',body,true);
+
+  // Age live update
+  setTimeout(function(){
+    var bd=document.getElementById('cf-birth');
+    var ad=document.getElementById('cf-age-display');
+    if(bd&&ad){bd.addEventListener('change',function(){var age=calcAge(bd.value);ad.innerHTML=age!==null?'🎂 Idade calculada: <strong style="color:var(--text)">'+age+' anos</strong>':'';});}
+  },50);
 }
+
 async function saveClient(id){
   var name=document.getElementById('cf-name').value.trim();
   var err=document.getElementById('cf-error');
   if(!name){err.textContent='Nome é obrigatório';err.style.display='flex';return;}
-  var data={name:name,phone:document.getElementById('cf-phone').value.trim()||null,email:document.getElementById('cf-email').value.trim()||null,notes:document.getElementById('cf-notes').value.trim()||null};
+  var cpfRaw=document.getElementById('cf-cpf').value.replace(/\D/g,'')||null;
+  var data={
+    name:name,
+    phone:document.getElementById('cf-phone').value.trim()||null,
+    email:document.getElementById('cf-email').value.trim()||null,
+    notes:document.getElementById('cf-notes').value.trim()||null,
+    cpf:cpfRaw,
+    birth_date:document.getElementById('cf-birth').value||null,
+    education:document.getElementById('cf-education').value||null,
+    address:document.getElementById('cf-address').value.trim()||null
+  };
   closeModal();
   try{
     if(id){await dbUpdateClient(id,data);}
@@ -461,34 +593,48 @@ async function saveClient(id){
     renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
   }catch(e){showToast('❌ Erro ao salvar.',true);}
 }
+
 function deleteClientConfirm(id){
   var c=getDB().clients.find(function(c){return c.id===id;});
   showModal('Excluir Cliente','<div class="alert alert-red">⚠️ Excluir <strong>'+c.name+'</strong> e todos os seus dados?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){await deleteClientDo(\''+id+'\');})()">Excluir</button></div>');
 }
-async function deleteClientDo(id){closeModal();var db=getDB();db.clients.filter(function(c){return c.id===id;});await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();renderClients();showToast('🗑️ Cliente excluído');}
+async function deleteClientDo(id){closeModal();await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();renderClients();showToast('🗑️ Cliente excluído');}
 
 function showClientDetail(id){
   var db=getDB();var c=db.clients.find(function(c){return c.id===id;});if(!c)return;
   var pkgs=db.packages.filter(function(p){return p.clientId===id;});
   var sessions=db.sessions.filter(function(s){return s.clientId===id;}).sort(function(a,b){return b.date.localeCompare(a.date);});
+  var age=calcAge(c.birth_date);
+
+  var infoHtml='';
+  if(c.cpf)infoHtml+='<div style="font-size:13px;color:var(--text2)">🪪 CPF: '+fmtCpf(c.cpf)+'</div>';
+  if(c.birth_date)infoHtml+='<div style="font-size:13px;color:var(--text2)">🎂 '+fmtDate(c.birth_date)+(age!==null?' ('+age+' anos)':'')+'</div>';
+  if(c.education&&c.education!=='Não informado')infoHtml+='<div style="font-size:13px;color:var(--text2)">🎓 '+c.education+'</div>';
+  if(c.address)infoHtml+='<div style="font-size:13px;color:var(--text2)">📍 '+c.address+'</div>';
+  if(c.phone)infoHtml+='<div style="font-size:13px;color:var(--text2)">📱 '+c.phone+'</div>';
+  if(c.email)infoHtml+='<div style="font-size:13px;color:var(--text2)">✉️ '+c.email+'</div>';
+  if(c.notes)infoHtml+='<div style="font-size:12px;color:var(--text3);margin-top:4px">'+c.notes+'</div>';
+
   var pkgsHtml=pkgs.length===0?'<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>':'';
   pkgs.forEach(function(p){var st=pkgStats(p);var bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';pkgsHtml+='<div class="package-card"><div class="package-header"><div><strong>'+p.name+'</strong>'+(st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':'')+'</div><span class="badge '+paymentBadgeClass(p.paymentStatus)+'">'+paymentLabel(p.paymentStatus,p.paymentType)+'</span></div><div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">'+p.totalSessions+'</strong></span><span style="font-size:12px;color:var(--text2)">Realizadas: <strong style="color:var(--text)">'+st.used+'</strong></span><span style="font-size:12px;color:var(--text2)">Restantes: <strong style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--green)')+'">'+st.remaining+'</strong></span><span style="font-size:12px;color:var(--text2)">Valor: <strong style="color:var(--text)">'+fmt(p.price)+'</strong></span></div><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></div>';});
   var sessHtml='<table style="width:100%;border-collapse:collapse"><thead><tr><th>Data</th><th>Hora</th><th>Categoria</th><th>Status</th><th></th></tr></thead><tbody>';
-  sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<tr><td>'+fmtDate(s.date)+'</td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td><span class="badge '+sb[0]+'">'+sb[1]+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="(async function(){await dbDeleteSession(\''+s.id+'\');showToast(\'🗑️ Removida\');showClientDetail(\''+id+'\');})()">🗑️</button></div></td></tr>';});
+  sessions.forEach(function(s){var sb=statusBadge(s.status);var isAvulsa=s.isAvulsa||!s.packageId;sessHtml+='<tr><td>'+fmtDate(s.date)+'</td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+(isAvulsa?'badge-avulsa':catBadgeClass(s.category))+'">'+( isAvulsa?'🟠 Avulsa':catLabelShort(s.category))+'</span></td><td><span class="badge '+sb[0]+'">'+sb[1]+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="(async function(){await dbDeleteSession(\''+s.id+'\');showToast(\'🗑️ Removida\');showClientDetail(\''+id+'\');})()">🗑️</button></div></td></tr>';});
   sessHtml+='</tbody></table>';
-  showModal('Cliente: '+c.name,'<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px"><div class="client-avatar">'+getInitials(c.name)+'</div><div>'+(c.phone?'<div style="font-size:13px;color:var(--text2)">📱 '+c.phone+'</div>':'')+(c.email?'<div style="font-size:13px;color:var(--text2)">✉️ '+c.email+'</div>':'')+(c.notes?'<div style="font-size:12px;color:var(--text3);margin-top:4px">'+c.notes+'</div>':'')+'</div></div><div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\')">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\')">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\')">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
+  showModal('Cliente: '+c.name,'<div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px"><div class="client-avatar">'+getInitials(c.name)+'</div><div style="flex:1">'+infoHtml+'</div></div><div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\')">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\')">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\')">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
 }
 
 // ── PACKAGES ──
 function renderPackages(){
   var db=getDB();
   document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showPackageForm()">+ Novo Pacote</button>';
+  // Sort packages alphabetically by name
+  var sortedPkgs=db.packages.slice().sort(function(a,b){return a.name.localeCompare(b.name,'pt-BR',{sensitivity:'base'});});
   var rows='';
-  db.packages.forEach(function(p){
+  sortedPkgs.forEach(function(p){
     var st=pkgStats(p);var bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';
     rows+='<tr><td><strong>'+p.name+'</strong>'+(st.isExhausted?'<span class="badge badge-red" style="margin-left:6px">Encerrado</span>':'')+'</td><td>'+clientName(p.clientId)+'</td><td><span style="color:var(--green)">'+st.used+'</span><span style="color:var(--text3)"> / '+p.totalSessions+'</span><span style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--text2)')+'">('+st.remaining+' rest.)</span></td><td style="min-width:100px"><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></td><td>'+fmt(p.price)+'</td><td><span class="badge '+paymentBadgeClass(p.paymentStatus)+'" style="cursor:pointer" onclick="(async function(){await cyclePayment(\''+p.id+'\');})()">'+paymentLabel(p.paymentStatus,p.paymentType)+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showPackageForm(null,\''+p.id+'\')">✏️</button><button class="btn-icon" onclick="deletePackageConfirm(\''+p.id+'\')">🗑️</button></div></td></tr>';
   });
-  var html='<div class="page">'+(db.packages.length===0?'<div class="card"><div class="empty"><div class="empty-icon">📦</div><p>Nenhum pacote cadastrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Pacote</th><th>Cliente</th><th>Sessões</th><th>Progresso</th><th>Valor</th><th>Pagamento</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>')+'</div>';
+  var html='<div class="page">'+(sortedPkgs.length===0?'<div class="card"><div class="empty"><div class="empty-icon">📦</div><p>Nenhum pacote cadastrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Pacote</th><th>Cliente</th><th>Sessões</th><th>Progresso</th><th>Valor</th><th>Pagamento</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>')+'</div>';
   document.getElementById('page-content').innerHTML=html;
 }
 
@@ -554,7 +700,7 @@ async function savePackage(id){
   var successCount=0;
   for(var i=0;i<totalSessions;i++){
     var d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+(i*interval));
-    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
+    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString(),is_avulsa:false})});
     if(sessRes.ok)successCount++;
   }
   await loadFromSupabase();renderPackages();
@@ -623,13 +769,23 @@ function renderSessions(){
     var rows='';
     sessions.forEach(function(s){
       var sb=statusBadge(s.status);
-      var pkgSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-      var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
-      var pkg=db.packages.find(function(p){return p.id===s.packageId;});
-      var total=pkg?pkg.totalSessions:'?';
-      var isPaidPerSession=pkg&&pkg.paymentType==='sessao';
+      var isAvulsa=s.isAvulsa||!s.packageId;
+      var sessNumDisplay='';
+      var pkgDisplay='';
+      if(isAvulsa){
+        sessNumDisplay='<span style="color:var(--orange);font-size:12px;font-weight:600">Avulsa</span>';
+        pkgDisplay='<span class="badge badge-avulsa">Avulsa</span>';
+      }else{
+        var pkgSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+        var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
+        var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+        var total=pkg?pkg.totalSessions:'?';
+        sessNumDisplay='<strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong>';
+        pkgDisplay=pkgName(s.packageId);
+      }
+      var isPaidPerSession=s.packageId&&(function(){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return pkg&&pkg.paymentType==='sessao';})();
       var paidCell=isPaidPerSession?'<td><span class="badge '+(s.sessionPaid?'badge-green':'badge-yellow')+'" style="cursor:pointer" onclick="(async function(){await toggleSessionPaid(\''+s.id+'\');})()">'+( s.sessionPaid?'💰 Pago':'⏳ A pagar')+'</span></td>':'<td></td>';
-      rows+='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
+      rows+='<tr><td>'+sessNumDisplay+'</td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgDisplay+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
     });
     html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(clientName(clientId))+'</div><div><div style="font-weight:700;font-size:15px">'+clientName(clientId)+'</div><div style="font-size:12px;color:var(--text2);margin-top:2px">'+sessions.length+' sessão'+(sessions.length!==1?'ões:':':')+' <span style="color:var(--green)">'+completedCount+' realizada'+(completedCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+clientId+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+clientId+'\')">Ver perfil →</button></div></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   });
@@ -640,11 +796,18 @@ function renderSessions(){
 function showSessionForm(preClientId,preDate){
   var db=getDB();
   if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
-  if(db.packages.length===0){showToast('❌ Crie um pacote primeiro!',true);return;}
   var clientOpts='<option value="">Selecione...</option>';
   db.clients.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(c){clientOpts+='<option value="'+c.id+'" '+(c.id===preClientId?'selected':'')+'>'+c.name+'</option>';});
-  var body='<div class="form-group"><label>Cliente *</label><select id="sf-client" onchange="updatePkgOpts()">'+clientOpts+'</select></div>';
-  body+='<div class="form-group"><label>Pacote *</label><select id="sf-package"><option value="">Selecione o cliente primeiro...</option></select></div>';
+  var body='';
+
+  // Session type toggle
+  body+='<div style="margin-bottom:16px"><div style="font-size:10.5px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Tipo de Sessão</div><div style="display:flex;gap:6px"><button type="button" id="btn-tipo-pacote" class="btn btn-secondary" style="flex:1;justify-content:center;border-color:var(--green);color:var(--green)" onclick="setSessionTipo(\'pacote\')">📦 Vinculada ao Pacote</button><button type="button" id="btn-tipo-avulsa" class="btn btn-secondary" style="flex:1;justify-content:center" onclick="setSessionTipo(\'avulsa\')">🟠 Sessão Avulsa</button></div></div>';
+
+  body+='<div class="form-group"><label>Cliente *</label><select id="sf-client" onchange="updatePkgOpts()">'+clientOpts+'</select></div>';
+
+  // Package field (shown for pacote type)
+  body+='<div id="sf-pkg-wrap"><div class="form-group"><label>Pacote *</label><select id="sf-package"><option value="">Selecione o cliente primeiro...</option></select></div></div>';
+
   body+='<div class="form-group"><label>Categoria *</label><select id="sf-category"><option value="psicoterapia">🔵 Psicoterapia</option><option value="reabilitacao">🟣 Reabilitação</option><option value="avaliacao">🟢 Avaliação</option></select></div>';
   body+='<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="'+(preDate||today())+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="sf-time" value="09:00"/></div></div>';
   body+='<div class="form-group"><label>Status</label><select id="sf-status"><option value="agendada">📅 Agendada</option><option value="realizada">✅ Realizada</option><option value="falta">❌ Falta</option></select></div>';
@@ -652,8 +815,27 @@ function showSessionForm(preClientId,preDate){
   body+='<div id="sf-warn" class="alert alert-yellow" style="display:none"></div><div id="sf-error" class="alert alert-red" style="display:none"></div>';
   body+='<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveSession();})()">Salvar</button></div>';
   showModal('Nova Sessão',body);
+
+  window._sessionTipo='pacote';
+  window.setSessionTipo=function(tipo){
+    window._sessionTipo=tipo;
+    var b1=document.getElementById('btn-tipo-pacote');var b2=document.getElementById('btn-tipo-avulsa');
+    var wrap=document.getElementById('sf-pkg-wrap');
+    if(tipo==='pacote'){
+      b1.style.borderColor='var(--green)';b1.style.color='var(--green)';
+      b2.style.borderColor='';b2.style.color='';
+      wrap.style.display='';
+    }else{
+      b2.style.borderColor='var(--orange)';b2.style.color='var(--orange)';
+      b1.style.borderColor='';b1.style.color='';
+      wrap.style.display='none';
+    }
+  };
+
   if(preClientId)setTimeout(function(){updatePkgOpts(preClientId);},50);
+  else if(db.packages.length===0){setTimeout(function(){window.setSessionTipo('avulsa');},50);}
 }
+
 window.updatePkgOpts=function(forceId){
   var clientId=forceId||document.getElementById('sf-client').value;
   var sel=document.getElementById('sf-package');var warn=document.getElementById('sf-warn');
@@ -662,21 +844,34 @@ window.updatePkgOpts=function(forceId){
   sel.innerHTML=pkgs.length===0?'<option value="">Nenhum pacote</option>':pkgs.map(function(p){var st=pkgStats(p);return'<option value="'+p.id+'" '+(st.isExhausted?'disabled':'')+'>'+p.name+(st.isExhausted?' — ENCERRADO':' ('+st.remaining+' restante'+(st.remaining!==1?'s':'')+')')+'</option>';}).join('');
   if(warn){var ae=pkgs.length>0&&pkgs.every(function(p){return pkgStats(p).isExhausted;});warn.style.display=ae?'flex':'none';if(ae)warn.textContent='⚠️ Todos os pacotes estão esgotados.';}
 };
+
 async function saveSession(){
-  var clientId=document.getElementById('sf-client').value;var packageId=document.getElementById('sf-package').value;var date=document.getElementById('sf-date').value;var time=document.getElementById('sf-time').value;var status=document.getElementById('sf-status').value;var notes=document.getElementById('sf-notes').value.trim();var category=document.getElementById('sf-category').value;
+  var clientId=document.getElementById('sf-client').value;
+  var date=document.getElementById('sf-date').value;
+  var time=document.getElementById('sf-time').value;
+  var status=document.getElementById('sf-status').value;
+  var notes=document.getElementById('sf-notes').value.trim();
+  var category=document.getElementById('sf-category').value;
+  var isAvulsa=window._sessionTipo==='avulsa';
+  var packageId=isAvulsa?null:document.getElementById('sf-package').value;
   var err=document.getElementById('sf-error');
-  if(!clientId||!packageId||!date){err.textContent='Preencha todos os campos';err.style.display='flex';return;}
-  var db=getDB();var pkg=db.packages.find(function(p){return p.id===packageId;});var st=pkgStats(pkg);
-  if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
+  if(!clientId||!date){err.textContent='Preencha todos os campos';err.style.display='flex';return;}
+  if(!isAvulsa&&!packageId){err.textContent='Selecione um pacote';err.style.display='flex';return;}
+  var db=getDB();
+  if(!isAvulsa){
+    var pkg=db.packages.find(function(p){return p.id===packageId;});var st=pkgStats(pkg);
+    if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
+  }
   if(time&&date){var conflict=db.sessions.find(function(s){return s.date===date&&s.time===time&&s.clientId!==clientId;});if(conflict&&!window.confirm('⚠️ Já existe atendimento com '+clientName(conflict.clientId)+' às '+time+' do dia '+fmtDate(date)+'. Agendar mesmo assim?'))return;}
-  closeModal();await dbAddSession({clientId:clientId,packageId:packageId,date:date,time:time,status:status,notes:notes,category:category});
+  closeModal();
+  await dbAddSession({clientId:clientId,packageId:packageId,date:date,time:time,status:status,notes:notes,category:category,isAvulsa:isAvulsa});
   if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
-  showToast('✅ Sessão registrada!');
+  showToast(isAvulsa?'✅ Sessão avulsa registrada!':'✅ Sessão registrada!');
 }
 
 function showSessionEditForm(id){
   var db=getDB();var s=db.sessions.find(function(ss){return ss.id===id;});if(!s)return;
-  var futureSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date;}).length;
+  var futureSessions=s.packageId?db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date;}).length:0;
   var body='<div class="form-group"><label>Categoria</label><select id="se-cat"><option value="psicoterapia" '+(( s.category||'psicoterapia')==='psicoterapia'?'selected':'')+'>🔵 Psicoterapia</option><option value="reabilitacao" '+(s.category==='reabilitacao'?'selected':'')+'>🟣 Reabilitação</option><option value="avaliacao" '+(s.category==='avaliacao'?'selected':'')+'>🟢 Avaliação</option></select></div>';
   body+='<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="se-date" value="'+s.date+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="se-time" value="'+(s.time||'09:00')+'"/></div></div>';
   body+='<div class="form-group"><label>Status</label><select id="se-status"><option value="agendada" '+((s.status==='agendada'||s.status==='pending')?'selected':'')+'>📅 Agendada</option><option value="realizada" '+((s.status==='realizada'||s.status==='completed')?'selected':'')+'>✅ Realizada</option><option value="falta" '+(s.status==='falta'?'selected':'')+'>❌ Falta</option></select></div>';
@@ -737,15 +932,17 @@ function buildMonthDay(dt,db,todayStr,other){
   var show=sessions.slice(0,8);var extra=sessions.length-8;
   var chips='';
   show.forEach(function(s){
-    var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+    var isAvulsa=s.isAvulsa||!s.packageId;
+    var chipCat=isAvulsa?'avulsa':(s.category||'psicoterapia');
+    var pkg=isAvulsa?null:db.packages.find(function(p){return p.id===s.packageId;});
     var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'');}):[];
     var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
     var total=pkg?pkg.totalSessions:0;
     var parts=clientName(s.clientId).split(' ');
     var shortName=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
-    var label=pkg?shortName+' '+sessNum+'/'+total:shortName;
-    var chipClass=(s.category||'psicoterapia')+(s.status==='falta'?' falta':s.status==='realizada'?' realizada':'');
-    chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
+    var label=isAvulsa?shortName+'⚡':(pkg?shortName+' '+sessNum+'/'+total:shortName);
+    var chipClass=chipCat+(s.status==='falta'?' falta':s.status==='realizada'?' realizada':'');
+    chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+(isAvulsa?' (Avulsa)':pkg?' — Sessão '+sessNum+'/'+total:'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
   });
   if(extra>0)chips+='<div class="cal-more">+'+extra+' mais</div>';
   return'<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">'+dt.getDate()+'</div>'+chips+'</div>';
@@ -765,12 +962,14 @@ function buildWeekGrid(db,todayStr){
       var sessions=db.sessions.filter(function(s){return s.date===ds&&(s.time||'').startsWith(hStr);});
       var evts='';
       sessions.forEach(function(s){
-        var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+        var isAvulsa=s.isAvulsa||!s.packageId;
+        var evtCat=isAvulsa?'avulsa':(s.category||'psicoterapia');
+        var pkg=isAvulsa?null:db.packages.find(function(p){return p.id===s.packageId;});
         var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'');}):[];
         var n=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;var t=pkg?pkg.totalSessions:0;
         var parts=clientName(s.clientId).split(' ');var fn=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
-        var lbl=pkg?fn+' '+n+'/'+t:fn;
-        evts+='<span class="week-event '+(s.category||'psicoterapia')+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+lbl+'</span>';
+        var lbl=isAvulsa?fn+'⚡':(pkg?fn+' '+n+'/'+t:fn);
+        evts+='<span class="week-event '+evtCat+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+lbl+'</span>';
       });
       html+='<div class="week-cell" onclick="dayClick(\''+ds+'\')">'+evts+'</div>';
     });
@@ -784,7 +983,7 @@ window.calGoToday=function(){calDate=new Date();renderCalendar();};
 window.dayClick=function(dateStr){
   var db=getDB();var sessions=db.sessions.filter(function(s){return s.date===dateStr;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
   var sessHtml=sessions.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>':'<div>';
-  sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+(s.time||'')+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
+  sessions.forEach(function(s){var sb=statusBadge(s.status);var isAvulsa=s.isAvulsa||!s.packageId;sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+(isAvulsa?'var(--orange)':catColor(s.category))+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+(isAvulsa?' <span class="badge badge-avulsa" style="font-size:10px">Avulsa</span>':'')+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+(s.time||'')+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
   if(sessions.length>0)sessHtml+='</div>';
   showModal('📅 '+fmtDate(dateStr),sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
 };
