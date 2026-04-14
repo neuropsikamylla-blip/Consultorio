@@ -256,14 +256,14 @@ async function loadFromSupabase(){
     const [clients,packages,sessions]=await Promise.all([
       supaFetch('GET','clients',null,'?order=name'),
       supaFetch('GET','packages',null,'?order=created_at'),
-      supaFetch('GET','sessions',null,'?order=date,time')
+      supaFetch('GET','sessions',null,'?order=date')
     ]);
     _cache={
       clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
       sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false});})
     };
-  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};}
+  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados. Recarregue a página.',true);}
   showLoadingOverlay(false);
   return _cache;
 }
@@ -390,6 +390,15 @@ function loadBackupFile(e){
 // ── DASHBOARD ──
 function renderDashboard(){
   var db=getDB();
+  // If no data, show reload button
+  if(!db.clients.length && !db.packages.length){
+    document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados do servidor...</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar dados</button></div></div>';
+    loadFromSupabase().then(function(){
+      var db2=getDB();
+      if(db2.clients.length||db2.packages.length)renderDashboard();
+    });
+    return;
+  }
   var totalClients=db.clients.length;
   var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
   var totalPending=db.sessions.filter(function(s){return s.status==='agendada';}).length;
