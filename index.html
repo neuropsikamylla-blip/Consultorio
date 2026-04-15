@@ -317,9 +317,10 @@ async function doLogin(){
   var btn=document.querySelector('#login-screen .btn-primary');
   if(btn){btn.textContent='Entrando...';btn.disabled=true;}
   try{
-    var users=await supaFetch('GET','users',null,'?email=eq.'+encodeURIComponent(email)+'&password=eq.'+encodeURIComponent(pass));
-    if(users&&users.length>0){
-      _currentUser={id:users[0].id,email:users[0].email,name:users[0].name};
+    var users=await supaFetch('GET','users',null,'?email=eq.'+encodeURIComponent(email));
+    var matched=users&&users.find(function(u){return u.password===pass;});
+    if(matched){
+      _currentUser={id:matched.id,email:matched.email,name:matched.name};
       localStorage.setItem(AUTH_KEY,JSON.stringify(_currentUser));
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='flex';
@@ -328,10 +329,13 @@ async function doLogin(){
       navigate('dashboard');
       setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
     }else{
+      err.textContent='Email ou senha incorretos';
       err.style.display='flex';
       if(btn){btn.textContent='Entrar →';btn.disabled=false;}
     }
   }catch(e){
+    console.error('Login error:',e);
+    err.textContent='Erro de conexão. Tente novamente.';
     err.style.display='flex';
     if(btn){btn.textContent='Entrar →';btn.disabled=false;}
   }
@@ -969,8 +973,9 @@ async function saveSettings(){
   if(!name||!email){err.textContent='Nome e email obrigatórios';err.style.display='flex';return;}
   if(!current){err.textContent='Digite a senha atual';err.style.display='flex';return;}
   // Verify current password against DB
-  var users=await supaFetch('GET','users',null,'?id=eq.'+_currentUser.id+'&password=eq.'+encodeURIComponent(current));
-  if(!users||!users.length){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
+  var users=await supaFetch('GET','users',null,'?id=eq.'+_currentUser.id);
+  var matched2=users&&users.find(function(u){return u.password===current;});
+  if(!matched2){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
   if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
   if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
   var upd={name:name,email:email};if(np)upd.password=np;
