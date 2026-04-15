@@ -724,17 +724,19 @@ function renderSessions(){
       var pkg=db.packages.find(function(p){return p.id===s.packageId;});
       var total=pkg?pkg.totalSessions:'?';
       var isStandalone=!s.packageId;
-      // Get payment status: from package if exists, or from session itself if standalone
+      var isPerSession=pkg&&pkg.paymentType==='sessao';
+      var needsIndividualPay=isStandalone||isPerSession;
       var payStatus='pending';
-      if(isStandalone){
+      if(needsIndividualPay){
+        // Standalone or per-session: use session's own payment status
         payStatus=s.sessionPayStatus||'pending';
       } else if(pkg){
+        // Package payment: mirror from package
         payStatus=pkg.paymentStatus||'pending';
       }
       var payBadge=payStatus==='paid'?'badge-green':payStatus==='parcela1'?'badge-parcial':'badge-yellow';
       var payLabel=payStatus==='paid'?'💰 Pago':payStatus==='parcela1'?'🔶 1ª Parcela':'⏳ Pendente';
-      // Standalone sessions get clickable badge, package sessions show info only
-      var paidCell=isStandalone?
+      var paidCell=needsIndividualPay?
         '<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">'+payLabel+'</span></td>':
         '<td><span class="badge '+payBadge+'">'+payLabel+'</span></td>';
       rows+='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
