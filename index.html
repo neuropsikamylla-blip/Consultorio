@@ -174,7 +174,7 @@ select option{background:var(--bg3);}
       <h1>Gestão do Consultório</h1>
       <p>Área restrita — faça seu login</p>
     </div>
-    <div class="login-hint">Entre com seu email e senha cadastrados.<br><small style="font-size:11px;margin-top:4px;display:block;">Primeiro acesso: <strong>admin@admin.com</strong> / <strong>1234</strong></small></div>
+    <div class="login-hint">Acesso: <strong>admin@admin.com</strong> / <strong>1234</strong><br><small style="font-size:11px;margin-top:4px;display:block;">Altere nas ⚙️ Configurações após entrar.</small></div>
     <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
     <div class="form-group"><label>Email</label><input type="email" id="login-email" value="admin@admin.com"/></div>
     <div class="form-group"><label>Senha</label><input type="password" id="login-pass" value="1234"/></div>
@@ -216,9 +216,9 @@ select option{background:var(--bg3);}
 const SUPA_URL='https://zrjrzorspfnohjzzykog.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanJ6b3JzcGZub2hqenp5a29nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTA4NTIsImV4cCI6MjA5MTY2Njg1Mn0.Y8vDMSqzV9IosWMltnA8j5zTZYRXB_OjUsIhdSdq-HI';
 const AUTH_KEY='consultorio_auth';
+const CREDS_KEY='consultorio_creds';
 let _cache=null;
 let _idCounter=0;
-let _currentUser=null;  // {id, email, name}
 
 function genId(){_idCounter++;return Date.now().toString(36)+'_'+_idCounter.toString(36)+'_'+Math.random().toString(36).slice(2,8);}
 function today(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
@@ -227,8 +227,9 @@ function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return day+'/'
 function fmtDateTime(d,t){return t?fmtDate(d)+' às '+t:fmtDate(d);}
 function getInitials(name){if(!name)return'?';return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();}
 
-function getDB(){return _cache||{clients:[],packages:[],sessions:[],users:[]};}
-function getCurrentUser(){return _currentUser;}
+function getCreds(){const raw=localStorage.getItem(CREDS_KEY);if(raw)return JSON.parse(raw);return{email:'admin@admin.com',password:'1234',name:'Profissional'};}
+function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
+function getDB(){return _cache||{clients:[],packages:[],sessions:[]};}
 
 async function supaFetch(method,table,body,query){
   const url=SUPA_URL+'/rest/v1/'+table+(query||'');
@@ -253,25 +254,23 @@ function showLoadingOverlay(show){
 async function loadFromSupabase(){
   showLoadingOverlay(true);
   try{
-    var uid=_currentUser?_currentUser.id:'';
-    var uq='?user_id=eq.'+uid;
     const [clients,packages,sessions]=await Promise.all([
-      supaFetch('GET','clients',null,uq+'&order=name'),
-      supaFetch('GET','packages',null,uq+'&order=created_at'),
-      supaFetch('GET','sessions',null,uq+'&order=date')
+      supaFetch('GET','clients',null,'?order=name'),
+      supaFetch('GET','packages',null,'?order=created_at'),
+      supaFetch('GET','sessions',null,'?order=date')
     ]);
     _cache={
       clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
       sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false});})
     };
-  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
+  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados. Recarregue a página.',true);}
   showLoadingOverlay(false);
   return _cache;
 }
 
 // ── CRUD ──
-async function dbAddClient(data){var uid=_currentUser?_currentUser.id:'';const row=Object.assign({id:genId(),created_at:new Date().toISOString(),user_id:uid},data);await supaFetch('POST','clients',row);await loadFromSupabase();return row;}
+async function dbAddClient(data){const row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch('POST','clients',row);await loadFromSupabase();return row;}
 async function dbUpdateClient(id,data){await supaFetch('PATCH','clients',data,'?id=eq.'+id);await loadFromSupabase();}
 async function dbDeleteClient(id){await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();}
 
@@ -310,42 +309,22 @@ async function dbDeleteSession(id){await supaFetch('DELETE','sessions',null,'?id
 async function dbUpdateSessionsBatch(updates){await Promise.all(updates.map(function(u){return supaFetch('PATCH','sessions',u.data,'?id=eq.'+u.id);}));await loadFromSupabase();}
 
 // ── AUTH ──
-async function doLogin(){
-  var email=document.getElementById('login-email').value.trim().toLowerCase();
+function doLogin(){
+  var email=document.getElementById('login-email').value.trim();
   var pass=document.getElementById('login-pass').value;
+  var creds=getCreds();
   var err=document.getElementById('login-error');
-  var btn=document.querySelector('#login-screen .btn-primary');
-  if(btn){btn.textContent='Entrando...';btn.disabled=true;}
-  try{
-    var users=await supaFetch('GET','users',null,'?email=eq.'+encodeURIComponent(email));
-    var matched=users&&users.find(function(u){return u.password===pass;});
-    if(matched){
-      _currentUser={id:matched.id,email:matched.email,name:matched.name};
-      localStorage.setItem(AUTH_KEY,JSON.stringify(_currentUser));
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app').style.display='flex';
-      document.getElementById('sidebar-user-name').textContent=_currentUser.name;
-      err.style.display='none';
-      navigate('dashboard');
-      setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
-    }else{
-      err.textContent='Email ou senha incorretos';
-      err.style.display='flex';
-      if(btn){btn.textContent='Entrar →';btn.disabled=false;}
-    }
-  }catch(e){
-    console.error('Login error:',e);
-    err.textContent='Erro de conexão. Tente novamente.';
-    err.style.display='flex';
-    if(btn){btn.textContent='Entrar →';btn.disabled=false;}
-  }
+  if(email===creds.email&&pass===creds.password){
+    localStorage.setItem(AUTH_KEY,'1');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('sidebar-user-name').textContent=creds.name;
+    err.style.display='none';
+    navigate('dashboard');
+    setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
+  }else{err.style.display='flex';}
 }
-function doLogout(){
-  _currentUser=null;
-  localStorage.removeItem(AUTH_KEY);
-  document.getElementById('app').style.display='none';
-  document.getElementById('login-screen').style.display='flex';
-}
+function doLogout(){localStorage.removeItem(AUTH_KEY);document.getElementById('app').style.display='none';document.getElementById('login-screen').style.display='flex';}
 document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 
 // ── NAVIGATION ──
@@ -537,7 +516,7 @@ async function saveClient(id){
   closeModal();
   try{
     if(id){await dbUpdateClient(id,data);}
-    else{var uid=_currentUser?_currentUser.id:'';var row=Object.assign({id:genId(),created_at:new Date().toISOString(),user_id:uid},data);await supaFetch('POST','clients',row);await loadFromSupabase();}
+    else{var row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch('POST','clients',row);await loadFromSupabase();}
     renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
   }catch(e){showToast('❌ Erro ao salvar.',true);}
 }
@@ -630,12 +609,12 @@ async function savePackage(id){
   }
   showToast('⏳ Criando pacote e sessões...');
   var pkgId=genId();
-  var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,user_id:_currentUser?_currentUser.id:'',created_at:new Date().toISOString()})});
+  var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
   if(!pkgRes.ok){showToast('❌ Erro ao criar pacote.',true);return;}
   var successCount=0;
   for(var i=0;i<totalSessions;i++){
     var d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+(i*interval));
-    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,user_id:_currentUser?_currentUser.id:'',created_at:new Date(Date.now()+i*10).toISOString()})});
+    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
     if(sessRes.ok)successCount++;
   }
   await loadFromSupabase();renderPackages();
@@ -944,99 +923,42 @@ function renderNotes(){
 // ── SETTINGS ──
 function renderSettings(){
   var creds=getCreds();
-  var cu=_currentUser||{name:'',email:''};
-  var html='<div class="page"><div class="grid-2"><div class="card"><div class="section-header"><div class="section-title">🔐 Meus Dados</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:18px">Altere seu nome, email e senha.</p>';
-  html+='<div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="'+cu.name+'"/></div>';
-  html+='<div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="'+cu.email+'"/></div>';
+  var html='<div class="page"><div class="grid-2"><div class="card"><div class="section-header"><div class="section-title">🔐 Alterar Acesso</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:18px">Altere seu nome, email e senha.</p>';
+  html+='<div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="'+creds.name+'"/></div>';
+  html+='<div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="'+creds.email+'"/></div>';
   html+='<div class="form-group"><label>Senha Atual *</label><input type="password" id="st-current" placeholder="Digite a senha atual"/></div>';
   html+='<div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>';
   html+='<div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>';
   html+='<div id="st-error" class="alert alert-red" style="display:none"></div><div id="st-ok" class="alert alert-green" style="display:none"></div>';
   html+='<button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>';
   html+='<div><div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
-  html+='</div>';
-  html+='<div class="card" style="margin-top:16px"><div class="section-header"><div class="section-title">👥 Gerenciar Usuárias</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Adicione outras profissionais para acessar o sistema com dados separados.</p><div id="users-list-container"></div><div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)"><div class="section-title" style="font-size:13px;margin-bottom:12px">+ Adicionar nova usuária</div><div class="form-row"><div class="form-group"><label>Nome</label><input type="text" id="new-user-name" placeholder="Nome da profissional"/></div><div class="form-group"><label>Email</label><input type="email" id="new-user-email" placeholder="email@exemplo.com"/></div></div><div class="form-row"><div class="form-group"><label>Senha</label><input type="password" id="new-user-pass" placeholder="Mínimo 4 caracteres"/></div><div class="form-group" style="display:flex;align-items:flex-end"><button class="btn btn-primary" style="width:100%;justify-content:center" onclick="addNewUser()">Adicionar</button></div></div><div id="new-user-error" class="alert alert-red" style="display:none"></div></div></div>';
-  html+='<div>';
-  html+='<div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
   html+='<div class="card"><div class="section-header"><div class="section-title" style="color:var(--red)">⚠️ Zona de Risco</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:14px">Apaga todos os dados permanentemente.</p><button class="btn btn-danger" style="width:100%;justify-content:center" onclick="resetAllData()">🗑️ Apagar Todos os Dados</button></div></div></div></div>';
   document.getElementById('page-content').innerHTML=html;
-  setTimeout(loadUsersList,100);
 }
-async function saveSettings(){
-  var name=document.getElementById('st-name').value.trim();
-  var email=document.getElementById('st-email').value.trim().toLowerCase();
-  var current=document.getElementById('st-current').value;
-  var np=document.getElementById('st-new').value;
-  var nc=document.getElementById('st-confirm').value;
-  var err=document.getElementById('st-error');var ok=document.getElementById('st-ok');
-  err.style.display='none';ok.style.display='none';
+function saveSettings(){
+  var creds=getCreds();var name=document.getElementById('st-name').value.trim();var email=document.getElementById('st-email').value.trim();var current=document.getElementById('st-current').value;var np=document.getElementById('st-new').value;var nc=document.getElementById('st-confirm').value;
+  var err=document.getElementById('st-error');var ok=document.getElementById('st-ok');err.style.display='none';ok.style.display='none';
   if(!name||!email){err.textContent='Nome e email obrigatórios';err.style.display='flex';return;}
   if(!current){err.textContent='Digite a senha atual';err.style.display='flex';return;}
-  // Verify current password against DB
-  var users=await supaFetch('GET','users',null,'?id=eq.'+_currentUser.id);
-  var matched2=users&&users.find(function(u){return u.password===current;});
-  if(!matched2){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
+  if(current!==creds.password){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
   if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
   if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
-  var upd={name:name,email:email};if(np)upd.password=np;
-  await supaFetch('PATCH','users',upd,'?id=eq.'+_currentUser.id);
-  _currentUser.name=name;_currentUser.email=email;
-  localStorage.setItem(AUTH_KEY,JSON.stringify(_currentUser));
-  document.getElementById('sidebar-user-name').textContent=name;
+  creds.name=name;creds.email=email;if(np)creds.password=np;
+  saveCreds(creds);document.getElementById('sidebar-user-name').textContent=name;
   ok.textContent='✅ Salvo!';ok.style.display='flex';
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
 }
-async function loadUsersList(){
-  var users=await supaFetch('GET','users',null,'?order=name');
-  var container=document.getElementById('users-list-container');
-  if(!container)return;
-  if(!users||users.length<=1){container.innerHTML='<p style="color:var(--text2);font-size:13px">Nenhuma outra usuária cadastrada ainda.</p>';return;}
-  var html='<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Email</th><th>Ação</th></tr></thead><tbody>';
-  users.forEach(function(u){
-    if(u.id===_currentUser.id)return;
-    var uid2=u.id;var btn='<button class="btn btn-danger btn-sm" onclick="window._removeUser(\"'+uid2+'\")">Remover</button>';html+='<tr><td>'+u.name+'</td><td class="td-muted">'+u.email+'</td><td>'+btn+'</td></tr>';
-  });
-  html+='</tbody></table></div>';
-  container.innerHTML=html;
-}
-window.addNewUser=async function(){
-  var name=document.getElementById('new-user-name').value.trim();
-  var email=document.getElementById('new-user-email').value.trim().toLowerCase();
-  var pass=document.getElementById('new-user-pass').value;
-  var err=document.getElementById('new-user-error');
-  err.style.display='none';
-  if(!name||!email||!pass){err.textContent='Preencha todos os campos';err.style.display='flex';return;}
-  if(pass.length<4){err.textContent='Senha mínimo 4 caracteres';err.style.display='flex';return;}
-  var existing=await supaFetch('GET','users',null,'?email=eq.'+encodeURIComponent(email));
-  if(existing&&existing.length>0){err.textContent='Este email já está cadastrado';err.style.display='flex';return;}
-  await supaFetch('POST','users',{id:genId(),name:name,email:email,password:pass,created_at:new Date().toISOString()});
-  document.getElementById('new-user-name').value='';
-  document.getElementById('new-user-email').value='';
-  document.getElementById('new-user-pass').value='';
-  showToast('✅ Usuária '+name+' adicionada!');
-  loadUsersList();
-};
-window._removeUser=window.removeUser=async function(uid){
-  if(!window.confirm('Remover esta usuária? Os dados dela serão mantidos.'))return;
-  await supaFetch('DELETE','users',null,'?id=eq.'+uid);
-  showToast('🗑️ Usuária removida');
-  loadUsersList();
-};
 function resetAllData(){
   showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){if(document.getElementById(\'reset-confirm\').value!==\'APAGAR\'){showToast(\'Digite APAGAR para confirmar\',true);return;}closeModal();await supaFetch(\'DELETE\',\'sessions\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'packages\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'clients\',null,\'?id=neq.none\');await loadFromSupabase();navigate(\'dashboard\');showToast(\'Dados apagados\');})()">Apagar Tudo</button></div>');
 }
 
 // ── AUTO LOGIN ──
-var _savedUser=localStorage.getItem(AUTH_KEY);
-if(_savedUser){
-  try{
-    _currentUser=JSON.parse(_savedUser);
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='flex';
-    document.getElementById('sidebar-user-name').textContent=_currentUser.name;
-    navigate('dashboard');
-    setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
-  }catch(e){localStorage.removeItem(AUTH_KEY);}
+if(localStorage.getItem(AUTH_KEY)){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('sidebar-user-name').textContent=getCreds().name;
+  navigate('dashboard');
+  setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
 }
 </script>
 </body>
