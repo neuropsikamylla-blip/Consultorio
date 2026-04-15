@@ -433,7 +433,7 @@ function renderDashboard(){
   html+='<div class="grid-4" style="margin-bottom:24px">';
   html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
   html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
-  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer" onclick="window.focusDashNotes()"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Clique para adicionar notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
+  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:default"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Veja as notas abaixo')+'</div><div class="stat-label">Notas Importantes</div></div>';
   html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
   html+='</div>';
 
@@ -447,7 +447,7 @@ function renderDashboard(){
   html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25)">';
   html+='<div class="section-header"><div class="section-title">📝 Notas Importantes</div><button class="btn btn-sm" style="background:var(--yellow);color:#1a1000;font-weight:700" onclick="window.saveDashNotes()">💾 Salvar</button></div>';
   var safeNotes=savedNotes.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  html+='<textarea id="dash-notes" rows="5" placeholder="Anote lembretes importantes aqui... Ex: Emitir nota fiscal dia 30, Ligar para Maria sobre reagendamento..." style="width:100%;background:rgba(245,200,66,0.05);border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6">'+safeNotes+'</textarea>';
+  html+='<textarea id="dash-notes" rows="5" placeholder="Anote lembretes importantes aqui... Ex: Emitir nota fiscal dia 30, Ligar para Maria sobre reagendamento..." style="width:100%;background:rgba(245,200,66,0.05);border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6;box-sizing:border-box" oninput="localStorage.setItem(\'dashboard_notes\',this.value)" onblur="localStorage.setItem(\'dashboard_notes\',this.value)">'+safeNotes+'</textarea>';
   html+='</div>';
   html+='</div>';
   document.getElementById('page-content').innerHTML=html;
