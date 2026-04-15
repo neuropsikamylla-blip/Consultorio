@@ -271,7 +271,7 @@ async function loadFromSupabase(){
     _cache={
       clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
-      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false});})
+      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending'});})
     };
   }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
   showLoadingOverlay(false);
@@ -312,6 +312,7 @@ async function dbUpdateSession(id,data){
   if(data.notes!==undefined)row.notes=data.notes;
   if(data.category)row.category=data.category;
   if(data.sessionPaid!==undefined)row.session_paid=data.sessionPaid;
+  if(data.sessionPayStatus!==undefined)row.session_pay_status=data.sessionPayStatus;
   await supaFetch('PATCH','sessions',row,'?id=eq.'+id);await loadFromSupabase();
 }
 async function dbDeleteSession(id){await supaFetch('DELETE','sessions',null,'?id=eq.'+id);await loadFromSupabase();}
@@ -670,6 +671,32 @@ window.quickStatusMenu=function(sessionId,el){
   setTimeout(function(){document.addEventListener('click',function handler(e){if(!menu.contains(e.target)){menu.remove();document.removeEventListener('click',handler);}});},10);
 };
 
+window.cycleSessionPay=function(sessionId, el){
+  document.querySelectorAll('.quick-pay-menu').forEach(function(m){m.remove();});
+  var menu=document.createElement('div');
+  menu.className='quick-pay-menu';
+  menu.style.cssText='position:fixed;z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:160px;animation:fadeIn 0.1s ease';
+  [{value:'pending',label:'⏳ Pendente',cls:'badge-yellow'},{value:'parcela1',label:'🔶 1ª Parcela Paga',cls:'badge-parcial'},{value:'paid',label:'💰 Pago',cls:'badge-green'}].forEach(function(opt){
+    var item=document.createElement('div');
+    item.style.cssText='padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:background 0.1s';
+    item.innerHTML='<span class="badge '+opt.cls+'" style="font-size:11px">'+opt.label+'</span>';
+    item.onmouseenter=function(){item.style.background='var(--bg3)';};
+    item.onmouseleave=function(){item.style.background='';};
+    item.onclick=async function(){
+      menu.remove();
+      await dbUpdateSession(sessionId,{sessionPayStatus:opt.value,sessionPaid:opt.value==='paid'});
+      renderSessions();
+      showToast(opt.label);
+    };
+    menu.appendChild(item);
+  });
+  var rect=el.getBoundingClientRect();
+  menu.style.top=(rect.bottom+4)+'px';
+  menu.style.left=rect.left+'px';
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function handler(e){if(!menu.contains(e.target)){menu.remove();document.removeEventListener('click',handler);}});},10);
+};
+
 window.toggleSessionPaid=async function(sessionId){
   var db=getDB();var s=db.sessions.find(function(ss){return ss.id===sessionId;});if(!s)return;
   await dbUpdateSession(sessionId,{sessionPaid:!s.sessionPaid});renderSessions();
@@ -696,8 +723,12 @@ function renderSessions(){
       var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
       var pkg=db.packages.find(function(p){return p.id===s.packageId;});
       var total=pkg?pkg.totalSessions:'?';
-      var isPaidPerSession=pkg&&pkg.paymentType==='sessao';
-      var paidCell=isPaidPerSession?'<td><span class="badge '+(s.sessionPaid?'badge-green':'badge-yellow')+'" style="cursor:pointer" onclick="(async function(){await toggleSessionPaid(\''+s.id+'\');})()">'+( s.sessionPaid?'💰 Pago':'⏳ A pagar')+'</span></td>':'<td></td>';
+      var isStandalone=!s.packageId;
+      var isPaidPerSession=(pkg&&pkg.paymentType==='sessao')||isStandalone;
+      var payStatus=s.sessionPayStatus||'pending';
+      var payBadge=payStatus==='paid'?'badge-green':payStatus==='parcela1'?'badge-parcial':'badge-yellow';
+      var payLabel=payStatus==='paid'?'💰 Pago':payStatus==='parcela1'?'🔶 1ª Parcela':'⏳ Pendente';
+      var paidCell=isPaidPerSession?'<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">'+payLabel+'</span></td>':'<td></td>';
       rows+='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
     });
     html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(clientName(clientId))+'</div><div><div style="font-weight:700;font-size:15px">'+clientName(clientId)+'</div><div style="font-size:12px;color:var(--text2);margin-top:2px">'+sessions.length+' sessão'+(sessions.length!==1?'ões:':':')+' <span style="color:var(--green)">'+completedCount+' realizada'+(completedCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+clientId+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+clientId+'\')">Ver perfil →</button></div></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
