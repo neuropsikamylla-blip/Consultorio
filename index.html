@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gestão do Consultório</title>
+<title>NeuroPsi</title>
 <style>
 :root{--bg:#0f1117;--bg2:#181c27;--bg3:#1e2333;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#9099b0;--text3:#5a6278;--green:#34d98a;--green-bg:rgba(52,217,138,0.10);--green-bg2:rgba(52,217,138,0.18);--red:#f06060;--red-bg:rgba(240,96,96,0.12);--yellow:#f5c842;--yellow-bg:rgba(245,200,66,0.12);--blue:#60a5fa;--blue-bg:rgba(96,165,250,0.12);--purple:#a78bfa;--purple-bg:rgba(167,139,250,0.12);--radius:14px;--radius-sm:9px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -165,13 +165,21 @@ select option{background:var(--bg3);}
 @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 .page{animation:fadeIn 0.2s ease;}
 </style>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NeuroPsi">
+<meta name="application-name" content="NeuroPsi">
+<meta name="theme-color" content="#0f1117">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
+
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTmV1cm9Qc2kiLCJzaG9ydF9uYW1lIjoiTmV1cm9Qc2kiLCJzdGFydF91cmwiOiIvQ29uc3VsdG9yaW8vIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBmMTExNyIsInRoZW1lX2NvbG9yIjoiIzBmMTExNyJ9">
 </head>
 <body>
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">
       <div class="icon">🧠</div>
-      <h1>Gestão do Consultório</h1>
+      <h1>NeuroPsi</h1>
       <p>Área restrita — faça seu login</p>
     </div>
     <div class="login-hint">Acesso: <strong>admin@admin.com</strong> / <strong>1234</strong><br><small style="font-size:11px;margin-top:4px;display:block;">Altere nas ⚙️ Configurações após entrar.</small></div>
@@ -184,7 +192,7 @@ select option{background:var(--bg3);}
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <div id="app" style="display:none">
   <nav class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><h2>🧠 Consultório</h2><p id="sidebar-user-name">Profissional</p></div>
+    <div class="sidebar-logo"><h2>🧠 NeuroPsi</h2><p id="sidebar-user-name">Profissional</p></div>
     <div class="nav">
       <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard"><span class="ico">📊</span> Dashboard</button>
       <button class="nav-item" onclick="navigate('clients')" data-page="clients"><span class="ico">👥</span> Clientes</button>
