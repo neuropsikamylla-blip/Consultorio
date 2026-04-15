@@ -916,32 +916,111 @@ window.dayClick=function(dateStr){
 // ── FINANCIAL ──
 function renderFinancial(){
   var db=getDB();
-  var paid=db.packages.filter(function(p){return p.paymentStatus==='paid';});
-  var parcela1=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
-  var pending=db.packages.filter(function(p){return p.paymentStatus==='pending';});
-  var paidRev=paid.reduce(function(a,p){return a+p.price;},0);
-  var parcela1Rev=parcela1.reduce(function(a,p){return a+p.price/2;},0);
-  var pendRev=pending.reduce(function(a,p){return a+p.price;},0)+parcela1.reduce(function(a,p){return a+p.price/2;},0);
+  var nowDate=today();
+  var currentMonth=nowDate.slice(0,7); // 'YYYY-MM'
+
+  // Helper: get the relevant date for a package (payment date or created date)
+  function pkgMonth(p){
+    var d=p.paymentDate||(p.createdAt?p.createdAt.split('T')[0]:null);
+    return d?d.slice(0,7):'';
+  }
+
+  // Current month packages only - for top cards
+  var paidNow=db.packages.filter(function(p){return p.paymentStatus==='paid'&&pkgMonth(p)===currentMonth;});
+  var parcela1Now=db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&pkgMonth(p)===currentMonth;});
+  var pendingNow=db.packages.filter(function(p){return p.paymentStatus==='pending'&&pkgMonth(p)===currentMonth;});
+  // Also include parcela1 from any month that still has 2nd installment pending
+  var parcela1Any=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
+
+  var paidRev=paidNow.reduce(function(a,p){return a+p.price;},0);
+  var parcela1Rev=parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
+  var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
+
+  // Revenue by month (all history)
   var revenueByMonth={};
-  paid.forEach(function(p){var d=p.paymentDate||( p.createdAt?p.createdAt.split('T')[0]:null);if(d){var mon=d.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}});
-  parcela1.forEach(function(p){if(p.paymentDate){var mon=p.paymentDate.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price/2;}});
+  db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
+    var d=p.paymentDate||(p.createdAt?p.createdAt.split('T')[0]:null);
+    if(d){var mon=d.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
+  });
+  db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).forEach(function(p){
+    if(p.paymentDate){var mon=p.paymentDate.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price/2;}
+  });
   var sortedMonths=Object.keys(revenueByMonth).sort().reverse();
   var monthRows='';
-  sortedMonths.forEach(function(mon){var parts=mon.split('-');var mn=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});monthRows+='<tr><td><strong>'+mn.charAt(0).toUpperCase()+mn.slice(1)+'</strong></td><td style="color:var(--green);font-weight:700">'+fmt(revenueByMonth[mon])+'</td></tr>';});
+  sortedMonths.forEach(function(mon){
+    var parts=mon.split('-');
+    var mn=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    var isCurrent=mon===currentMonth;
+    monthRows+='<tr '+(isCurrent?'style="background:rgba(52,217,138,0.05)"':'')+'>'+
+      '<td><strong>'+(isCurrent?'🟢 ':'')+mn.charAt(0).toUpperCase()+mn.slice(1)+(isCurrent?' (atual)':'')+'</strong></td>'+
+      '<td style="color:var(--green);font-weight:700">'+fmt(revenueByMonth[mon])+'</td></tr>';
+  });
+
+  // Pending list: show ALL pending + parcela1 regardless of month
+  var allPending=db.packages.filter(function(p){return p.paymentStatus==='pending';});
+  var allParcela1=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
   var pendingRows='';
-  parcela1.forEach(function(p){pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td><td style="font-weight:600">'+fmt(p.price/2)+'</td><td><span class="badge badge-parcial">🔶 2ª Parcela Pendente</span></td><td style="color:'+(p.paymentDate2&&p.paymentDate2<today()?'var(--red)':'var(--text2)')+'">'+( p.paymentDate2?fmtDate(p.paymentDate2):'—')+'</td><td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">2ª Parcela Paga</button></td></tr>';});
-  pending.forEach(function(p){pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td><td style="color:var(--yellow);font-weight:600">'+fmt(p.price)+'</td><td><span class="badge badge-yellow">⏳ Pendente</span></td><td class="td-muted">—</td><td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">Marcar pago</button></td></tr>';});
+  allParcela1.forEach(function(p){
+    pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
+      '<td style="font-weight:600">'+fmt(p.price/2)+'</td>'+
+      '<td><span class="badge badge-parcial">🔶 2ª Parcela Pendente</span></td>'+
+      '<td style="color:'+(p.paymentDate2&&p.paymentDate2<today()?'var(--red)':'var(--text2)')+'">'+
+      (p.paymentDate2?fmtDate(p.paymentDate2):'—')+'</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">2ª Parcela Paga</button></td></tr>';
+  });
+  allPending.forEach(function(p){
+    var mon=pkgMonth(p);
+    var isOld=mon&&mon<currentMonth;
+    pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
+      '<td style="color:'+(isOld?'var(--text3)':'var(--yellow)')+';font-weight:600">'+fmt(p.price)+
+      (isOld?' <span style="font-size:11px;color:var(--text3)">(mês anterior)</span>':'')+'</td>'+
+      '<td><span class="badge '+(isOld?'badge-gray':'badge-yellow')+'">'+( isOld?'⚠️ Antigo':'⏳ Pendente')+'</span></td>'+
+      '<td class="td-muted">—</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">Marcar pago</button></td></tr>';
+  });
+
   var paidRows='';
-  paid.forEach(function(p){var st=pkgStats(p);paidRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td><td class="td-muted">'+st.used+'/'+p.totalSessions+'</td><td style="color:var(--green);font-weight:600">'+fmt(p.price)+'</td><td><button class="btn btn-ghost btn-sm" onclick="(async function(){await markPending(\''+p.id+'\');})()">Reverter</button></td></tr>';});
-  var html='<div class="page"><div class="grid-4" style="margin-bottom:24px">';
-  html+='<div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">'+fmt(paidRev)+'</div><div class="stat-label">Pago Integral</div></div>';
-  html+='<div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">'+fmt(parcela1Rev)+'</div><div class="stat-label">1ª Parcela Recebida</div></div>';
-  html+='<div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">'+fmt(pendRev)+'</div><div class="stat-label">A Receber</div></div>';
-  html+='<div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev+parcela1Rev+pending.reduce(function(a,p){return a+p.price;},0))+'</div><div class="stat-label">Total em Carteira</div></div>';
+  db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
+    var st=pkgStats(p);
+    paidRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
+      '<td class="td-muted">'+(p.paymentDate?fmtDate(p.paymentDate):'—')+'</td>'+
+      '<td style="color:var(--green);font-weight:600">'+fmt(p.price)+'</td>'+
+      '<td><button class="btn btn-ghost btn-sm" onclick="(async function(){await markPending(\''+p.id+'\');})()">Reverter</button></td></tr>';
+  });
+
+  var html='<div class="page">';
+
+  // Top cards - current month only
+  var curMonthName=new Date(parseInt(currentMonth.split('-')[0]),parseInt(currentMonth.split('-')[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  curMonthName=curMonthName.charAt(0).toUpperCase()+curMonthName.slice(1);
+  html+='<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">📅 Resumo de '+curMonthName+'</div>';
+  html+='<div class="grid-4" style="margin-bottom:24px">';
+  html+='<div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">'+fmt(paidRev)+'</div><div class="stat-label">Recebido este mês</div></div>';
+  html+='<div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">'+fmt(parcela1Rev)+'</div><div class="stat-label">1ª Parcela este mês</div></div>';
+  html+='<div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">'+fmt(pendRev)+'</div><div class="stat-label">A Receber este mês</div></div>';
+  html+='<div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev+parcela1Rev)+'</div><div class="stat-label">Total recebido este mês</div></div>';
   html+='</div>';
-  if(sortedMonths.length>0)html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">📆 Receita por Mês</div></div><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Receita Recebida</th></tr></thead><tbody>'+monthRows+'</tbody></table></div></div>';
-  if(parcela1.length>0||pending.length>0)html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>'+pendingRows+'</tbody></table></div></div>';
-  html+='<div class="card"><div class="section-header"><div class="section-title">✅ Pagamentos Confirmados</div></div>'+(paid.length===0?'<div class="empty" style="padding:20px"><p>Nenhum pagamento confirmado</p></div>':'<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Sessões</th><th>Valor</th><th>Ação</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>')+'</div></div>';
+
+  // Monthly history table
+  if(sortedMonths.length>0){
+    html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">📆 Histórico por Mês</div></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Mês</th><th>Receita Recebida</th></tr></thead><tbody>'+monthRows+'</tbody></table></div></div>';
+  }
+
+  // Pending payments
+  if(allPending.length>0||allParcela1.length>0){
+    html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>'+pendingRows+'</tbody></table></div></div>';
+  }
+
+  // Confirmed payments
+  html+='<div class="card"><div class="section-header"><div class="section-title">✅ Pagamentos Confirmados</div></div>'+
+    (db.packages.filter(function(p){return p.paymentStatus==='paid';}).length===0?
+      '<div class="empty" style="padding:20px"><p>Nenhum pagamento confirmado</p></div>':
+      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Data Pgto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>')+
+    '</div>';
+
+  html+='</div>';
   document.getElementById('page-content').innerHTML=html;
 }
 window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pagamento confirmado!');};
