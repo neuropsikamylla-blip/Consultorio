@@ -264,7 +264,7 @@ async function loadFromSupabase(){
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
       sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false});})
     };
-  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados. Recarregue a página.',true);}
+  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
   showLoadingOverlay(false);
   return _cache;
 }
@@ -924,20 +924,31 @@ function renderNotes(){
 function renderSettings(){
   var creds=getCreds();
   var html='<div class="page"><div class="grid-2"><div class="card"><div class="section-header"><div class="section-title">🔐 Alterar Acesso</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:18px">Altere seu nome, email e senha.</p>';
-  html+='<div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="'+creds.name+'"/></div>';
-  html+='<div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="'+creds.email+'"/></div>';
+  var creds2=getCreds();
+  html+='<div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="'+creds2.name+'"/></div>';
+  html+='<div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="'+creds2.email+'"/></div>';
   html+='<div class="form-group"><label>Senha Atual *</label><input type="password" id="st-current" placeholder="Digite a senha atual"/></div>';
   html+='<div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>';
   html+='<div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>';
   html+='<div id="st-error" class="alert alert-red" style="display:none"></div><div id="st-ok" class="alert alert-green" style="display:none"></div>';
   html+='<button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>';
   html+='<div><div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
+  
+  html+='</div>';
+  html+='<div>';
+  html+='<div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
   html+='<div class="card"><div class="section-header"><div class="section-title" style="color:var(--red)">⚠️ Zona de Risco</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:14px">Apaga todos os dados permanentemente.</p><button class="btn btn-danger" style="width:100%;justify-content:center" onclick="resetAllData()">🗑️ Apagar Todos os Dados</button></div></div></div></div>';
   document.getElementById('page-content').innerHTML=html;
 }
 function saveSettings(){
-  var creds=getCreds();var name=document.getElementById('st-name').value.trim();var email=document.getElementById('st-email').value.trim();var current=document.getElementById('st-current').value;var np=document.getElementById('st-new').value;var nc=document.getElementById('st-confirm').value;
-  var err=document.getElementById('st-error');var ok=document.getElementById('st-ok');err.style.display='none';ok.style.display='none';
+  var creds=getCreds();
+  var name=document.getElementById('st-name').value.trim();
+  var email=document.getElementById('st-email').value.trim();
+  var current=document.getElementById('st-current').value;
+  var np=document.getElementById('st-new').value;
+  var nc=document.getElementById('st-confirm').value;
+  var err=document.getElementById('st-error');var ok=document.getElementById('st-ok');
+  err.style.display='none';ok.style.display='none';
   if(!name||!email){err.textContent='Nome e email obrigatórios';err.style.display='flex';return;}
   if(!current){err.textContent='Digite a senha atual';err.style.display='flex';return;}
   if(current!==creds.password){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
@@ -948,6 +959,9 @@ function saveSettings(){
   ok.textContent='✅ Salvo!';ok.style.display='flex';
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
 }
+
+;
+;
 function resetAllData(){
   showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){if(document.getElementById(\'reset-confirm\').value!==\'APAGAR\'){showToast(\'Digite APAGAR para confirmar\',true);return;}closeModal();await supaFetch(\'DELETE\',\'sessions\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'packages\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'clients\',null,\'?id=neq.none\');await loadFromSupabase();navigate(\'dashboard\');showToast(\'Dados apagados\');})()">Apagar Tudo</button></div>');
 }
