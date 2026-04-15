@@ -901,12 +901,39 @@ window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'p
 // ── NOTES ──
 function renderNotes(){
   document.getElementById('topbar-actions').innerHTML='';
-  document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><span id="notes-status" style="font-size:12px;color:var(--text3)"></span></div><div id="notes-container" style="min-height:100px;text-align:center;color:var(--text2);padding:20px">Carregando notas...</div><div style="margin-top:12px;text-align:right"><button class="btn btn-primary" id="save-notes-btn">💾 Salvar no servidor</button></div></div></div>';
+  document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><span id="notes-status" style="font-size:12px;color:var(--text2)"></span></div><div id="notes-container" style="color:var(--text2);padding:10px 0">Carregando...</div><div style="margin-top:12px;text-align:right"><button class="btn btn-primary" id="save-notes-btn">💾 Salvar</button></div></div></div>';
 
   var _noteId=null;
-  var _ta=null;
 
-  function buildTextarea(content){
+  async function saveNotes(content){
+    var status=document.getElementById('notes-status');
+    if(status)status.textContent='Salvando...';
+    try{
+      var res;
+      if(_noteId){
+        res=await fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+_noteId,{
+          method:'PATCH',
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({content:content,updated_at:new Date().toISOString()})
+        });
+      } else {
+        _noteId='note_admin';
+        res=await fetch(SUPA_URL+'/rest/v1/notes',{
+          method:'POST',
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          body:JSON.stringify({id:'note_admin',user_id:'admin',content:content,updated_at:new Date().toISOString()})
+        });
+      }
+      localStorage.setItem('dashboard_notes',content);
+      if(status)status.textContent=res.ok?'✅ Salvo!':'⚠️ Erro: '+res.status;
+    }catch(e){
+      localStorage.setItem('dashboard_notes',content);
+      if(status)status.textContent='✅ Salvo localmente';
+    }
+    setTimeout(function(){var s=document.getElementById('notes-status');if(s)s.textContent='';},3000);
+  }
+
+  function buildUI(content){
     var ta=document.createElement('textarea');
     ta.rows=18;
     ta.placeholder='Escreva seus lembretes aqui...';
@@ -914,38 +941,22 @@ function renderNotes(){
     ta.value=content||'';
     var container=document.getElementById('notes-container');
     if(container){container.innerHTML='';container.appendChild(ta);}
-    _ta=ta;
     var btn=document.getElementById('save-notes-btn');
-    if(btn){
-      btn.onclick=async function(){
-        var content=_ta?_ta.value:'';
-        var status=document.getElementById('notes-status');
-        if(status)status.textContent='Salvando...';
-        var ok=false;
-        if(_noteId){
-          var r=await supaFetch('PATCH','notes',{content:content,updated_at:new Date().toISOString()},'?id=eq.'+_noteId);
-          ok=r!==null;
-        } else {
-          _noteId=genId();
-          var r=await supaFetch('POST','notes',{id:_noteId,user_id:'admin',content:content,updated_at:new Date().toISOString()});
-          ok=r!==null;
-        }
-        localStorage.setItem('dashboard_notes',content);
-        if(status)status.textContent=ok?'✅ Salvo no servidor!':'✅ Salvo localmente';
-        setTimeout(function(){var s=document.getElementById('notes-status');if(s)s.textContent='';},3000);
-      };
-    }
+    if(btn)btn.onclick=function(){saveNotes(ta.value);};
   }
 
-  supaFetch('GET','notes',null,'?user_id=eq.admin&limit=1').then(function(rows){
+  // Try to load from Supabase using fixed ID 'note_admin'
+  fetch(SUPA_URL+'/rest/v1/notes?id=eq.note_admin',{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  }).then(function(r){return r.json();}).then(function(rows){
     if(rows&&rows.length>0){
-      _noteId=rows[0].id;
-      buildTextarea(rows[0].content||'');
+      _noteId='note_admin';
+      buildUI(rows[0].content||'');
     } else {
-      buildTextarea(localStorage.getItem('dashboard_notes')||'');
+      buildUI(localStorage.getItem('dashboard_notes')||'');
     }
-  }).catch(function(e){
-    buildTextarea(localStorage.getItem('dashboard_notes')||'');
+  }).catch(function(){
+    buildUI(localStorage.getItem('dashboard_notes')||'');
   });
 }
 
