@@ -444,13 +444,18 @@ function renderDashboard(){
   html+='<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver pacotes →</button></div>'+expiringHtml+'</div>';
   html+='</div>';
 
-  html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25)">';
-  html+='<div class="section-header"><div class="section-title">📝 Notas Importantes</div><button class="btn btn-sm" style="background:var(--yellow);color:#1a1000;font-weight:700" onclick="window.saveDashNotes()">💾 Salvar</button></div>';
-  var safeNotes=savedNotes.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  html+='<textarea id="dash-notes" rows="5" placeholder="Anote lembretes importantes aqui... Ex: Emitir nota fiscal dia 30, Ligar para Maria sobre reagendamento..." style="width:100%;background:rgba(245,200,66,0.05);border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6;box-sizing:border-box" oninput="localStorage.setItem(\'dashboard_notes\',this.value)" onblur="localStorage.setItem(\'dashboard_notes\',this.value)">'+safeNotes+'</textarea>';
-  html+='</div>';
+  html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><button class="btn btn-sm" style="background:var(--yellow);color:#1a1000;font-weight:700" onclick="window.saveDashNotes()">💾 Salvar</button></div><div id="dash-notes-container"></div></div>';
   html+='</div>';
   document.getElementById('page-content').innerHTML=html;
+  var ta=document.createElement('textarea');
+  ta.id='dash-notes';
+  ta.rows=5;
+  ta.placeholder='Anote lembretes importantes aqui... Ex: Emitir nota fiscal dia 30, Ligar para Maria sobre reagendamento...';
+  ta.style.cssText='width:100%;background:rgba(245,200,66,0.05);border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6;box-sizing:border-box;display:block;';
+  ta.value=savedNotes;
+  ta.addEventListener('input',function(){localStorage.setItem('dashboard_notes',this.value);});
+  var container=document.getElementById('dash-notes-container');
+  if(container)container.appendChild(ta);
 }
 
 
