@@ -192,6 +192,7 @@ select option{background:var(--bg3);}
       <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões</button>
       <button class="nav-item" onclick="navigate('agenda')" data-page="agenda"><span class="ico">🗓️</span> Agenda</button>
       <button class="nav-item" onclick="navigate('financial')" data-page="financial"><span class="ico">💰</span> Financeiro</button>
+      <button class="nav-item" onclick="navigate('notes')" data-page="notes"><span class="ico">📝</span> Notas</button>
       <button class="nav-item" onclick="navigate('settings')" data-page="settings"><span class="ico">⚙️</span> Configurações</button>
     </div>
     <div class="sidebar-footer">
@@ -333,11 +334,11 @@ function navigate(page){
   var main=document.querySelector('.main');
   if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
   document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
-  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',settings:'Configurações'};
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',notes:'Notas Importantes',settings:'Configurações'};
   document.getElementById('page-title').textContent=titles[page]||page;
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('page-content').innerHTML='';
-  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,settings:renderSettings};
+  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,notes:renderNotes,settings:renderSettings};
   if(pages[page])pages[page]();
 }
 function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
@@ -433,7 +434,7 @@ function renderDashboard(){
   html+='<div class="grid-4" style="margin-bottom:24px">';
   html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
   html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
-  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:default"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Veja as notas abaixo')+'</div><div class="stat-label">Notas Importantes</div></div>';
+  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer" onclick="navigate(\'notes\')"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Clique para abrir notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
   html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
   html+='</div>';
 
@@ -444,18 +445,9 @@ function renderDashboard(){
   html+='<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver pacotes →</button></div>'+expiringHtml+'</div>';
   html+='</div>';
 
-  html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><button class="btn btn-sm" style="background:var(--yellow);color:#1a1000;font-weight:700" onclick="window.saveDashNotes()">💾 Salvar</button></div><div id="dash-notes-container"></div></div>';
+  html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25);cursor:pointer" onclick="navigate(\'notes\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div class="section-title" style="margin-bottom:6px">📝 Notas Importantes</div><div style="font-size:13px;color:var(--text2)">'+(hasNotes?notesPreview.slice(0,120)+(notesPreview.length>120?'...':''):'Nenhuma nota ainda. Clique para adicionar.')+'</div></div><button class="btn btn-ghost btn-sm" style="margin-left:16px;flex-shrink:0">Abrir →</button></div></div>';
   html+='</div>';
   document.getElementById('page-content').innerHTML=html;
-  var ta=document.createElement('textarea');
-  ta.id='dash-notes';
-  ta.rows=5;
-  ta.placeholder='Anote lembretes importantes aqui... Ex: Emitir nota fiscal dia 30, Ligar para Maria sobre reagendamento...';
-  ta.style.cssText='width:100%;background:rgba(245,200,66,0.05);border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:12px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.6;box-sizing:border-box;display:block;';
-  ta.value=savedNotes;
-  ta.addEventListener('input',function(){localStorage.setItem('dashboard_notes',this.value);});
-  var container=document.getElementById('dash-notes-container');
-  if(container)container.appendChild(ta);
 }
 
 
@@ -877,6 +869,28 @@ function renderFinancial(){
 window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pagamento confirmado!');};
 window.markParcela1=async function(id){await dbUpdatePackage(id,{paymentStatus:'parcela1'});renderFinancial();showToast('🔶 1ª parcela registrada!');};
 window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido para pendente');};
+
+// ── NOTES ──
+function renderNotes(){
+  document.getElementById('topbar-actions').innerHTML='';
+  var container=document.getElementById('page-content');
+  container.innerHTML='<div class="page"><div class="card" style="border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><button class="btn btn-sm" id="save-notes-btn" style="background:var(--yellow);color:#1a1000;font-weight:700">💾 Salvar</button></div><div id="notes-container"></div><div id="notes-saved" style="display:none;color:var(--green);font-size:12px;margin-top:8px">✅ Salvo!</div></div></div>';
+  var ta=document.createElement('textarea');
+  ta.rows=20;
+  ta.placeholder='Escreva seus lembretes aqui...\n\nEx:\n- Emitir nota fiscal dia 30\n- Ligar para Maria sobre reagendamento';
+  ta.style.cssText='width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.8;box-sizing:border-box;display:block;min-height:400px;';
+  ta.value=localStorage.getItem('dashboard_notes')||'';
+  document.getElementById('notes-container').appendChild(ta);
+  document.getElementById('save-notes-btn').addEventListener('click',function(){
+    localStorage.setItem('dashboard_notes',ta.value);
+    var saved=document.getElementById('notes-saved');
+    saved.style.display='block';
+    setTimeout(function(){saved.style.display='none';},2000);
+  });
+  ta.addEventListener('input',function(){
+    localStorage.setItem('dashboard_notes',ta.value);
+  });
+}
 
 // ── SETTINGS ──
 function renderSettings(){
