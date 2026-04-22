@@ -1332,12 +1332,13 @@ function saveSettings(){
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
 }
 
-;
-;
-function resetAllData(){
-  showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){if(document.getElementById(\'reset-confirm\').value!==\'APAGAR\'){showToast(\'Digite APAGAR para confirmar\',true);return;}closeModal();await supaFetch(\'DELETE\',\'sessions\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'packages\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'clients\',null,\'?id=neq.none\');await loadFromSupabase();navigate(\'dashboard\');showToast(\'Dados apagados\');})()">Apagar Tudo</button></div>');
-}
 
+
+
+function resetAllData(){
+  window._doReset=async function(){if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}closeModal();await supaFetch('DELETE','sessions',null,'?id=neq.none');await supaFetch('DELETE','packages',null,'?id=neq.none');await supaFetch('DELETE','clients',null,'?id=neq.none');await loadFromSupabase();navigate('dashboard');showToast('Dados apagados');};
+  showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._doReset()">Apagar Tudo</button></div>');
+}
 // ── AUTO LOGIN ──
 if(localStorage.getItem(AUTH_KEY)){
   document.getElementById('login-screen').style.display='none';
