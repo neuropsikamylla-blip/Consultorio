@@ -1197,8 +1197,8 @@ renderBills();
 }
 
 window.markBillPaid=async function(id){
-var paidDate=window.prompt(‘Data do pagamento (deixe vazio para hoje):’,’’);
-var d=paidDate&&paidDate.match(/\d{2}/\d{2}/\d{4}/)?paidDate.split(’/’).reverse().join(’-’):today();
+var paidDate=window.prompt(‘Data do pagamento (AAAA-MM-DD, deixe vazio para hoje):’,’’);
+var d=paidDate&&paidDate.length===10?paidDate:today();
 await supaFetch(‘PATCH’,‘bills’,{paid:true,paid_date:d},’?id=eq.’+id);
 showToast(‘✅ Boleto marcado como pago!’);
 renderBills();
@@ -1220,8 +1220,15 @@ win2.document.write(’<img src="'+url+'" style="max-width:100%;"/>’);
 };
 
 function deleteBillConfirm(id){
-showModal(‘Excluir Boleto’,’<p style="color:var(--text2);margin-bottom:20px">Tem certeza que deseja excluir este boleto?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await supaFetch(\'DELETE\',\'bills\',null,\'?id=eq.'+id+'\');showToast(\'🗑️ Boleto excluído\');renderBills();})()">Excluir</button></div>’);
+window._deleteBillId=id;
+showModal(‘Excluir Boleto’,’<p style="color:var(--text2);margin-bottom:20px">Tem certeza que deseja excluir este boleto?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._confirmDeleteBill()">Excluir</button></div>’);
 }
+window._confirmDeleteBill=async function(){
+closeModal();
+await supaFetch(‘DELETE’,‘bills’,null,’?id=eq.’+window._deleteBillId);
+showToast(‘🗑️ Boleto excluído’);
+renderBills();
+};
 
 // ── NOTES ──
 function renderNotes(){
