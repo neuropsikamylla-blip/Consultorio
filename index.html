@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
@@ -231,1122 +230,1122 @@ const CREDS_KEY='consultorio_creds';
 let _cache=null;
 let _idCounter=0;
 
-function genId(){*idCounter++;return Date.now().toString(36)+’*’+*idCounter.toString(36)+’*’+Math.random().toString(36).slice(2,8);}
-function today(){const n=new Date();return n.getFullYear()+’-’+String(n.getMonth()+1).padStart(2,‘0’)+’-’+String(n.getDate()).padStart(2,‘0’);}
-function fmt(v){return new Intl.NumberFormat(‘pt-BR’,{style:‘currency’,currency:‘BRL’}).format(v||0);}
-function fmtDate(d){if(!d)return’—’;const[y,m,day]=d.split(’-’);return day+’/’+m+’/’+y;}
-function fmtDateTime(d,t){return t?fmtDate(d)+’ às ‘+t:fmtDate(d);}
-function getInitials(name){if(!name)return’?’;return name.split(’ ‘).slice(0,2).map(n=>n[0]).join(’’).toUpperCase();}
+function genId(){_idCounter++;return Date.now().toString(36)+'_'+_idCounter.toString(36)+'_'+Math.random().toString(36).slice(2,8);}
+function today(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);}
+function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return day+'/'+m+'/'+y;}
+function fmtDateTime(d,t){return t?fmtDate(d)+' às '+t:fmtDate(d);}
+function getInitials(name){if(!name)return'?';return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();}
 
-function getCreds(){const raw=localStorage.getItem(CREDS_KEY);if(raw)return JSON.parse(raw);return{email:‘admin@admin.com’,password:‘1234’,name:‘Profissional’};}
+function getCreds(){const raw=localStorage.getItem(CREDS_KEY);if(raw)return JSON.parse(raw);return{email:'admin@admin.com',password:'1234',name:'Profissional'};}
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
 function getDB(){return _cache||{clients:[],packages:[],sessions:[]};}
 
 async function supaFetch(method,table,body,query){
-const url=SUPA_URL+’/rest/v1/’+table+(query||’’);
-const headers={‘apikey’:SUPA_KEY,‘Authorization’:’Bearer ’+SUPA_KEY,‘Content-Type’:‘application/json’};
-if(method===‘POST’||method===‘PATCH’)headers[‘Prefer’]=‘return=representation’;
-const opts={method:method,headers:headers};
-if(body!=null)opts.body=JSON.stringify(body);
-try{
-const res=await fetch(url,opts);
-const text=await res.text();
-if(!res.ok){console.error(‘DB Error’,res.status,text);return null;}
-return text?JSON.parse(text):[];
-}catch(err){console.error(‘Network error:’,err.message);return null;}
+  const url=SUPA_URL+'/rest/v1/'+table+(query||'');
+  const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'};
+  if(method==='POST'||method==='PATCH')headers['Prefer']='return=representation';
+  const opts={method:method,headers:headers};
+  if(body!=null)opts.body=JSON.stringify(body);
+  try{
+    const res=await fetch(url,opts);
+    const text=await res.text();
+    if(!res.ok){console.error('DB Error',res.status,text);return null;}
+    return text?JSON.parse(text):[];
+  }catch(err){console.error('Network error:',err.message);return null;}
 }
 
 function showLoadingOverlay(show){
-let el=document.getElementById(‘loading-overlay’);
-if(show&&!el){el=document.createElement(‘div’);el.id=‘loading-overlay’;el.style.cssText=‘position:fixed;inset:0;background:rgba(15,17,23,0.7);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;’;el.innerHTML=’<div style="text-align:center"><div style="font-size:28px;margin-bottom:12px">🔄</div><div style="color:var(--text2);font-size:14px">Sincronizando…</div></div>’;document.body.appendChild(el);}
-else if(!show&&el){el.remove();}
+  let el=document.getElementById('loading-overlay');
+  if(show&&!el){el=document.createElement('div');el.id='loading-overlay';el.style.cssText='position:fixed;inset:0;background:rgba(15,17,23,0.7);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;';el.innerHTML='<div style="text-align:center"><div style="font-size:28px;margin-bottom:12px">🔄</div><div style="color:var(--text2);font-size:14px">Sincronizando...</div></div>';document.body.appendChild(el);}
+  else if(!show&&el){el.remove();}
 }
 
 async function loadFromSupabase(){
-showLoadingOverlay(true);
-try{
-const [clients,packages,sessions]=await Promise.all([
-supaFetch(‘GET’,‘clients’,null,’?order=name’),
-supaFetch(‘GET’,‘packages’,null,’?order=created_at’),
-supaFetch(‘GET’,‘sessions’,null,’?order=date’)
-]);
-_cache={
-clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||’’,birthDate:c.birth_date||null,education:c.education||’’,address:c.address||’’});}),
-packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||’’,paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||‘pacote’});}),
-sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||‘pending’});})
-};
-}catch(e){console.error(‘Load error:’,e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast(‘⚠️ Erro ao carregar dados.’,true);}
-showLoadingOverlay(false);
-return _cache;
+  showLoadingOverlay(true);
+  try{
+    const [clients,packages,sessions]=await Promise.all([
+      supaFetch('GET','clients',null,'?order=name'),
+      supaFetch('GET','packages',null,'?order=created_at'),
+      supaFetch('GET','sessions',null,'?order=date')
+    ]);
+    _cache={
+      clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
+      packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
+      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending'});})
+    };
+  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
+  showLoadingOverlay(false);
+  return _cache;
 }
 
 // ── CRUD ──
-async function dbAddClient(data){const row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch(‘POST’,‘clients’,row);await loadFromSupabase();return row;}
-async function dbUpdateClient(id,data){await supaFetch(‘PATCH’,‘clients’,data,’?id=eq.’+id);await loadFromSupabase();}
-async function dbDeleteClient(id){await supaFetch(‘DELETE’,‘clients’,null,’?id=eq.’+id);await loadFromSupabase();}
+async function dbAddClient(data){const row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch('POST','clients',row);await loadFromSupabase();return row;}
+async function dbUpdateClient(id,data){await supaFetch('PATCH','clients',data,'?id=eq.'+id);await loadFromSupabase();}
+async function dbDeleteClient(id){await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();}
 
 async function dbUpdatePackage(id,data){
-var row={};
-if(data.name)row.name=data.name;
-if(data.totalSessions)row.total_sessions=data.totalSessions;
-if(data.price!==undefined)row.price=data.price;
-if(data.paymentStatus)row.payment_status=data.paymentStatus;
-if(data.clientId)row.client_id=data.clientId;
-if(data.notes!==undefined)row.notes=data.notes;
-if(data.paymentDate!==undefined)row.payment_date=data.paymentDate||null;
-if(data.paymentDate2!==undefined)row.payment_date2=data.paymentDate2||null;
-if(data.paymentType!==undefined)row.payment_type=data.paymentType;
-await supaFetch(‘PATCH’,‘packages’,row,’?id=eq.’+id);
-if(data.newTime){await supaFetch(‘PATCH’,‘sessions’,{time:data.newTime},’?package_id=eq.’+id+’&date=gte.’+today()+’&status=eq.agendada’);}
-await loadFromSupabase();
+  var row={};
+  if(data.name)row.name=data.name;
+  if(data.totalSessions)row.total_sessions=data.totalSessions;
+  if(data.price!==undefined)row.price=data.price;
+  if(data.paymentStatus)row.payment_status=data.paymentStatus;
+  if(data.clientId)row.client_id=data.clientId;
+  if(data.notes!==undefined)row.notes=data.notes;
+  if(data.paymentDate!==undefined)row.payment_date=data.paymentDate||null;
+  if(data.paymentDate2!==undefined)row.payment_date2=data.paymentDate2||null;
+  if(data.paymentType!==undefined)row.payment_type=data.paymentType;
+  await supaFetch('PATCH','packages',row,'?id=eq.'+id);
+  if(data.newTime){await supaFetch('PATCH','sessions',{time:data.newTime},'?package_id=eq.'+id+'&date=gte.'+today()+'&status=eq.agendada');}
+  await loadFromSupabase();
 }
-async function dbDeletePackage(id){await supaFetch(‘DELETE’,‘packages’,null,’?id=eq.’+id);await loadFromSupabase();}
+async function dbDeletePackage(id){await supaFetch('DELETE','packages',null,'?id=eq.'+id);await loadFromSupabase();}
 
 async function dbAddSession(data){
-var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||‘agendada’,category:data.category||‘psicoterapia’,notes:data.notes||null,interval_days:data.intervalDays||null,created_at:new Date().toISOString()};
-await supaFetch(‘POST’,‘sessions’,row);await loadFromSupabase();return row;
+  var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||'agendada',category:data.category||'psicoterapia',notes:data.notes||null,interval_days:data.intervalDays||null,created_at:new Date().toISOString()};
+  await supaFetch('POST','sessions',row);await loadFromSupabase();return row;
 }
 async function dbUpdateSession(id,data){
-var row={};
-if(data.date)row.date=data.date;
-if(data.time!==undefined)row.time=data.time;
-if(data.status)row.status=data.status;
-if(data.notes!==undefined)row.notes=data.notes;
-if(data.category)row.category=data.category;
-if(data.sessionPaid!==undefined)row.session_paid=data.sessionPaid;
-if(data.sessionPayStatus!==undefined)row.session_pay_status=data.sessionPayStatus;
-await supaFetch(‘PATCH’,‘sessions’,row,’?id=eq.’+id);await loadFromSupabase();
+  var row={};
+  if(data.date)row.date=data.date;
+  if(data.time!==undefined)row.time=data.time;
+  if(data.status)row.status=data.status;
+  if(data.notes!==undefined)row.notes=data.notes;
+  if(data.category)row.category=data.category;
+  if(data.sessionPaid!==undefined)row.session_paid=data.sessionPaid;
+  if(data.sessionPayStatus!==undefined)row.session_pay_status=data.sessionPayStatus;
+  await supaFetch('PATCH','sessions',row,'?id=eq.'+id);await loadFromSupabase();
 }
-async function dbDeleteSession(id){await supaFetch(‘DELETE’,‘sessions’,null,’?id=eq.’+id);await loadFromSupabase();}
-async function dbUpdateSessionsBatch(updates){await Promise.all(updates.map(function(u){return supaFetch(‘PATCH’,‘sessions’,u.data,’?id=eq.’+u.id);}));await loadFromSupabase();}
+async function dbDeleteSession(id){await supaFetch('DELETE','sessions',null,'?id=eq.'+id);await loadFromSupabase();}
+async function dbUpdateSessionsBatch(updates){await Promise.all(updates.map(function(u){return supaFetch('PATCH','sessions',u.data,'?id=eq.'+u.id);}));await loadFromSupabase();}
 
 // ── AUTH ──
 function doLogin(){
-var email=document.getElementById(‘login-email’).value.trim();
-var pass=document.getElementById(‘login-pass’).value;
-var creds=getCreds();
-var err=document.getElementById(‘login-error’);
-if(email===creds.email&&pass===creds.password){
-localStorage.setItem(AUTH_KEY,‘1’);
-document.getElementById(‘login-screen’).style.display=‘none’;
-document.getElementById(‘app’).style.display=‘flex’;
-document.getElementById(‘sidebar-user-name’).textContent=creds.name;
-err.style.display=‘none’;
-navigate(‘dashboard’);
-setTimeout(function(){loadFromSupabase().then(function(){navigate(‘dashboard’);}).catch(function(){});},200);
-}else{err.style.display=‘flex’;}
+  var email=document.getElementById('login-email').value.trim();
+  var pass=document.getElementById('login-pass').value;
+  var creds=getCreds();
+  var err=document.getElementById('login-error');
+  if(email===creds.email&&pass===creds.password){
+    localStorage.setItem(AUTH_KEY,'1');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('sidebar-user-name').textContent=creds.name;
+    err.style.display='none';
+    navigate('dashboard');
+    setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
+  }else{err.style.display='flex';}
 }
-function doLogout(){localStorage.removeItem(AUTH_KEY);document.getElementById(‘app’).style.display=‘none’;document.getElementById(‘login-screen’).style.display=‘flex’;}
-document.getElementById(‘login-pass’).addEventListener(‘keydown’,function(e){if(e.key===‘Enter’)doLogin();});
+function doLogout(){localStorage.removeItem(AUTH_KEY);document.getElementById('app').style.display='none';document.getElementById('login-screen').style.display='flex';}
+document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 
 // ── NAVIGATION ──
-var currentPage=‘dashboard’;
+var currentPage='dashboard';
 function navigate(page){
-currentPage=page;closeSidebar();
-var main=document.querySelector(’.main’);
-if(main)main.style.padding=page===‘agenda’?‘20px 16px’:‘28px 32px’;
-document.querySelectorAll(’.nav-item’).forEach(function(el){el.classList.toggle(‘active’,el.dataset.page===page);});
-var titles={dashboard:‘Dashboard’,clients:‘Clientes’,packages:‘Pacotes’,sessions:‘Sessões’,agenda:‘Agenda’,financial:‘Financeiro’,bills:‘Boletos’,notes:‘Notas Importantes’,settings:‘Configurações’};
-document.getElementById(‘page-title’).textContent=titles[page]||page;
-document.getElementById(‘topbar-actions’).innerHTML=’’;
-document.getElementById(‘page-content’).innerHTML=’’;
-var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings};
-if(pages[page])pages[page]();
+  currentPage=page;closeSidebar();
+  var main=document.querySelector('.main');
+  if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
+  document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações'};
+  document.getElementById('page-title').textContent=titles[page]||page;
+  document.getElementById('topbar-actions').innerHTML='';
+  document.getElementById('page-content').innerHTML='';
+  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings};
+  if(pages[page])pages[page]();
 }
-function openSidebar(){document.getElementById(‘sidebar’).classList.add(‘open’);document.getElementById(‘sidebar-overlay’).classList.add(‘open’);}
-function closeSidebar(){document.getElementById(‘sidebar’).classList.remove(‘open’);document.getElementById(‘sidebar-overlay’).classList.remove(‘open’);}
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('open');}
 
 // ── HELPERS ──
-function paymentBadgeClass(s){if(s===‘paid’)return’badge-green’;if(s===‘parcela1’)return’badge-parcial’;return’badge-yellow’;}
-function paymentLabel(s,t){if(s===‘paid’&&t===‘sessao’)return’💳 Por Sessão’;if(s===‘paid’)return’💰 Pago’;if(s===‘parcela1’)return’🔶 1ª Parcela’;return’⏳ Pendente’;}
-function catColor(cat){if(!cat||cat===‘psicoterapia’)return’var(–blue)’;if(cat===‘reabilitacao’)return’var(–purple)’;if(cat===‘avaliacao’)return’var(–green)’;return’var(–blue)’;}
-function catBadgeClass(cat){if(!cat||cat===‘psicoterapia’)return’badge-psico’;if(cat===‘reabilitacao’)return’badge-reab’;if(cat===‘avaliacao’)return’badge-aval’;return’badge-blue’;}
-function catLabelShort(cat){if(!cat||cat===‘psicoterapia’)return’Psicoterapia’;if(cat===‘reabilitacao’)return’Reabilitação’;if(cat===‘avaliacao’)return’Avaliação’;return cat||’—’;}
-function statusBadge(s){if(s===‘realizada’||s===‘completed’)return[‘badge-realizada’,‘✅ Realizada’];if(s===‘falta’)return[‘badge-falta’,‘❌ Falta’];return[‘badge-agendada’,‘📅 Agendada’];}
-function pkgStats(pkg){var db=getDB();var used=db.sessions.filter(function(s){return s.packageId===pkg.id&&(s.status===‘realizada’||s.status===‘completed’);}).length;var total=db.sessions.filter(function(s){return s.packageId===pkg.id;}).length;return{used:used,remaining:pkg.totalSessions-used,totalRegistered:total,isExhausted:(pkg.totalSessions-used)<=0,canAdd:total<pkg.totalSessions,pct:Math.round((used/pkg.totalSessions)*100)};}
-function clientName(id){var c=getDB().clients.find(function(c){return c.id===id;});return c?c.name:’—’;}
-function pkgName(id){var p=getDB().packages.find(function(p){return p.id===id;});return p?p.name:’—’;}
+function paymentBadgeClass(s){if(s==='paid')return'badge-green';if(s==='parcela1')return'badge-parcial';return'badge-yellow';}
+function paymentLabel(s,t){if(s==='paid'&&t==='sessao')return'💳 Por Sessão';if(s==='paid')return'💰 Pago';if(s==='parcela1')return'🔶 1ª Parcela';return'⏳ Pendente';}
+function catColor(cat){if(!cat||cat==='psicoterapia')return'var(--blue)';if(cat==='reabilitacao')return'var(--purple)';if(cat==='avaliacao')return'var(--green)';return'var(--blue)';}
+function catBadgeClass(cat){if(!cat||cat==='psicoterapia')return'badge-psico';if(cat==='reabilitacao')return'badge-reab';if(cat==='avaliacao')return'badge-aval';return'badge-blue';}
+function catLabelShort(cat){if(!cat||cat==='psicoterapia')return'Psicoterapia';if(cat==='reabilitacao')return'Reabilitação';if(cat==='avaliacao')return'Avaliação';return cat||'—';}
+function statusBadge(s){if(s==='realizada'||s==='completed')return['badge-realizada','✅ Realizada'];if(s==='falta')return['badge-falta','❌ Falta'];return['badge-agendada','📅 Agendada'];}
+function pkgStats(pkg){var db=getDB();var used=db.sessions.filter(function(s){return s.packageId===pkg.id&&(s.status==='realizada'||s.status==='completed');}).length;var total=db.sessions.filter(function(s){return s.packageId===pkg.id;}).length;return{used:used,remaining:pkg.totalSessions-used,totalRegistered:total,isExhausted:(pkg.totalSessions-used)<=0,canAdd:total<pkg.totalSessions,pct:Math.round((used/pkg.totalSessions)*100)};}
+function clientName(id){var c=getDB().clients.find(function(c){return c.id===id;});return c?c.name:'—';}
+function pkgName(id){var p=getDB().packages.find(function(p){return p.id===id;});return p?p.name:'—';}
 
 // ── MODAL ──
 function showModal(title,bodyHTML,large){
-document.getElementById(‘modal-container’).innerHTML=’<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal '+(large?'modal-lg':'')+'"><div class="modal-header"><h3>’+title+’</h3><button class="modal-close" onclick="closeModal()">×</button></div><div class="modal-body">’+bodyHTML+’</div></div></div>’;
+  document.getElementById('modal-container').innerHTML='<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal '+(large?'modal-lg':'')+'"><div class="modal-header"><h3>'+title+'</h3><button class="modal-close" onclick="closeModal()">×</button></div><div class="modal-body">'+bodyHTML+'</div></div></div>';
 }
-function closeModal(){document.getElementById(‘modal-container’).innerHTML=’’;}
+function closeModal(){document.getElementById('modal-container').innerHTML='';}
 
 // ── TOAST ──
 function showToast(msg,error){
-var t=document.createElement(‘div’);
-t.style.cssText=‘position:fixed;bottom:24px;right:24px;background:’+(error?‘var(–red-bg)’:‘var(–green-bg2)’)+’;border:1px solid ‘+(error?‘rgba(240,96,96,0.3)’:‘rgba(52,217,138,0.3)’)+’;color:’+(error?‘var(–red)’:‘var(–green)’)+’;padding:12px 18px;border-radius:var(–radius-sm);font-size:13px;font-weight:600;z-index:999;animation:fadeIn 0.2s ease;box-shadow:0 4px 20px rgba(0,0,0,0.4);’;
-t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove();},3000);
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:'+(error?'var(--red-bg)':'var(--green-bg2)')+';border:1px solid '+(error?'rgba(240,96,96,0.3)':'rgba(52,217,138,0.3)')+';color:'+(error?'var(--red)':'var(--green)')+';padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;z-index:999;animation:fadeIn 0.2s ease;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+  t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove();},3000);
 }
 
 // ── BACKUP ──
-function exportBackup(){var blob=new Blob([JSON.stringify(getDB(),null,2)],{type:‘application/json’});var a=document.createElement(‘a’);a.href=URL.createObjectURL(blob);a.download=‘consultorio-backup-’+today()+’.json’;a.click();}
-function importBackup(){document.getElementById(‘import-file’).click();}
+function exportBackup(){var blob=new Blob([JSON.stringify(getDB(),null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='consultorio-backup-'+today()+'.json';a.click();}
+function importBackup(){document.getElementById('import-file').click();}
 function loadBackupFile(e){
-var file=e.target.files[0];if(!file)return;
-var reader=new FileReader();
-reader.onload=async function(ev){
-try{
-var data=JSON.parse(ev.target.result);
-if(!data.clients||!data.packages||!data.sessions)throw new Error();
-showToast(‘⏳ Restaurando…’);
-for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch(‘POST’,‘clients’,{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()});}
-for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch(‘POST’,‘packages’,{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||‘pending’,created_at:p.createdAt||new Date().toISOString()});}
-for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status===‘completed’?‘realizada’:s.status===‘pending’?‘agendada’:s.status||‘agendada’;await supaFetch(‘POST’,‘sessions’,{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||‘psicoterapia’,notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString()});}
-await loadFromSupabase();navigate(currentPage);showToast(‘✅ Backup restaurado!’);
-}catch(err){console.error(err);showToast(‘❌ Arquivo inválido’,true);}
-};
-reader.readAsText(file);e.target.value=’’;
+  var file=e.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=async function(ev){
+    try{
+      var data=JSON.parse(ev.target.result);
+      if(!data.clients||!data.packages||!data.sessions)throw new Error();
+      showToast('⏳ Restaurando...');
+      for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',created_at:p.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString()});}
+      await loadFromSupabase();navigate(currentPage);showToast('✅ Backup restaurado!');
+    }catch(err){console.error(err);showToast('❌ Arquivo inválido',true);}
+  };
+  reader.readAsText(file);e.target.value='';
 }
 
 // ── DASHBOARD ──
 function renderDashboard(){
-var db=getDB();
-if(!db.clients.length&&!db.packages.length){
-document.getElementById(‘page-content’).innerHTML=’<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados…</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar</button></div></div>’;
-loadFromSupabase().then(function(){var db2=getDB();if(db2.clients.length||db2.packages.length)renderDashboard();});
-return;
+  var db=getDB();
+  if(!db.clients.length&&!db.packages.length){
+    document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados...</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar</button></div></div>';
+    loadFromSupabase().then(function(){var db2=getDB();if(db2.clients.length||db2.packages.length)renderDashboard();});
+    return;
+  }
+  var totalClients=db.clients.length;
+  var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+  var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
+  var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
+  var now=today();
+  var in7=new Date();in7.setDate(in7.getDate()+7);
+  var in7s=in7.toISOString().split('T')[0];
+
+  // Proximas 7 dias
+  var upcoming=db.sessions.filter(function(s){return s.status==='agendada'&&s.date>=now&&s.date<=in7s;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,6);
+  var upcomingHtml='';
+  if(upcoming.length===0){
+    upcomingHtml='<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>';
+  } else {
+    upcoming.forEach(function(s){upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';});
+  }
+
+  // Pacotes a encerrar (1 ou 2 sessoes restantes)
+  var expiringHtml='';
+  var expiringCount=0;
+  db.packages.forEach(function(p){
+    var st=pkgStats(p);
+    if(!st.isExhausted&&st.remaining<=2&&st.remaining>0){
+      expiringCount++;
+      expiringHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(p.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+p.name+' · <span style="color:var(--yellow)">'+st.remaining+' sessão'+(st.remaining!==1?'ões':'')+' restante'+(st.remaining!==1?'s':'')+'</span></div></div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver →</button></div>';
+    }
+  });
+  if(expiringCount===0)expiringHtml='<div class="empty" style="padding:24px"><div class="empty-icon">✅</div><p>Nenhum pacote encerrando em breve</p></div>';
+
+  // Notas
+  var savedNotes=localStorage.getItem('dashboard_notes')||'';
+  var notesPreview=savedNotes.trim();
+  var hasNotes=notesPreview.length>0;
+
+  var html='<div class="page">';
+  html+='<div class="grid-4" style="margin-bottom:24px">';
+  html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
+  html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
+  html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer" onclick="navigate(\'notes\')"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Clique para abrir notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
+  html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada</div></div>';
+  html+='</div>';
+
+  if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
+  // Bills alert - load async
+  supaFetch('GET','bills',null,'?paid=eq.false&order=due_date').then(function(bills){
+    if(!bills||!bills.length)return;
+    var now=today();
+    var urgent=bills.filter(function(b){
+      var diff=Math.round((new Date(b.due_date+'T12:00:00')-new Date(now+'T12:00:00'))/(1000*60*60*24));
+      return diff<=3;
+    });
+    if(urgent.length>0){
+      var alertDiv=document.createElement('div');
+      alertDiv.className='alert alert-red';
+      alertDiv.style.marginBottom='20px';
+      alertDiv.style.cursor='pointer';
+      alertDiv.onclick=function(){navigate('bills');};
+      var labels=urgent.map(function(b){
+        var diff=Math.round((new Date(b.due_date+'T12:00:00')-new Date(now+'T12:00:00'))/(1000*60*60*24));
+        return b.description+(diff<0?' (vencido)':diff===0?' (hoje)':' ('+diff+'d)');
+      }).join(', ');
+      alertDiv.innerHTML='📎 <strong>'+urgent.length+' boleto'+(urgent.length!==1?'s':'')+' urgente'+(urgent.length!==1?'s':'')+' → clique para ver:</strong> '+labels;
+      var pageContent=document.getElementById('page-content');
+      if(pageContent){
+        var firstAlert=pageContent.querySelector('.alert');
+        if(firstAlert){firstAlert.parentNode.insertBefore(alertDiv,firstAlert);}
+        else{var page=pageContent.querySelector('.page');if(page)page.insertBefore(alertDiv,page.firstChild);}
+      }
+    }
+  }).catch(function(){});
+
+  html+='<div class="grid-2">';
+  html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>'+upcomingHtml+'</div>';
+  html+='<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver pacotes →</button></div>'+expiringHtml+'</div>';
+  html+='</div>';
+
+  html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25);cursor:pointer" onclick="navigate(\'notes\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div class="section-title" style="margin-bottom:6px">📝 Notas Importantes</div><div style="font-size:13px;color:var(--text2)">'+(hasNotes?notesPreview.slice(0,120)+(notesPreview.length>120?'...':''):'Nenhuma nota ainda. Clique para adicionar.')+'</div></div><button class="btn btn-ghost btn-sm" style="margin-left:16px;flex-shrink:0">Abrir →</button></div></div>';
+  html+='</div>';
+  document.getElementById('page-content').innerHTML=html;
 }
-var totalClients=db.clients.length;
-var totalDone=db.sessions.filter(function(s){return s.status===‘realizada’||s.status===‘completed’;}).length;
-var paidRev=db.packages.filter(function(p){return p.paymentStatus===‘paid’;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus===‘parcela1’;}).reduce(function(a,p){return a+p.price/2;},0);
-var pendRev=db.packages.filter(function(p){return p.paymentStatus===‘pending’;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus===‘parcela1’;}).reduce(function(a,p){return a+p.price/2;},0);
-var now=today();
-var in7=new Date();in7.setDate(in7.getDate()+7);
-var in7s=in7.toISOString().split(‘T’)[0];
 
-// Proximas 7 dias
-var upcoming=db.sessions.filter(function(s){return s.status===‘agendada’&&s.date>=now&&s.date<=in7s;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,6);
-var upcomingHtml=’’;
-if(upcoming.length===0){
-upcomingHtml=’<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>’;
-} else {
-upcoming.forEach(function(s){upcomingHtml+=’<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">’+clientName(s.clientId)+’</div><div style="font-size:12px;color:var(--text2)">’+fmtDateTime(s.date,s.time)+’ · <span style="color:'+catColor(s.category)+'">’+catLabelShort(s.category)+’</span></div></div></div>’;});
-}
 
-// Pacotes a encerrar (1 ou 2 sessoes restantes)
-var expiringHtml=’’;
-var expiringCount=0;
-db.packages.forEach(function(p){
-var st=pkgStats(p);
-if(!st.isExhausted&&st.remaining<=2&&st.remaining>0){
-expiringCount++;
-expiringHtml+=’<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13.5px;font-weight:600">’+clientName(p.clientId)+’</div><div style="font-size:12px;color:var(--text2)">’+p.name+’ · <span style="color:var(--yellow)">’+st.remaining+’ sessão’+(st.remaining!==1?‘ões’:’’)+’ restante’+(st.remaining!==1?‘s’:’’)+’</span></div></div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver →</button></div>’;
-}
-});
-if(expiringCount===0)expiringHtml=’<div class="empty" style="padding:24px"><div class="empty-icon">✅</div><p>Nenhum pacote encerrando em breve</p></div>’;
-
-// Notas
-var savedNotes=localStorage.getItem(‘dashboard_notes’)||’’;
-var notesPreview=savedNotes.trim();
-var hasNotes=notesPreview.length>0;
-
-var html=’<div class="page">’;
-html+=’<div class="grid-4" style="margin-bottom:24px">’;
-html+=’<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">’+totalClients+’</div><div class="stat-label">Clientes</div></div>’;
-html+=’<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">’+totalDone+’</div><div class="stat-label">Sessões Realizadas</div></div>’;
-html+=’<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer" onclick="navigate(\'notes\')"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">’+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?’…’:’’):‘Clique para abrir notas’)+’</div><div class="stat-label">Notas Importantes</div></div>’;
-html+=’<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">’+fmt(paidRev)+’</div><div class="stat-label">Receita Confirmada</div></div>’;
-html+=’</div>’;
-
-if(pendRev>0)html+=’<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>’+fmt(pendRev)+’</strong> em pagamentos pendentes</div>’;
-// Bills alert - load async
-supaFetch(‘GET’,‘bills’,null,’?paid=eq.false&order=due_date’).then(function(bills){
-if(!bills||!bills.length)return;
-var now=today();
-var urgent=bills.filter(function(b){
-var diff=Math.round((new Date(b.due_date+‘T12:00:00’)-new Date(now+‘T12:00:00’))/(1000*60*60*24));
-return diff<=3;
-});
-if(urgent.length>0){
-var alertDiv=document.createElement(‘div’);
-alertDiv.className=‘alert alert-red’;
-alertDiv.style.marginBottom=‘20px’;
-alertDiv.style.cursor=‘pointer’;
-alertDiv.onclick=function(){navigate(‘bills’);};
-var labels=urgent.map(function(b){
-var diff=Math.round((new Date(b.due_date+‘T12:00:00’)-new Date(now+‘T12:00:00’))/(1000*60*60*24));
-return b.description+(diff<0?’ (vencido)’:diff===0?’ (hoje)’:’ (’+diff+‘d)’);
-}).join(’, ‘);
-alertDiv.innerHTML=‘📎 <strong>’+urgent.length+’ boleto’+(urgent.length!==1?‘s’:’’)+’ urgente’+(urgent.length!==1?‘s’:’’)+’ → clique para ver:</strong> ‘+labels;
-var pageContent=document.getElementById(‘page-content’);
-if(pageContent){
-var firstAlert=pageContent.querySelector(’.alert’);
-if(firstAlert){firstAlert.parentNode.insertBefore(alertDiv,firstAlert);}
-else{var page=pageContent.querySelector(’.page’);if(page)page.insertBefore(alertDiv,page.firstChild);}
-}
-}
-}).catch(function(){});
-
-html+=’<div class="grid-2">’;
-html+=’<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>’+upcomingHtml+’</div>’;
-html+=’<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver pacotes →</button></div>’+expiringHtml+’</div>’;
-html+=’</div>’;
-
-html+=’<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25);cursor:pointer" onclick="navigate(\'notes\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div class="section-title" style="margin-bottom:6px">📝 Notas Importantes</div><div style="font-size:13px;color:var(--text2)">’+(hasNotes?notesPreview.slice(0,120)+(notesPreview.length>120?’…’:’’):‘Nenhuma nota ainda. Clique para adicionar.’)+’</div></div><button class="btn btn-ghost btn-sm" style="margin-left:16px;flex-shrink:0">Abrir →</button></div></div>’;
-html+=’</div>’;
-document.getElementById(‘page-content’).innerHTML=html;
-}
-
-window.saveDashNotes=function(){var notes=document.getElementById(‘dash-notes’)?document.getElementById(‘dash-notes’).value:’’;localStorage.setItem(‘dashboard_notes’,notes);showToast(‘✅ Notas salvas!’);};
+window.saveDashNotes=function(){var notes=document.getElementById('dash-notes')?document.getElementById('dash-notes').value:'';localStorage.setItem('dashboard_notes',notes);showToast('✅ Notas salvas!');};
 
 // ── CLIENTS ──
 function renderClients(){
-var db=getDB();
-document.getElementById(‘topbar-actions’).innerHTML=’<button class="btn btn-primary" onclick="showClientForm()">+ Novo Cliente</button>’;
-var search=’’;
-function render(){
-var filtered=db.clients.filter(function(c){return !search||c.name.toLowerCase().includes(search.toLowerCase())||(c.email||’’).toLowerCase().includes(search.toLowerCase())||(c.phone||’’).includes(search);}).sort(function(a,b){return a.name.localeCompare(b.name);});
-var rows=’’;
-filtered.forEach(function(c){
-var pkgs=db.packages.filter(function(p){return p.clientId===c.id;});
-var done=db.sessions.filter(function(s){return s.clientId===c.id&&(s.status===‘realizada’||s.status===‘completed’);}).length;
-var age=’’;if(c.birthDate){var bd=new Date(c.birthDate+‘T12:00:00’);var now2=new Date();age=’ · ‘+(now2.getFullYear()-bd.getFullYear()-(now2<new Date(now2.getFullYear(),bd.getMonth(),bd.getDate())?1:0))+’ anos’;}
-rows+=’<tr><td><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0">’+getInitials(c.name)+’</div><div><div style="font-weight:600">’+c.name+’</div>’+(c.email?’<div style="font-size:12px;color:var(--text2)">’+c.email+age+’</div>’:’<div style="font-size:12px;color:var(--text2)">’+age.replace(’ · ‘,’’)+’</div>’)+’</div></div></td><td class="td-muted">’+(c.phone||’—’)+’</td><td><span class="badge badge-blue">’+pkgs.length+’ pacote’+(pkgs.length!==1?‘s’:’’)+’</span></td><td><span class="badge badge-green">’+done+’ realizada’+(done!==1?‘s’:’’)+’</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showClientDetail(\''+c.id+'\')">👁️</button><button class="btn-icon" onclick="showSessionForm(\''+c.id+'\')">📝</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></td></tr>’;
-});
-var html=’<div class="page"><div style="display:flex;gap:10px;margin-bottom:18px"><div class="search-input-wrap"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar cliente..." value="'+search+'" oninput="window._cs(this.value)" style="padding-left:36px"/></div></div>’;
-html+=filtered.length===0?’<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente encontrado</p></div></div>’:’<div class="card"><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>Pacotes</th><th>Sessões</th><th>Ações</th></tr></thead><tbody>’+rows+’</tbody></table></div></div>’;
-html+=’</div>’;
-document.getElementById(‘page-content’).innerHTML=html;
-}
-window._cs=function(v){search=v;render();};
-render();
+  var db=getDB();
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showClientForm()">+ Novo Cliente</button>';
+  var search='';
+  function render(){
+    var filtered=db.clients.filter(function(c){return !search||c.name.toLowerCase().includes(search.toLowerCase())||(c.email||'').toLowerCase().includes(search.toLowerCase())||(c.phone||'').includes(search);}).sort(function(a,b){return a.name.localeCompare(b.name);});
+    var rows='';
+    filtered.forEach(function(c){
+      var pkgs=db.packages.filter(function(p){return p.clientId===c.id;});
+      var done=db.sessions.filter(function(s){return s.clientId===c.id&&(s.status==='realizada'||s.status==='completed');}).length;
+      var age='';if(c.birthDate){var bd=new Date(c.birthDate+'T12:00:00');var now2=new Date();age=' · '+(now2.getFullYear()-bd.getFullYear()-(now2<new Date(now2.getFullYear(),bd.getMonth(),bd.getDate())?1:0))+' anos';}
+    rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0">'+getInitials(c.name)+'</div><div><div style="font-weight:600">'+c.name+'</div>'+(c.email?'<div style="font-size:12px;color:var(--text2)">'+c.email+age+'</div>':'<div style="font-size:12px;color:var(--text2)">'+age.replace(' · ','')+'</div>')+'</div></div></td><td class="td-muted">'+(c.phone||'—')+'</td><td><span class="badge badge-blue">'+pkgs.length+' pacote'+(pkgs.length!==1?'s':'')+'</span></td><td><span class="badge badge-green">'+done+' realizada'+(done!==1?'s':'')+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showClientDetail(\''+c.id+'\')">👁️</button><button class="btn-icon" onclick="showSessionForm(\''+c.id+'\')">📝</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></td></tr>';
+    });
+    var html='<div class="page"><div style="display:flex;gap:10px;margin-bottom:18px"><div class="search-input-wrap"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar cliente..." value="'+search+'" oninput="window._cs(this.value)" style="padding-left:36px"/></div></div>';
+    html+=filtered.length===0?'<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum cliente encontrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Telefone</th><th>Pacotes</th><th>Sessões</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    html+='</div>';
+    document.getElementById('page-content').innerHTML=html;
+  }
+  window._cs=function(v){search=v;render();};
+  render();
 }
 
 function showClientForm(id){
-var db=getDB();var c=id?db.clients.find(function(c){return c.id===id;}):null;
-var body=’’;
-body+=’<div class="form-group"><label>Nome *</label><input type="text" id="cf-name" value="'+(c?c.name||'':'')+'" placeholder="Nome completo"/></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>Telefone</label><input type="tel" id="cf-phone" value="'+(c?c.phone||'':'')+'" placeholder="(11) 99999-9999"/></div><div class="form-group"><label>Email</label><input type="email" id="cf-email" value="'+(c?c.email||'':'')+'" placeholder="email@exemplo.com"/></div></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>CPF</label><input type="text" id="cf-cpf" value="'+(c?c.cpf||'':'')+'" placeholder="000.000.000-00"/></div><div class="form-group"><label>Data de Nascimento</label><input type="date" id="cf-birth" value="'+(c?c.birthDate||'':'')+'"/></div></div>’;
-body+=’<div id="cf-age-display" style="font-size:12px;color:var(--green);margin-top:-10px;margin-bottom:12px;display:none"></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>Escolaridade</label><select id="cf-education"><option value="">Não informado</option>’;
-var edOpts=[‘Fundamental Incompleto’,‘Fundamental Completo’,‘Médio Incompleto’,‘Médio Completo’,‘Superior Incompleto’,‘Superior Completo’,‘Pós-graduação’];
-edOpts.forEach(function(opt){body+=’<option value=”’+opt+’” ‘+(c&&c.education===opt?‘selected’:’’)+’>’+opt+’</option>’;});
-body+=’</select></div><div class="form-group"><label>Endereço / CEP</label><input type="text" id="cf-address" value="'+(c?c.address||'':'')+'" placeholder="Rua, número, bairro, CEP"/></div></div>’;
-body+=’<div class="form-group"><label>Observações</label><textarea id="cf-notes">’+(c?c.notes||’’:’’)+’</textarea></div>’;
-body+=’<div id="cf-error" class="alert alert-red" style="display:none"></div>’;
-body+=’<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveClient(\''+(id||'')+'\');})()">Salvar</button></div>’;
-showModal(id?‘Editar Cliente’:‘Novo Cliente’,body);
-// Auto-calculate age when birth date changes
-setTimeout(function(){
-var birthInput=document.getElementById(‘cf-birth’);
-var ageDisplay=document.getElementById(‘cf-age-display’);
-function updateAge(){
-if(birthInput&&birthInput.value&&ageDisplay){
-var bd=new Date(birthInput.value+‘T12:00:00’);
-var now=new Date();
-var age=now.getFullYear()-bd.getFullYear()-(now<new Date(now.getFullYear(),bd.getMonth(),bd.getDate())?1:0);
-ageDisplay.textContent=‘Idade: ‘+age+’ anos’;
-ageDisplay.style.display=‘block’;
-}
-}
-if(birthInput)birthInput.addEventListener(‘change’,updateAge);
-updateAge();
-},100);
+  var db=getDB();var c=id?db.clients.find(function(c){return c.id===id;}):null;
+  var body='';
+  body+='<div class="form-group"><label>Nome *</label><input type="text" id="cf-name" value="'+(c?c.name||'':'')+'" placeholder="Nome completo"/></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Telefone</label><input type="tel" id="cf-phone" value="'+(c?c.phone||'':'')+'" placeholder="(11) 99999-9999"/></div><div class="form-group"><label>Email</label><input type="email" id="cf-email" value="'+(c?c.email||'':'')+'" placeholder="email@exemplo.com"/></div></div>';
+  body+='<div class="form-row"><div class="form-group"><label>CPF</label><input type="text" id="cf-cpf" value="'+(c?c.cpf||'':'')+'" placeholder="000.000.000-00"/></div><div class="form-group"><label>Data de Nascimento</label><input type="date" id="cf-birth" value="'+(c?c.birthDate||'':'')+'"/></div></div>';
+  body+='<div id="cf-age-display" style="font-size:12px;color:var(--green);margin-top:-10px;margin-bottom:12px;display:none"></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Escolaridade</label><select id="cf-education"><option value="">Não informado</option>';
+  var edOpts=['Fundamental Incompleto','Fundamental Completo','Médio Incompleto','Médio Completo','Superior Incompleto','Superior Completo','Pós-graduação'];
+  edOpts.forEach(function(opt){body+='<option value="'+opt+'" '+(c&&c.education===opt?'selected':'')+'>'+opt+'</option>';});
+  body+='</select></div><div class="form-group"><label>Endereço / CEP</label><input type="text" id="cf-address" value="'+(c?c.address||'':'')+'" placeholder="Rua, número, bairro, CEP"/></div></div>';
+  body+='<div class="form-group"><label>Observações</label><textarea id="cf-notes">'+(c?c.notes||'':'')+'</textarea></div>';
+  body+='<div id="cf-error" class="alert alert-red" style="display:none"></div>';
+  body+='<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveClient(\''+(id||'')+'\');})()">Salvar</button></div>';
+  showModal(id?'Editar Cliente':'Novo Cliente',body);
+  // Auto-calculate age when birth date changes
+  setTimeout(function(){
+    var birthInput=document.getElementById('cf-birth');
+    var ageDisplay=document.getElementById('cf-age-display');
+    function updateAge(){
+      if(birthInput&&birthInput.value&&ageDisplay){
+        var bd=new Date(birthInput.value+'T12:00:00');
+        var now=new Date();
+        var age=now.getFullYear()-bd.getFullYear()-(now<new Date(now.getFullYear(),bd.getMonth(),bd.getDate())?1:0);
+        ageDisplay.textContent='Idade: '+age+' anos';
+        ageDisplay.style.display='block';
+      }
+    }
+    if(birthInput)birthInput.addEventListener('change',updateAge);
+    updateAge();
+  },100);
 }
 async function saveClient(id){
-var name=document.getElementById(‘cf-name’).value.trim();
-var err=document.getElementById(‘cf-error’);
-if(!name){err.textContent=‘Nome é obrigatório’;err.style.display=‘flex’;return;}
-var data={name:name,phone:document.getElementById(‘cf-phone’).value.trim()||null,email:document.getElementById(‘cf-email’).value.trim()||null,notes:document.getElementById(‘cf-notes’).value.trim()||null,cpf:document.getElementById(‘cf-cpf’).value.trim()||null,birth_date:document.getElementById(‘cf-birth’).value||null,education:document.getElementById(‘cf-education’).value||null,address:document.getElementById(‘cf-address’).value.trim()||null};
-closeModal();
-try{
-if(id){await dbUpdateClient(id,data);}
-else{var row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch(‘POST’,‘clients’,row);await loadFromSupabase();}
-renderClients();showToast(id?‘✅ Cliente atualizado!’:‘✅ Cliente cadastrado!’);
-}catch(e){showToast(‘❌ Erro ao salvar.’,true);}
+  var name=document.getElementById('cf-name').value.trim();
+  var err=document.getElementById('cf-error');
+  if(!name){err.textContent='Nome é obrigatório';err.style.display='flex';return;}
+  var data={name:name,phone:document.getElementById('cf-phone').value.trim()||null,email:document.getElementById('cf-email').value.trim()||null,notes:document.getElementById('cf-notes').value.trim()||null,cpf:document.getElementById('cf-cpf').value.trim()||null,birth_date:document.getElementById('cf-birth').value||null,education:document.getElementById('cf-education').value||null,address:document.getElementById('cf-address').value.trim()||null};
+  closeModal();
+  try{
+    if(id){await dbUpdateClient(id,data);}
+    else{var row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch('POST','clients',row);await loadFromSupabase();}
+    renderClients();showToast(id?'✅ Cliente atualizado!':'✅ Cliente cadastrado!');
+  }catch(e){showToast('❌ Erro ao salvar.',true);}
 }
 function deleteClientConfirm(id){
-var c=getDB().clients.find(function(c){return c.id===id;});
-showModal(‘Excluir Cliente’,’<div class="alert alert-red">⚠️ Excluir <strong>’+c.name+’</strong> e todos os seus dados?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){await deleteClientDo(\''+id+'\');})()">Excluir</button></div>’);
+  var c=getDB().clients.find(function(c){return c.id===id;});
+  showModal('Excluir Cliente','<div class="alert alert-red">⚠️ Excluir <strong>'+c.name+'</strong> e todos os seus dados?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){await deleteClientDo(\''+id+'\');})()">Excluir</button></div>');
 }
-async function deleteClientDo(id){closeModal();var db=getDB();db.clients.filter(function(c){return c.id===id;});await supaFetch(‘DELETE’,‘clients’,null,’?id=eq.’+id);await loadFromSupabase();renderClients();showToast(‘🗑️ Cliente excluído’);}
+async function deleteClientDo(id){closeModal();var db=getDB();db.clients.filter(function(c){return c.id===id;});await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();renderClients();showToast('🗑️ Cliente excluído');}
 
 function showClientDetail(id){
-var db=getDB();var c=db.clients.find(function(c){return c.id===id;});if(!c)return;
-var pkgs=db.packages.filter(function(p){return p.clientId===id;});
-var sessions=db.sessions.filter(function(s){return s.clientId===id;}).sort(function(a,b){return b.date.localeCompare(a.date);});
-var pkgsHtml=pkgs.length===0?’<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>’:’’;
-pkgs.forEach(function(p){var st=pkgStats(p);var bc=st.pct>=100?‘progress-red’:st.pct>=70?‘progress-yellow’:‘progress-green’;pkgsHtml+=’<div class="package-card"><div class="package-header"><div><strong>’+p.name+’</strong>’+(st.isExhausted?’<span class="badge badge-red" style="margin-left:8px">Encerrado</span>’:’’)+’</div><span class="badge '+paymentBadgeClass(p.paymentStatus)+'">’+paymentLabel(p.paymentStatus,p.paymentType)+’</span></div><div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">’+p.totalSessions+’</strong></span><span style="font-size:12px;color:var(--text2)">Realizadas: <strong style="color:var(--text)">’+st.used+’</strong></span><span style="font-size:12px;color:var(--text2)">Restantes: <strong style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--green)')+'">’+st.remaining+’</strong></span><span style="font-size:12px;color:var(--text2)">Valor: <strong style="color:var(--text)">’+fmt(p.price)+’</strong></span></div><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></div>’;});
-var sessHtml=’<table style="width:100%;border-collapse:collapse"><thead><tr><th>Data</th><th>Hora</th><th>Categoria</th><th>Status</th><th></th></tr></thead><tbody>’;
-sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+=’<tr><td>’+fmtDate(s.date)+’</td><td class="td-muted">’+(s.time||’—’)+’</td><td><span class="badge '+catBadgeClass(s.category)+'">’+catLabelShort(s.category)+’</span></td><td><span class="badge '+sb[0]+'">’+sb[1]+’</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="(async function(){await dbDeleteSession(\''+s.id+'\');showToast(\'🗑️ Removida\');showClientDetail(\''+id+'\');})()">🗑️</button></div></td></tr>’;});
-sessHtml+=’</tbody></table>’;
-var detailHeader=’<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px"><div class="client-avatar">’+getInitials(c.name)+’</div><div>’+(c.phone?’<div style="font-size:13px;color:var(--text2)">📱 ‘+c.phone+’</div>’:’’)+(c.email?’<div style="font-size:13px;color:var(--text2)">✉️ ‘+c.email+’</div>’:’’)+(c.birthDate?’<div style="font-size:13px;color:var(--text2)">🎂 ‘+fmtDate(c.birthDate)+ageStr+’</div>’:’’)+(c.cpf?’<div style="font-size:13px;color:var(--text2)">🪪 ‘+c.cpf+’</div>’:’’)+(c.education?’<div style="font-size:13px;color:var(--text2)">🎓 ‘+c.education+’</div>’:’’)+(c.address?’<div style="font-size:13px;color:var(--text2)">📍 ‘+c.address+’</div>’:’’)+(c.notes?’<div style="font-size:12px;color:var(--text3);margin-top:4px">’+c.notes+’</div>’:’’)+’</div></div>’;
-showModal(‘Cliente: ‘+c.name,detailHeader+’<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\');">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\');">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\');">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>’+pkgsHtml+’<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>’+sessHtml,true);
+  var db=getDB();var c=db.clients.find(function(c){return c.id===id;});if(!c)return;
+  var pkgs=db.packages.filter(function(p){return p.clientId===id;});
+  var sessions=db.sessions.filter(function(s){return s.clientId===id;}).sort(function(a,b){return b.date.localeCompare(a.date);});
+  var pkgsHtml=pkgs.length===0?'<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>':'';
+  pkgs.forEach(function(p){var st=pkgStats(p);var bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';pkgsHtml+='<div class="package-card"><div class="package-header"><div><strong>'+p.name+'</strong>'+(st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':'')+'</div><span class="badge '+paymentBadgeClass(p.paymentStatus)+'">'+paymentLabel(p.paymentStatus,p.paymentType)+'</span></div><div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">'+p.totalSessions+'</strong></span><span style="font-size:12px;color:var(--text2)">Realizadas: <strong style="color:var(--text)">'+st.used+'</strong></span><span style="font-size:12px;color:var(--text2)">Restantes: <strong style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--green)')+'">'+st.remaining+'</strong></span><span style="font-size:12px;color:var(--text2)">Valor: <strong style="color:var(--text)">'+fmt(p.price)+'</strong></span></div><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></div>';});
+  var sessHtml='<table style="width:100%;border-collapse:collapse"><thead><tr><th>Data</th><th>Hora</th><th>Categoria</th><th>Status</th><th></th></tr></thead><tbody>';
+  sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<tr><td>'+fmtDate(s.date)+'</td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td><span class="badge '+sb[0]+'">'+sb[1]+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="(async function(){await dbDeleteSession(\''+s.id+'\');showToast(\'🗑️ Removida\');showClientDetail(\''+id+'\');})()">🗑️</button></div></td></tr>';});
+  sessHtml+='</tbody></table>';
+  var detailHeader='<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px"><div class="client-avatar">'+getInitials(c.name)+'</div><div>'+(c.phone?'<div style="font-size:13px;color:var(--text2)">📱 '+c.phone+'</div>':'')+(c.email?'<div style="font-size:13px;color:var(--text2)">✉️ '+c.email+'</div>':'')+(c.birthDate?'<div style="font-size:13px;color:var(--text2)">🎂 '+fmtDate(c.birthDate)+ageStr+'</div>':'')+(c.cpf?'<div style="font-size:13px;color:var(--text2)">🪪 '+c.cpf+'</div>':'')+(c.education?'<div style="font-size:13px;color:var(--text2)">🎓 '+c.education+'</div>':'')+(c.address?'<div style="font-size:13px;color:var(--text2)">📍 '+c.address+'</div>':'')+(c.notes?'<div style="font-size:12px;color:var(--text3);margin-top:4px">'+c.notes+'</div>':'')+'</div></div>';
+  showModal('Cliente: '+c.name,detailHeader+'<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\');">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\');">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\');">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
 }
 
 // ── PACKAGES ──
 function renderPackages(){
-var db=getDB();
-document.getElementById(‘topbar-actions’).innerHTML=’<button class="btn btn-primary" onclick="showPackageForm()">+ Novo Pacote</button>’;
-var rows=’’;
-db.packages.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(p){
-var st=pkgStats(p);var bc=st.pct>=100?‘progress-red’:st.pct>=70?‘progress-yellow’:‘progress-green’;
-rows+=’<tr><td><strong>’+p.name+’</strong>’+(st.isExhausted?’<span class="badge badge-red" style="margin-left:6px">Encerrado</span>’:’’)+’</td><td>’+clientName(p.clientId)+’</td><td><span style="color:var(--green)">’+st.used+’</span><span style="color:var(--text3)"> / ‘+p.totalSessions+’</span><span style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--text2)')+'">(’+st.remaining+’ rest.)</span></td><td style="min-width:100px"><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></td><td>’+fmt(p.price)+’</td><td><span class="badge '+paymentBadgeClass(p.paymentStatus)+'" style="cursor:pointer" onclick="(async function(){await cyclePayment(\''+p.id+'\');})()">’+paymentLabel(p.paymentStatus,p.paymentType)+’</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showPackageForm(null,\''+p.id+'\')">✏️</button><button class="btn-icon" onclick="deletePackageConfirm(\''+p.id+'\')">🗑️</button></div></td></tr>’;
-});
-var html=’<div class="page">’+(db.packages.length===0?’<div class="card"><div class="empty"><div class="empty-icon">📦</div><p>Nenhum pacote cadastrado</p></div></div>’:’<div class="card"><div class="table-wrap"><table><thead><tr><th>Pacote</th><th>Cliente</th><th>Sessões</th><th>Progresso</th><th>Valor</th><th>Pagamento</th><th>Ações</th></tr></thead><tbody>’+rows+’</tbody></table></div></div>’)+’</div>’;
-document.getElementById(‘page-content’).innerHTML=html;
+  var db=getDB();
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showPackageForm()">+ Novo Pacote</button>';
+  var rows='';
+  db.packages.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(p){
+    var st=pkgStats(p);var bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';
+    rows+='<tr><td><strong>'+p.name+'</strong>'+(st.isExhausted?'<span class="badge badge-red" style="margin-left:6px">Encerrado</span>':'')+'</td><td>'+clientName(p.clientId)+'</td><td><span style="color:var(--green)">'+st.used+'</span><span style="color:var(--text3)"> / '+p.totalSessions+'</span><span style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--text2)')+'">('+st.remaining+' rest.)</span></td><td style="min-width:100px"><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></td><td>'+fmt(p.price)+'</td><td><span class="badge '+paymentBadgeClass(p.paymentStatus)+'" style="cursor:pointer" onclick="(async function(){await cyclePayment(\''+p.id+'\');})()">'+paymentLabel(p.paymentStatus,p.paymentType)+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showPackageForm(null,\''+p.id+'\')">✏️</button><button class="btn-icon" onclick="deletePackageConfirm(\''+p.id+'\')">🗑️</button></div></td></tr>';
+  });
+  var html='<div class="page">'+(db.packages.length===0?'<div class="card"><div class="empty"><div class="empty-icon">📦</div><p>Nenhum pacote cadastrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Pacote</th><th>Cliente</th><th>Sessões</th><th>Progresso</th><th>Valor</th><th>Pagamento</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>')+'</div>';
+  document.getElementById('page-content').innerHTML=html;
 }
 
 function showPackageForm(clientId,pkgId){
-var db=getDB();var pkg=pkgId?db.packages.find(function(p){return p.id===pkgId;}):null;
-if(db.clients.length===0){showToast(‘❌ Cadastre um cliente primeiro!’,true);return;}
-var isNew=!pkgId;
-var pkgTime=pkgId?(db.sessions.find(function(s){return s.packageId===pkgId;})||{time:‘09:00’}).time||‘09:00’:‘09:00’;
-var clientOpts=’’;
-db.clients.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(c){clientOpts+=’<option value=”’+c.id+’” ‘+((pkg?(pkg.clientId===c.id):clientId===c.id)?‘selected’:’’)+’>’+c.name+’</option>’;});
-var payType=pkg?pkg.paymentType||‘pacote’:‘pacote’;
-var payStatus=pkg?pkg.paymentStatus||‘pending’:‘pending’;
-var payDate=pkg?pkg.paymentDate||’’:’’;
-var payDate2=pkg?pkg.paymentDate2||’’:’’;
-var body=’<div class="form-group"><label>Cliente *</label><select id="pf-client">’+clientOpts+’</select></div>’;
-body+=’<div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="'+(pkg?pkg.name||'':'')+'" placeholder="Ex: Pacote 8 sessões"/></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="'+(pkg?pkg.totalSessions||'':'')+'" min="1" placeholder="Ex: 8"/></div><div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="'+(pkg?pkg.price||'':'')+'" min="0" step="0.01" placeholder="Ex: 800.00"/></div></div>’;
-if(!isNew){body+=’<div class="form-group"><label>Horário das Sessões</label><div style="display:flex;gap:10px;align-items:center"><input type="time" id="pf-edit-time" value="'+pkgTime+'" style="max-width:140px"/><label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500"><input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em sessões futuras</label></div></div>’;}
-if(isNew){body+=’<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático</div><div class="form-row"><div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="'+today()+'"/></div><div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div></div><div class="form-row"><div class="form-group"><label>Intervalo</label><select id="pf-interval"><option value="7">Semanal</option><option value="14">Quinzenal</option><option value="30">Mensal</option></select></div><div class="form-group"><label>Categoria</label><select id="pf-category"><option value="psicoterapia">🔵 Psicoterapia</option><option value="reabilitacao">🟣 Reabilitação</option><option value="avaliacao">🟢 Avaliação</option></select></div></div></div>’;}
-if(!isNew){body+=’<div class="form-group"><label>📋 Prontuário</label><textarea id="pf-pkg-notes" rows="4" placeholder="Anotações clínicas...">’+(pkg?pkg.notes||’’:’’)+’</textarea></div>’;}
-body+=’<div class="form-group"><label>Modalidade de Pagamento</label><select id="pf-type"><option value=“pacote” ‘+(payType===‘pacote’?‘selected’:’’)+’>📦 Pacote (à vista ou parcelado)</option><option value=“sessao” ‘+(payType===‘sessao’?‘selected’:’’)+’>💳 Por Sessão</option></select></div>’;
-body+=’<div class="form-group"><label>Status de Pagamento</label><select id="pf-payment"><option value=“pending” ‘+(payStatus===‘pending’?‘selected’:’’)+’>⏳ Pendente</option><option value=“parcela1” ‘+(payStatus===‘parcela1’?‘selected’:’’)+’>🔶 1ª Parcela Paga</option><option value=“paid” ‘+(payStatus===‘paid’?‘selected’:’’)+’>💰 Pago integral</option></select></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>Data do Pagamento</label><input type="date" id="pf-payment-date" value="'+payDate+'"/></div><div class="form-group"><label>Data 2ª Parcela</label><input type="date" id="pf-payment-date2" value="'+payDate2+'"/></div></div>’;
-body+=’<div id="pf-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="window._savePkg()">Salvar</button></div>’;
-showModal(pkgId?‘Editar Pacote’:‘Novo Pacote’,body);
-var _pkgId=pkgId||’’;
-window._savePkg=async function(){await savePackage(_pkgId);};
+  var db=getDB();var pkg=pkgId?db.packages.find(function(p){return p.id===pkgId;}):null;
+  if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
+  var isNew=!pkgId;
+  var pkgTime=pkgId?(db.sessions.find(function(s){return s.packageId===pkgId;})||{time:'09:00'}).time||'09:00':'09:00';
+  var clientOpts='';
+  db.clients.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(c){clientOpts+='<option value="'+c.id+'" '+((pkg?(pkg.clientId===c.id):clientId===c.id)?'selected':'')+'>'+c.name+'</option>';});
+  var payType=pkg?pkg.paymentType||'pacote':'pacote';
+  var payStatus=pkg?pkg.paymentStatus||'pending':'pending';
+  var payDate=pkg?pkg.paymentDate||'':'';
+  var payDate2=pkg?pkg.paymentDate2||'':'';
+  var body='<div class="form-group"><label>Cliente *</label><select id="pf-client">'+clientOpts+'</select></div>';
+  body+='<div class="form-group"><label>Nome do Pacote *</label><input type="text" id="pf-name" value="'+(pkg?pkg.name||'':'')+'" placeholder="Ex: Pacote 8 sessões"/></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Nº de Sessões *</label><input type="number" id="pf-sessions" value="'+(pkg?pkg.totalSessions||'':'')+'" min="1" placeholder="Ex: 8"/></div><div class="form-group"><label>Valor (R$) *</label><input type="number" id="pf-price" value="'+(pkg?pkg.price||'':'')+'" min="0" step="0.01" placeholder="Ex: 800.00"/></div></div>';
+  if(!isNew){body+='<div class="form-group"><label>Horário das Sessões</label><div style="display:flex;gap:10px;align-items:center"><input type="time" id="pf-edit-time" value="'+pkgTime+'" style="max-width:140px"/><label style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:500"><input type="checkbox" id="pf-propagate-time" style="width:auto"/> Atualizar horário em sessões futuras</label></div></div>';}
+  if(isNew){body+='<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📅 Agendamento Automático</div><div class="form-row"><div class="form-group"><label>Data da 1ª Sessão *</label><input type="date" id="pf-first-date" value="'+today()+'"/></div><div class="form-group"><label>Horário *</label><input type="time" id="pf-time" value="09:00"/></div></div><div class="form-row"><div class="form-group"><label>Intervalo</label><select id="pf-interval"><option value="7">Semanal</option><option value="14">Quinzenal</option><option value="30">Mensal</option></select></div><div class="form-group"><label>Categoria</label><select id="pf-category"><option value="psicoterapia">🔵 Psicoterapia</option><option value="reabilitacao">🟣 Reabilitação</option><option value="avaliacao">🟢 Avaliação</option></select></div></div></div>';}
+  if(!isNew){body+='<div class="form-group"><label>📋 Prontuário</label><textarea id="pf-pkg-notes" rows="4" placeholder="Anotações clínicas...">'+(pkg?pkg.notes||'':'')+'</textarea></div>';}
+  body+='<div class="form-group"><label>Modalidade de Pagamento</label><select id="pf-type"><option value="pacote" '+(payType==='pacote'?'selected':'')+'>📦 Pacote (à vista ou parcelado)</option><option value="sessao" '+(payType==='sessao'?'selected':'')+'>💳 Por Sessão</option></select></div>';
+  body+='<div class="form-group"><label>Status de Pagamento</label><select id="pf-payment"><option value="pending" '+(payStatus==='pending'?'selected':'')+'>⏳ Pendente</option><option value="parcela1" '+(payStatus==='parcela1'?'selected':'')+'>🔶 1ª Parcela Paga</option><option value="paid" '+(payStatus==='paid'?'selected':'')+'>💰 Pago integral</option></select></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Data do Pagamento</label><input type="date" id="pf-payment-date" value="'+payDate+'"/></div><div class="form-group"><label>Data 2ª Parcela</label><input type="date" id="pf-payment-date2" value="'+payDate2+'"/></div></div>';
+  body+='<div id="pf-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="window._savePkg()">Salvar</button></div>';
+  showModal(pkgId?'Editar Pacote':'Novo Pacote',body);
+  var _pkgId=pkgId||'';
+  window._savePkg=async function(){await savePackage(_pkgId);};
 }
 
 async function savePackage(id){
-var clientId=document.getElementById(‘pf-client’).value;
-var name=document.getElementById(‘pf-name’).value.trim();
-var totalSessions=parseInt(document.getElementById(‘pf-sessions’).value);
-var price=parseFloat(document.getElementById(‘pf-price’).value);
-var paymentStatus=document.getElementById(‘pf-payment’).value;
-var paymentType=document.getElementById(‘pf-type’).value;
-var paymentDate=document.getElementById(‘pf-payment-date’).value||null;
-var paymentDate2=document.getElementById(‘pf-payment-date2’).value||null;
-var err=document.getElementById(‘pf-error’);
-if(!name||!totalSessions||isNaN(price)){err.textContent=‘Preencha todos os campos obrigatórios’;err.style.display=‘flex’;return;}
-if(totalSessions<1){err.textContent=‘Sessões deve ser maior que 0’;err.style.display=‘flex’;return;}
-if(!id){var fd=document.getElementById(‘pf-first-date’)?document.getElementById(‘pf-first-date’).value:’’;if(!fd){err.textContent=‘Informe a data da 1ª sessão’;err.style.display=‘flex’;return;}}
-var firstDate=document.getElementById(‘pf-first-date’)?document.getElementById(‘pf-first-date’).value||’’:’’;
-var time=document.getElementById(‘pf-time’)?document.getElementById(‘pf-time’).value||‘09:00’:‘09:00’;
-var interval=document.getElementById(‘pf-interval’)?parseInt(document.getElementById(‘pf-interval’).value)||7:7;
-var category=document.getElementById(‘pf-category’)?document.getElementById(‘pf-category’).value||‘psicoterapia’:‘psicoterapia’;
-var finalStatus=paymentType===‘sessao’?‘paid’:paymentStatus;
-closeModal();
-if(id){
-var db=getDB();var st=pkgStats(db.packages.find(function(p){return p.id===id;}));
-if(totalSessions<st.used){showToast(‘Não pode reduzir abaixo das já realizadas’,true);return;}
-var editTime=document.getElementById(‘pf-edit-time’)?document.getElementById(‘pf-edit-time’).value:null;
-var propagateTime=document.getElementById(‘pf-propagate-time’)?document.getElementById(‘pf-propagate-time’).checked:false;
-var pkgNotes=document.getElementById(‘pf-pkg-notes’)?document.getElementById(‘pf-pkg-notes’).value||’’:’’;
-await dbUpdatePackage(id,{clientId:clientId,name:name,totalSessions:totalSessions,price:price,paymentStatus:finalStatus,notes:pkgNotes,paymentDate:paymentDate,paymentDate2:paymentDate2,paymentType:paymentType,newTime:propagateTime&&editTime?editTime:null});
-showToast(propagateTime?‘✅ Pacote e horários atualizados!’:‘✅ Pacote atualizado!’);
-renderPackages();return;
-}
-showToast(‘⏳ Criando pacote e sessões…’);
-var pkgId=genId();
-var pkgRes=await fetch(SUPA_URL+’/rest/v1/packages’,{method:‘POST’,headers:{‘apikey’:SUPA_KEY,‘Authorization’:‘Bearer ‘+SUPA_KEY,‘Content-Type’:‘application/json’,‘Prefer’:‘return=minimal’},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
-if(!pkgRes.ok){showToast(‘❌ Erro ao criar pacote.’,true);return;}
-var successCount=0;
-for(var i=0;i<totalSessions;i++){
-var d=new Date(firstDate+‘T12:00:00’);d.setDate(d.getDate()+(i*interval));
-var sessRes=await fetch(SUPA_URL+’/rest/v1/sessions’,{method:‘POST’,headers:{‘apikey’:SUPA_KEY,‘Authorization’:‘Bearer ‘+SUPA_KEY,‘Content-Type’:‘application/json’,‘Prefer’:‘return=minimal’},body:JSON.stringify({id:pkgId+’_s’+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split(‘T’)[0],time:time,status:‘agendada’,category:category,notes:’’,interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
-if(sessRes.ok)successCount++;
-}
-await loadFromSupabase();renderPackages();
-showToast(successCount===totalSessions?‘✅ Pacote criado com ‘+totalSessions+’ sessões!’:‘⚠️ ‘+successCount+’/’+totalSessions+’ sessões criadas.’,successCount!==totalSessions);
+  var clientId=document.getElementById('pf-client').value;
+  var name=document.getElementById('pf-name').value.trim();
+  var totalSessions=parseInt(document.getElementById('pf-sessions').value);
+  var price=parseFloat(document.getElementById('pf-price').value);
+  var paymentStatus=document.getElementById('pf-payment').value;
+  var paymentType=document.getElementById('pf-type').value;
+  var paymentDate=document.getElementById('pf-payment-date').value||null;
+  var paymentDate2=document.getElementById('pf-payment-date2').value||null;
+  var err=document.getElementById('pf-error');
+  if(!name||!totalSessions||isNaN(price)){err.textContent='Preencha todos os campos obrigatórios';err.style.display='flex';return;}
+  if(totalSessions<1){err.textContent='Sessões deve ser maior que 0';err.style.display='flex';return;}
+  if(!id){var fd=document.getElementById('pf-first-date')?document.getElementById('pf-first-date').value:'';if(!fd){err.textContent='Informe a data da 1ª sessão';err.style.display='flex';return;}}
+  var firstDate=document.getElementById('pf-first-date')?document.getElementById('pf-first-date').value||'':'';
+  var time=document.getElementById('pf-time')?document.getElementById('pf-time').value||'09:00':'09:00';
+  var interval=document.getElementById('pf-interval')?parseInt(document.getElementById('pf-interval').value)||7:7;
+  var category=document.getElementById('pf-category')?document.getElementById('pf-category').value||'psicoterapia':'psicoterapia';
+  var finalStatus=paymentType==='sessao'?'paid':paymentStatus;
+  closeModal();
+  if(id){
+    var db=getDB();var st=pkgStats(db.packages.find(function(p){return p.id===id;}));
+    if(totalSessions<st.used){showToast('Não pode reduzir abaixo das já realizadas',true);return;}
+    var editTime=document.getElementById('pf-edit-time')?document.getElementById('pf-edit-time').value:null;
+    var propagateTime=document.getElementById('pf-propagate-time')?document.getElementById('pf-propagate-time').checked:false;
+    var pkgNotes=document.getElementById('pf-pkg-notes')?document.getElementById('pf-pkg-notes').value||'':'';
+    await dbUpdatePackage(id,{clientId:clientId,name:name,totalSessions:totalSessions,price:price,paymentStatus:finalStatus,notes:pkgNotes,paymentDate:paymentDate,paymentDate2:paymentDate2,paymentType:paymentType,newTime:propagateTime&&editTime?editTime:null});
+    showToast(propagateTime?'✅ Pacote e horários atualizados!':'✅ Pacote atualizado!');
+    renderPackages();return;
+  }
+  showToast('⏳ Criando pacote e sessões...');
+  var pkgId=genId();
+  var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
+  if(!pkgRes.ok){showToast('❌ Erro ao criar pacote.',true);return;}
+  var successCount=0;
+  for(var i=0;i<totalSessions;i++){
+    var d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+(i*interval));
+    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
+    if(sessRes.ok)successCount++;
+  }
+  await loadFromSupabase();renderPackages();
+  showToast(successCount===totalSessions?'✅ Pacote criado com '+totalSessions+' sessões!':'⚠️ '+successCount+'/'+totalSessions+' sessões criadas.',successCount!==totalSessions);
 }
 
-async function cyclePayment(id){var db=getDB();var pkg=db.packages.find(function(p){return p.id===id;});var cycle={pending:‘parcela1’,parcela1:‘paid’,paid:‘pending’};var newStatus=cycle[pkg.paymentStatus]||‘parcela1’;await dbUpdatePackage(id,{paymentStatus:newStatus});renderPackages();showToast(‘✅ ‘+paymentLabel(newStatus));}
-function deletePackageConfirm(id){var p=getDB().packages.find(function(p){return p.id===id;});showModal(‘Excluir Pacote’,’<div class="alert alert-red">⚠️ Excluir <strong>’+p.name+’</strong> e todas as sessões?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeletePackage(\''+id+'\');renderPackages();showToast(\'🗑️ Pacote excluído\');})()">Excluir</button></div>’);}
+async function cyclePayment(id){var db=getDB();var pkg=db.packages.find(function(p){return p.id===id;});var cycle={pending:'parcela1',parcela1:'paid',paid:'pending'};var newStatus=cycle[pkg.paymentStatus]||'parcela1';await dbUpdatePackage(id,{paymentStatus:newStatus});renderPackages();showToast('✅ '+paymentLabel(newStatus));}
+function deletePackageConfirm(id){var p=getDB().packages.find(function(p){return p.id===id;});showModal('Excluir Pacote','<div class="alert alert-red">⚠️ Excluir <strong>'+p.name+'</strong> e todas as sessões?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeletePackage(\''+id+'\');renderPackages();showToast(\'🗑️ Pacote excluído\');})()">Excluir</button></div>');}
 
 // ── SESSIONS ──
 function showProntuario(clientId){
-var db=getDB();var client=db.clients.find(function(c){return c.id===clientId;});
-var pkgs=db.packages.filter(function(p){return p.clientId===clientId;}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});
-if(pkgs.length===0){showToast(‘Este cliente não tem pacotes ainda.’,true);return;}
-var html=’’;
-pkgs.forEach(function(pkg){
-var sessionsInPkg=db.sessions.filter(function(s){return s.packageId===pkg.id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-var firstDate=sessionsInPkg.length>0?sessionsInPkg[0].date:null;
-var lastDate=sessionsInPkg.length>0?sessionsInPkg[sessionsInPkg.length-1].date:null;
-var done=sessionsInPkg.filter(function(s){return s.status===‘realizada’||s.status===‘completed’;}).length;
-var pkgLabel=pkg.name+(firstDate?’ (’+fmtDate(firstDate)+(lastDate&&lastDate!==firstDate?’ – ‘+fmtDate(lastDate):’’)+’)’:’’);
-html+=’<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div><div style="font-weight:700;font-size:14px">’+pkgLabel+’</div><div style="font-size:12px;color:var(--text2);margin-top:3px">’+done+’/’+pkg.totalSessions+’ sessões · ‘+fmt(pkg.price)+’ · <span class="badge '+paymentBadgeClass(pkg.paymentStatus)+'">’+paymentLabel(pkg.paymentStatus,pkg.paymentType)+’</span></div></div></div><textarea id="pron-'+pkg.id+'" rows="5" placeholder="Anotações clínicas..." style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);font-size:13.5px;font-family:inherit;outline:none;resize:vertical;line-height:1.6">’+( pkg.notes||’’)+’</textarea><div style="text-align:right;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="saveProntuario(\''+pkg.id+'\')">💾 Salvar</button></div></div>’;
-});
-showModal(‘📋 Prontuário — ‘+(client?client.name:’’),html,true);
+  var db=getDB();var client=db.clients.find(function(c){return c.id===clientId;});
+  var pkgs=db.packages.filter(function(p){return p.clientId===clientId;}).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});
+  if(pkgs.length===0){showToast('Este cliente não tem pacotes ainda.',true);return;}
+  var html='';
+  pkgs.forEach(function(pkg){
+    var sessionsInPkg=db.sessions.filter(function(s){return s.packageId===pkg.id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+    var firstDate=sessionsInPkg.length>0?sessionsInPkg[0].date:null;
+    var lastDate=sessionsInPkg.length>0?sessionsInPkg[sessionsInPkg.length-1].date:null;
+    var done=sessionsInPkg.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+    var pkgLabel=pkg.name+(firstDate?' ('+fmtDate(firstDate)+(lastDate&&lastDate!==firstDate?' – '+fmtDate(lastDate):'')+')':'');
+    html+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div><div style="font-weight:700;font-size:14px">'+pkgLabel+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">'+done+'/'+pkg.totalSessions+' sessões · '+fmt(pkg.price)+' · <span class="badge '+paymentBadgeClass(pkg.paymentStatus)+'">'+paymentLabel(pkg.paymentStatus,pkg.paymentType)+'</span></div></div></div><textarea id="pron-'+pkg.id+'" rows="5" placeholder="Anotações clínicas..." style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);font-size:13.5px;font-family:inherit;outline:none;resize:vertical;line-height:1.6">'+( pkg.notes||'')+'</textarea><div style="text-align:right;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="saveProntuario(\''+pkg.id+'\')">💾 Salvar</button></div></div>';
+  });
+  showModal('📋 Prontuário — '+(client?client.name:''),html,true);
 }
-window.saveProntuario=async function(pkgId){var notes=document.getElementById(‘pron-’+pkgId)?document.getElementById(‘pron-’+pkgId).value||’’:’’;await supaFetch(‘PATCH’,‘packages’,{notes:notes},’?id=eq.’+pkgId);await loadFromSupabase();showToast(‘✅ Prontuário salvo!’);};
+window.saveProntuario=async function(pkgId){var notes=document.getElementById('pron-'+pkgId)?document.getElementById('pron-'+pkgId).value||'':'';await supaFetch('PATCH','packages',{notes:notes},'?id=eq.'+pkgId);await loadFromSupabase();showToast('✅ Prontuário salvo!');};
 
 window.quickStatusMenu=function(sessionId,el){
-document.querySelectorAll(’.quick-status-menu’).forEach(function(m){m.remove();});
-var menu=document.createElement(‘div’);menu.className=‘quick-status-menu’;menu.style.cssText=‘position:fixed;z-index:300;background:var(–bg2);border:1px solid var(–border2);border-radius:var(–radius-sm);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:160px;animation:fadeIn 0.1s ease’;
-[{value:‘agendada’,label:‘📅 Agendada’,cls:‘badge-agendada’},{value:‘realizada’,label:‘✅ Realizada’,cls:‘badge-realizada’},{value:‘falta’,label:‘❌ Falta’,cls:‘badge-falta’}].forEach(function(opt){
-var item=document.createElement(‘div’);item.style.cssText=‘padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:background 0.1s’;
-item.innerHTML=’<span class="badge '+opt.cls+'" style="font-size:11px">’+opt.label+’</span>’;
-item.onmouseenter=function(){item.style.background=‘var(–bg3)’;};item.onmouseleave=function(){item.style.background=’’;};
-item.onclick=async function(){
-menu.remove();
-if(opt.value===‘falta’&&!window.confirm(‘Confirmar falta para esta sessão?’))return;
-await dbUpdateSession(sessionId,{status:opt.value});renderSessions();
-showToast(opt.value===‘realizada’?‘✅ Sessão realizada!’:opt.value===‘falta’?‘❌ Falta registrada’:‘📅 Agendada’);
-};
-menu.appendChild(item);
-});
-var rect=el.getBoundingClientRect();menu.style.top=(rect.bottom+4)+‘px’;menu.style.left=rect.left+‘px’;document.body.appendChild(menu);
-setTimeout(function(){document.addEventListener(‘click’,function handler(e){if(!menu.contains(e.target)){menu.remove();document.removeEventListener(‘click’,handler);}});},10);
+  document.querySelectorAll('.quick-status-menu').forEach(function(m){m.remove();});
+  var menu=document.createElement('div');menu.className='quick-status-menu';menu.style.cssText='position:fixed;z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:160px;animation:fadeIn 0.1s ease';
+  [{value:'agendada',label:'📅 Agendada',cls:'badge-agendada'},{value:'realizada',label:'✅ Realizada',cls:'badge-realizada'},{value:'falta',label:'❌ Falta',cls:'badge-falta'}].forEach(function(opt){
+    var item=document.createElement('div');item.style.cssText='padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:background 0.1s';
+    item.innerHTML='<span class="badge '+opt.cls+'" style="font-size:11px">'+opt.label+'</span>';
+    item.onmouseenter=function(){item.style.background='var(--bg3)';};item.onmouseleave=function(){item.style.background='';};
+    item.onclick=async function(){
+      menu.remove();
+      if(opt.value==='falta'&&!window.confirm('Confirmar falta para esta sessão?'))return;
+      await dbUpdateSession(sessionId,{status:opt.value});renderSessions();
+      showToast(opt.value==='realizada'?'✅ Sessão realizada!':opt.value==='falta'?'❌ Falta registrada':'📅 Agendada');
+    };
+    menu.appendChild(item);
+  });
+  var rect=el.getBoundingClientRect();menu.style.top=(rect.bottom+4)+'px';menu.style.left=rect.left+'px';document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function handler(e){if(!menu.contains(e.target)){menu.remove();document.removeEventListener('click',handler);}});},10);
 };
 
 window.cycleSessionPay=function(sessionId, el){
-document.querySelectorAll(’.quick-pay-menu’).forEach(function(m){m.remove();});
-var menu=document.createElement(‘div’);
-menu.className=‘quick-pay-menu’;
-menu.style.cssText=‘position:fixed;z-index:300;background:var(–bg2);border:1px solid var(–border2);border-radius:var(–radius-sm);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:160px;animation:fadeIn 0.1s ease’;
-[{value:‘pending’,label:‘⏳ Pendente’,cls:‘badge-yellow’},{value:‘parcela1’,label:‘🔶 1ª Parcela Paga’,cls:‘badge-parcial’},{value:‘paid’,label:‘💰 Pago’,cls:‘badge-green’}].forEach(function(opt){
-var item=document.createElement(‘div’);
-item.style.cssText=‘padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:background 0.1s’;
-item.innerHTML=’<span class="badge '+opt.cls+'" style="font-size:11px">’+opt.label+’</span>’;
-item.onmouseenter=function(){item.style.background=‘var(–bg3)’;};
-item.onmouseleave=function(){item.style.background=’’;};
-item.onclick=async function(){
-menu.remove();
-await dbUpdateSession(sessionId,{sessionPayStatus:opt.value,sessionPaid:opt.value===‘paid’});
-renderSessions();
-showToast(opt.label);
-};
-menu.appendChild(item);
-});
-var rect=el.getBoundingClientRect();
-menu.style.top=(rect.bottom+4)+‘px’;
-menu.style.left=rect.left+‘px’;
-document.body.appendChild(menu);
-setTimeout(function(){document.addEventListener(‘click’,function handler(e){if(!menu.contains(e.target)){menu.remove();document.removeEventListener(‘click’,handler);}});},10);
+  document.querySelectorAll('.quick-pay-menu').forEach(function(m){m.remove();});
+  var menu=document.createElement('div');
+  menu.className='quick-pay-menu';
+  menu.style.cssText='position:fixed;z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);min-width:160px;animation:fadeIn 0.1s ease';
+  [{value:'pending',label:'⏳ Pendente',cls:'badge-yellow'},{value:'parcela1',label:'🔶 1ª Parcela Paga',cls:'badge-parcial'},{value:'paid',label:'💰 Pago',cls:'badge-green'}].forEach(function(opt){
+    var item=document.createElement('div');
+    item.style.cssText='padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:background 0.1s';
+    item.innerHTML='<span class="badge '+opt.cls+'" style="font-size:11px">'+opt.label+'</span>';
+    item.onmouseenter=function(){item.style.background='var(--bg3)';};
+    item.onmouseleave=function(){item.style.background='';};
+    item.onclick=async function(){
+      menu.remove();
+      await dbUpdateSession(sessionId,{sessionPayStatus:opt.value,sessionPaid:opt.value==='paid'});
+      renderSessions();
+      showToast(opt.label);
+    };
+    menu.appendChild(item);
+  });
+  var rect=el.getBoundingClientRect();
+  menu.style.top=(rect.bottom+4)+'px';
+  menu.style.left=rect.left+'px';
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function handler(e){if(!menu.contains(e.target)){menu.remove();document.removeEventListener('click',handler);}});},10);
 };
 
 window.toggleSessionPaid=async function(sessionId){
-var db=getDB();var s=db.sessions.find(function(ss){return ss.id===sessionId;});if(!s)return;
-await dbUpdateSession(sessionId,{sessionPaid:!s.sessionPaid});renderSessions();
-showToast(s.sessionPaid?‘↩️ Desmarcado’:‘💰 Sessão paga!’);
+  var db=getDB();var s=db.sessions.find(function(ss){return ss.id===sessionId;});if(!s)return;
+  await dbUpdateSession(sessionId,{sessionPaid:!s.sessionPaid});renderSessions();
+  showToast(s.sessionPaid?'↩️ Desmarcado':'💰 Sessão paga!');
 };
 
 function renderSessions(){
-var db=getDB();
-document.getElementById(‘topbar-actions’).innerHTML=’<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>’;
-var byClient={};
-db.sessions.forEach(function(s){if(!byClient[s.clientId])byClient[s.clientId]=[];byClient[s.clientId].push(s);});
-Object.values(byClient).forEach(function(arr){arr.sort(function(a,b){return a.date.localeCompare(b.date);});});
-var clientIds=Object.keys(byClient).sort(function(a,b){return clientName(a).localeCompare(clientName(b));});
-if(clientIds.length===0){document.getElementById(‘page-content’).innerHTML=’<div class="page"><div class="card"><div class="empty"><div class="empty-icon">📅</div><p>Nenhuma sessão registrada</p><small>Crie um pacote para gerar sessões automaticamente</small></div></div></div>’;return;}
-var html=’<div class="page">’;
-clientIds.forEach(function(clientId){
-var sessions=byClient[clientId];
-var completedCount=sessions.filter(function(s){return s.status===‘realizada’||s.status===‘completed’;}).length;
-var faltaCount=sessions.filter(function(s){return s.status===‘falta’;}).length;
-var rows=’’;
-sessions.forEach(function(s){
-var sb=statusBadge(s.status);
-var pkgSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
-var pkg=db.packages.find(function(p){return p.id===s.packageId;});
-var total=pkg?pkg.totalSessions:’?’;
-var isStandalone=!s.packageId;
-var isPerSession=pkg&&pkg.paymentType===‘sessao’;
-var needsIndividualPay=isStandalone||isPerSession;
-var payStatus=‘pending’;
-if(needsIndividualPay){
-// Standalone or per-session: use session’s own payment status
-payStatus=s.sessionPayStatus||‘pending’;
-} else if(pkg){
-// Package payment: mirror from package
-payStatus=pkg.paymentStatus||‘pending’;
-}
-var payBadge=payStatus===‘paid’?‘badge-green’:payStatus===‘parcela1’?‘badge-parcial’:‘badge-yellow’;
-var payLabel=payStatus===‘paid’?‘💰 Pago’:payStatus===‘parcela1’?‘🔶 1ª Parcela’:‘⏳ Pendente’;
-var paidCell=needsIndividualPay?
-‘<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">’+payLabel+’</span></td>’:
-‘<td><span class="badge '+payBadge+'">’+payLabel+’</span></td>’;
-rows+=’<tr><td><strong style="color:var(--text2);font-size:13px">’+sessNum+’/’+total+’</strong></td><td><strong>’+fmtDate(s.date)+’</strong></td><td class="td-muted">’+(s.time||’—’)+’</td><td><span class="badge '+catBadgeClass(s.category)+'">’+catLabelShort(s.category)+’</span></td><td class="td-muted">’+pkgName(s.packageId)+’</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">’+sb[1]+’</span></div></td>’+paidCell+’<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>’;
-});
-html+=’<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">’+getInitials(clientName(clientId))+’</div><div><div style="font-weight:700;font-size:15px">’+clientName(clientId)+’</div><div style="font-size:12px;color:var(--text2);margin-top:2px">’+sessions.length+’ sessão’+(sessions.length!==1?‘ões:’:’:’)+’ <span style="color:var(--green)">’+completedCount+’ realizada’+(completedCount!==1?‘s’:’’)+’</span>’+(faltaCount>0?’ · <span style="color:var(--red)">’+faltaCount+’ falta’+(faltaCount!==1?‘s’:’’)+’</span>’:’’)+’</div></div></div><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+clientId+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+clientId+'\')">Ver perfil →</button></div></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>’+rows+’</tbody></table></div></div>’;
-});
-html+=’</div>’;
-document.getElementById(‘page-content’).innerHTML=html;
+  var db=getDB();
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>';
+  var byClient={};
+  db.sessions.forEach(function(s){if(!byClient[s.clientId])byClient[s.clientId]=[];byClient[s.clientId].push(s);});
+  Object.values(byClient).forEach(function(arr){arr.sort(function(a,b){return a.date.localeCompare(b.date);});});
+  var clientIds=Object.keys(byClient).sort(function(a,b){return clientName(a).localeCompare(clientName(b));});
+  if(clientIds.length===0){document.getElementById('page-content').innerHTML='<div class="page"><div class="card"><div class="empty"><div class="empty-icon">📅</div><p>Nenhuma sessão registrada</p><small>Crie um pacote para gerar sessões automaticamente</small></div></div></div>';return;}
+  var html='<div class="page">';
+  clientIds.forEach(function(clientId){
+    var sessions=byClient[clientId];
+    var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+    var faltaCount=sessions.filter(function(s){return s.status==='falta';}).length;
+    var rows='';
+    sessions.forEach(function(s){
+      var sb=statusBadge(s.status);
+      var pkgSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+      var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
+      var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+      var total=pkg?pkg.totalSessions:'?';
+      var isStandalone=!s.packageId;
+      var isPerSession=pkg&&pkg.paymentType==='sessao';
+      var needsIndividualPay=isStandalone||isPerSession;
+      var payStatus='pending';
+      if(needsIndividualPay){
+        // Standalone or per-session: use session's own payment status
+        payStatus=s.sessionPayStatus||'pending';
+      } else if(pkg){
+        // Package payment: mirror from package
+        payStatus=pkg.paymentStatus||'pending';
+      }
+      var payBadge=payStatus==='paid'?'badge-green':payStatus==='parcela1'?'badge-parcial':'badge-yellow';
+      var payLabel=payStatus==='paid'?'💰 Pago':payStatus==='parcela1'?'🔶 1ª Parcela':'⏳ Pendente';
+      var paidCell=needsIndividualPay?
+        '<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">'+payLabel+'</span></td>':
+        '<td><span class="badge '+payBadge+'">'+payLabel+'</span></td>';
+      rows+='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
+    });
+    html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(clientName(clientId))+'</div><div><div style="font-weight:700;font-size:15px">'+clientName(clientId)+'</div><div style="font-size:12px;color:var(--text2);margin-top:2px">'+sessions.length+' sessão'+(sessions.length!==1?'ões:':':')+' <span style="color:var(--green)">'+completedCount+' realizada'+(completedCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+clientId+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+clientId+'\')">Ver perfil →</button></div></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  });
+  html+='</div>';
+  document.getElementById('page-content').innerHTML=html;
 }
 
 function showSessionForm(preClientId,preDate){
-var db=getDB();
-if(db.clients.length===0){showToast(‘❌ Cadastre um cliente primeiro!’,true);return;}
-// packages not required for standalone sessions
-var clientOpts=’<option value="">Selecione…</option>’;
-db.clients.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(c){clientOpts+=’<option value=”’+c.id+’” ‘+(c.id===preClientId?‘selected’:’’)+’>’+c.name+’</option>’;});
-var body=’<div class="form-group"><label>Cliente *</label><select id="sf-client" onchange="updatePkgOpts()">’+clientOpts+’</select></div>’;
-body+=’<div class="form-group"><label>Pacote (opcional)</label><select id="sf-package"><option value="">— Sessão Avulsa (sem pacote) —</option></select></div>’;
-body+=’<div id="sf-standalone-pay" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💳 Sessão Avulsa — Pagamento</div><div class="form-row"><div class="form-group"><label>Valor da Sessão (R$)</label><input type="number" id="sf-price" value="" min="0" step="0.01" placeholder="Ex: 200.00"/></div><div class="form-group"><label>Status de Pagamento</label><select id="sf-pay-status"><option value="pending">⏳ Pendente</option><option value="paid">💰 Pago</option></select></div></div></div>’;
-body+=’<div class="form-group"><label>Categoria *</label><select id="sf-category"><option value="psicoterapia">🔵 Psicoterapia</option><option value="reabilitacao">🟣 Reabilitação</option><option value="avaliacao">🟢 Avaliação</option></select></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="'+(preDate||today())+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="sf-time" value="09:00"/></div></div>’;
-body+=’<div class="form-group"><label>Status</label><select id="sf-status"><option value="agendada">📅 Agendada</option><option value="realizada">✅ Realizada</option><option value="falta">❌ Falta</option></select></div>’;
-body+=’<div class="form-group"><label>Notas</label><textarea id="sf-notes" placeholder="Observações..."></textarea></div>’;
-body+=’<div id="sf-warn" class="alert alert-yellow" style="display:none"></div><div id="sf-error" class="alert alert-red" style="display:none"></div>’;
-body+=’<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveSession();})()">Salvar</button></div>’;
-showModal(‘Nova Sessão’,body);
-if(preClientId)setTimeout(function(){updatePkgOpts(preClientId);},50);
+  var db=getDB();
+  if(db.clients.length===0){showToast('❌ Cadastre um cliente primeiro!',true);return;}
+  // packages not required for standalone sessions
+  var clientOpts='<option value="">Selecione...</option>';
+  db.clients.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(c){clientOpts+='<option value="'+c.id+'" '+(c.id===preClientId?'selected':'')+'>'+c.name+'</option>';});
+  var body='<div class="form-group"><label>Cliente *</label><select id="sf-client" onchange="updatePkgOpts()">'+clientOpts+'</select></div>';
+  body+='<div class="form-group"><label>Pacote (opcional)</label><select id="sf-package"><option value="">— Sessão Avulsa (sem pacote) —</option></select></div>';
+  body+='<div id="sf-standalone-pay" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">💳 Sessão Avulsa — Pagamento</div><div class="form-row"><div class="form-group"><label>Valor da Sessão (R$)</label><input type="number" id="sf-price" value="" min="0" step="0.01" placeholder="Ex: 200.00"/></div><div class="form-group"><label>Status de Pagamento</label><select id="sf-pay-status"><option value="pending">⏳ Pendente</option><option value="paid">💰 Pago</option></select></div></div></div>';
+  body+='<div class="form-group"><label>Categoria *</label><select id="sf-category"><option value="psicoterapia">🔵 Psicoterapia</option><option value="reabilitacao">🟣 Reabilitação</option><option value="avaliacao">🟢 Avaliação</option></select></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="sf-date" value="'+(preDate||today())+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="sf-time" value="09:00"/></div></div>';
+  body+='<div class="form-group"><label>Status</label><select id="sf-status"><option value="agendada">📅 Agendada</option><option value="realizada">✅ Realizada</option><option value="falta">❌ Falta</option></select></div>';
+  body+='<div class="form-group"><label>Notas</label><textarea id="sf-notes" placeholder="Observações..."></textarea></div>';
+  body+='<div id="sf-warn" class="alert alert-yellow" style="display:none"></div><div id="sf-error" class="alert alert-red" style="display:none"></div>';
+  body+='<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveSession();})()">Salvar</button></div>';
+  showModal('Nova Sessão',body);
+  if(preClientId)setTimeout(function(){updatePkgOpts(preClientId);},50);
 }
 window.updatePkgOpts=function(forceId){
-var clientId=forceId||document.getElementById(‘sf-client’).value;
-var sel=document.getElementById(‘sf-package’);var warn=document.getElementById(‘sf-warn’);
-if(!sel||!clientId)return;
-var db=getDB();var pkgs=db.packages.filter(function(p){return p.clientId===clientId;});
-sel.innerHTML=’<option value="">— Sessão Avulsa (sem pacote) —</option>’+pkgs.map(function(p){var st=pkgStats(p);return’<option value=”’+p.id+’” ‘+(st.isExhausted?‘disabled’:’’)+’>’+p.name+(st.isExhausted?’ — ENCERRADO’:’ (’+st.remaining+’ restante’+(st.remaining!==1?‘s’:’’)+’)’)+’</option>’;}).join(’’);
-if(warn){var ae=pkgs.length>0&&pkgs.every(function(p){return pkgStats(p).isExhausted;});warn.style.display=ae&&pkgs.length>0?‘flex’:‘none’;if(ae&&pkgs.length>0)warn.textContent=‘⚠️ Todos os pacotes estão esgotados.’;}
+  var clientId=forceId||document.getElementById('sf-client').value;
+  var sel=document.getElementById('sf-package');var warn=document.getElementById('sf-warn');
+  if(!sel||!clientId)return;
+  var db=getDB();var pkgs=db.packages.filter(function(p){return p.clientId===clientId;});
+  sel.innerHTML='<option value="">— Sessão Avulsa (sem pacote) —</option>'+pkgs.map(function(p){var st=pkgStats(p);return'<option value="'+p.id+'" '+(st.isExhausted?'disabled':'')+'>'+p.name+(st.isExhausted?' — ENCERRADO':' ('+st.remaining+' restante'+(st.remaining!==1?'s':'')+')')+'</option>';}).join('');
+  if(warn){var ae=pkgs.length>0&&pkgs.every(function(p){return pkgStats(p).isExhausted;});warn.style.display=ae&&pkgs.length>0?'flex':'none';if(ae&&pkgs.length>0)warn.textContent='⚠️ Todos os pacotes estão esgotados.';}
 };
 async function saveSession(){
-var clientId=document.getElementById(‘sf-client’).value;var packageId=document.getElementById(‘sf-package’).value||null;var date=document.getElementById(‘sf-date’).value;var time=document.getElementById(‘sf-time’).value;var status=document.getElementById(‘sf-status’).value;var notes=document.getElementById(‘sf-notes’).value.trim();var category=document.getElementById(‘sf-category’).value;
-var err=document.getElementById(‘sf-error’);
-if(!clientId||!date){err.textContent=‘Cliente e data são obrigatórios’;err.style.display=‘flex’;return;}
-var db=getDB();
-if(packageId){
-var pkg=db.packages.find(function(p){return p.id===packageId;});var st=pkgStats(pkg);
-if(!st.canAdd){err.textContent=‘Pacote esgotado!’;err.style.display=‘flex’;return;}
-}
-if(time&&date){var conflict=db.sessions.find(function(s){return s.date===date&&s.time===time&&s.clientId!==clientId;});if(conflict&&!window.confirm(‘⚠️ Já existe atendimento com ‘+clientName(conflict.clientId)+’ às ‘+time+’ do dia ‘+fmtDate(date)+’. Agendar mesmo assim?’))return;}
-// Handle standalone session payment
-var standalonePrice=null;var standalonePayStatus=null;
-if(!packageId){
-standalonePrice=parseFloat(document.getElementById(‘sf-price’).value)||null;
-standalonePayStatus=document.getElementById(‘sf-pay-status’).value;
-}
-closeModal();
-var sessData={clientId:clientId,packageId:packageId,date:date,time:time,status:status,notes:notes,category:category};
-if(standalonePrice!==null)sessData.standalonePrice=standalonePrice;
-if(standalonePayStatus)sessData.standalonePayStatus=standalonePayStatus;
-await dbAddSession(sessData);
-if(currentPage===‘sessions’)renderSessions();else if(currentPage===‘agenda’)renderCalendar();
-showToast(‘✅ Sessão registrada!’);
+  var clientId=document.getElementById('sf-client').value;var packageId=document.getElementById('sf-package').value||null;var date=document.getElementById('sf-date').value;var time=document.getElementById('sf-time').value;var status=document.getElementById('sf-status').value;var notes=document.getElementById('sf-notes').value.trim();var category=document.getElementById('sf-category').value;
+  var err=document.getElementById('sf-error');
+  if(!clientId||!date){err.textContent='Cliente e data são obrigatórios';err.style.display='flex';return;}
+  var db=getDB();
+  if(packageId){
+    var pkg=db.packages.find(function(p){return p.id===packageId;});var st=pkgStats(pkg);
+    if(!st.canAdd){err.textContent='Pacote esgotado!';err.style.display='flex';return;}
+  }
+  if(time&&date){var conflict=db.sessions.find(function(s){return s.date===date&&s.time===time&&s.clientId!==clientId;});if(conflict&&!window.confirm('⚠️ Já existe atendimento com '+clientName(conflict.clientId)+' às '+time+' do dia '+fmtDate(date)+'. Agendar mesmo assim?'))return;}
+  // Handle standalone session payment
+  var standalonePrice=null;var standalonePayStatus=null;
+  if(!packageId){
+    standalonePrice=parseFloat(document.getElementById('sf-price').value)||null;
+    standalonePayStatus=document.getElementById('sf-pay-status').value;
+  }
+  closeModal();
+  var sessData={clientId:clientId,packageId:packageId,date:date,time:time,status:status,notes:notes,category:category};
+  if(standalonePrice!==null)sessData.standalonePrice=standalonePrice;
+  if(standalonePayStatus)sessData.standalonePayStatus=standalonePayStatus;
+  await dbAddSession(sessData);
+  if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
+  showToast('✅ Sessão registrada!');
 }
 
 function showSessionEditForm(id){
-var db=getDB();var s=db.sessions.find(function(ss){return ss.id===id;});if(!s)return;
-var futureSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date;}).length;
-var body=’<div class="form-group"><label>Categoria</label><select id="se-cat"><option value=“psicoterapia” ‘+(( s.category||‘psicoterapia’)===‘psicoterapia’?‘selected’:’’)+’>🔵 Psicoterapia</option><option value=“reabilitacao” ‘+(s.category===‘reabilitacao’?‘selected’:’’)+’>🟣 Reabilitação</option><option value=“avaliacao” ‘+(s.category===‘avaliacao’?‘selected’:’’)+’>🟢 Avaliação</option></select></div>’;
-body+=’<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="se-date" value="'+s.date+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="se-time" value="'+(s.time||'09:00')+'"/></div></div>’;
-body+=’<div class="form-group"><label>Status</label><select id="se-status"><option value=“agendada” ‘+((s.status===‘agendada’||s.status===‘pending’)?‘selected’:’’)+’>📅 Agendada</option><option value=“realizada” ‘+((s.status===‘realizada’||s.status===‘completed’)?‘selected’:’’)+’>✅ Realizada</option><option value=“falta” ‘+(s.status===‘falta’?‘selected’:’’)+’>❌ Falta</option></select></div>’;
-body+=’<div class="form-group"><label>Notas</label><textarea id="se-notes">’+(s.notes||’’)+’</textarea></div>’;
-if(futureSessions>0){body+=’<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;font-weight:500"><input type="checkbox" id="se-propagate" style="width:auto;flex-shrink:0"/> Propagar data/hora para as ‘+futureSessions+’ sessão(ões) futuras</label></div>’;}
-body+=’<div id="se-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveSessionEdit(\''+id+'\');})()">Salvar</button></div>’;
-showModal(‘Editar Sessão’,body);
+  var db=getDB();var s=db.sessions.find(function(ss){return ss.id===id;});if(!s)return;
+  var futureSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date;}).length;
+  var body='<div class="form-group"><label>Categoria</label><select id="se-cat"><option value="psicoterapia" '+(( s.category||'psicoterapia')==='psicoterapia'?'selected':'')+'>🔵 Psicoterapia</option><option value="reabilitacao" '+(s.category==='reabilitacao'?'selected':'')+'>🟣 Reabilitação</option><option value="avaliacao" '+(s.category==='avaliacao'?'selected':'')+'>🟢 Avaliação</option></select></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="se-date" value="'+s.date+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="se-time" value="'+(s.time||'09:00')+'"/></div></div>';
+  body+='<div class="form-group"><label>Status</label><select id="se-status"><option value="agendada" '+((s.status==='agendada'||s.status==='pending')?'selected':'')+'>📅 Agendada</option><option value="realizada" '+((s.status==='realizada'||s.status==='completed')?'selected':'')+'>✅ Realizada</option><option value="falta" '+(s.status==='falta'?'selected':'')+'>❌ Falta</option></select></div>';
+  body+='<div class="form-group"><label>Notas</label><textarea id="se-notes">'+(s.notes||'')+'</textarea></div>';
+  if(futureSessions>0){body+='<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;font-weight:500"><input type="checkbox" id="se-propagate" style="width:auto;flex-shrink:0"/> Propagar data/hora para as '+futureSessions+' sessão(ões) futuras</label></div>';}
+  body+='<div id="se-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveSessionEdit(\''+id+'\');})()">Salvar</button></div>';
+  showModal('Editar Sessão',body);
 }
 async function saveSessionEdit(id){
-var date=document.getElementById(‘se-date’).value;var time=document.getElementById(‘se-time’).value;var status=document.getElementById(‘se-status’).value;var notes=document.getElementById(‘se-notes’).value.trim();var category=document.getElementById(‘se-cat’).value;
-var propagate=document.getElementById(‘se-propagate’)?document.getElementById(‘se-propagate’).checked:false;
-var err=document.getElementById(‘se-error’);
-if(!date){err.textContent=‘Data é obrigatória’;err.style.display=‘flex’;return;}
-var db=getDB();var s=db.sessions.find(function(ss){return ss.id===id;});
-if(status===‘falta’&&s&&s.status!==‘falta’&&!window.confirm(‘Confirmar falta para esta sessão?’))return;
-var conflict=db.sessions.find(function(ss){return ss.date===date&&ss.time===time&&ss.clientId!==s.clientId&&ss.id!==id;});
-if(conflict&&!window.confirm(‘⚠️ Conflito com ‘+clientName(conflict.clientId)+’ às ‘+time+’ do dia ‘+fmtDate(date)+’. Reagendar mesmo assim?’))return;
-closeModal();
-await dbUpdateSession(id,{date:date,time:time,status:status,notes:notes,category:category});
-if(propagate&&s&&date!==s.date){
-var diff=(new Date(date+‘T12:00:00’)-new Date(s.date+‘T12:00:00’))/(1000*60*60*24);
-var futures=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date&&ss.id!==id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-if(futures.length>0){await dbUpdateSessionsBatch(futures.map(function(ss){var nd=new Date(ss.date+‘T12:00:00’);nd.setDate(nd.getDate()+diff);return{id:ss.id,data:{date:nd.toISOString().split(‘T’)[0],time:time}};}));}
+  var date=document.getElementById('se-date').value;var time=document.getElementById('se-time').value;var status=document.getElementById('se-status').value;var notes=document.getElementById('se-notes').value.trim();var category=document.getElementById('se-cat').value;
+  var propagate=document.getElementById('se-propagate')?document.getElementById('se-propagate').checked:false;
+  var err=document.getElementById('se-error');
+  if(!date){err.textContent='Data é obrigatória';err.style.display='flex';return;}
+  var db=getDB();var s=db.sessions.find(function(ss){return ss.id===id;});
+  if(status==='falta'&&s&&s.status!=='falta'&&!window.confirm('Confirmar falta para esta sessão?'))return;
+  var conflict=db.sessions.find(function(ss){return ss.date===date&&ss.time===time&&ss.clientId!==s.clientId&&ss.id!==id;});
+  if(conflict&&!window.confirm('⚠️ Conflito com '+clientName(conflict.clientId)+' às '+time+' do dia '+fmtDate(date)+'. Reagendar mesmo assim?'))return;
+  closeModal();
+  await dbUpdateSession(id,{date:date,time:time,status:status,notes:notes,category:category});
+  if(propagate&&s&&date!==s.date){
+    var diff=(new Date(date+'T12:00:00')-new Date(s.date+'T12:00:00'))/(1000*60*60*24);
+    var futures=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date&&ss.id!==id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+    if(futures.length>0){await dbUpdateSessionsBatch(futures.map(function(ss){var nd=new Date(ss.date+'T12:00:00');nd.setDate(nd.getDate()+diff);return{id:ss.id,data:{date:nd.toISOString().split('T')[0],time:time}};}));}
+  }
+  if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
+  showToast(propagate?'✅ Sessão e futuras atualizadas!':'✅ Sessão atualizada!');
 }
-if(currentPage===‘sessions’)renderSessions();else if(currentPage===‘agenda’)renderCalendar();
-showToast(propagate?‘✅ Sessão e futuras atualizadas!’:‘✅ Sessão atualizada!’);
-}
-function deleteSessionConfirm(id){showModal(‘Excluir Sessão’,’<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeleteSession(\''+id+'\');if(currentPage===\'sessions\')renderSessions();else if(currentPage===\'agenda\')renderCalendar();showToast(\'🗑️ Sessão excluída\');})()">Excluir</button></div>’);}
+function deleteSessionConfirm(id){showModal('Excluir Sessão','<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeleteSession(\''+id+'\');if(currentPage===\'sessions\')renderSessions();else if(currentPage===\'agenda\')renderCalendar();showToast(\'🗑️ Sessão excluída\');})()">Excluir</button></div>');}
 
 // ── AGENDA ──
-var calView=‘month’,calDate=new Date();
-function renderAgenda(){document.getElementById(‘topbar-actions’).innerHTML=’<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>’;renderCalendar();}
+var calView='month',calDate=new Date();
+function renderAgenda(){document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>';renderCalendar();}
 function renderCalendar(){
-var db=getDB();var todayStr=today();
-var title=’’;
-if(calView===‘month’){title=calDate.toLocaleDateString(‘pt-BR’,{month:‘long’,year:‘numeric’});title=title.charAt(0).toUpperCase()+title.slice(1);}
-else{var mon=weekStart(calDate);var sun=new Date(mon);sun.setDate(sun.getDate()+6);title=fmtDate(mon.toISOString().split(‘T’)[0])+’ – ‘+fmtDate(sun.toISOString().split(‘T’)[0]);}
-var body=’<div class="cal-wrap"><div class="cal-toolbar"><div class="cal-toolbar-left"><button class="cal-nav-btn" onclick="calNav(-1)">‹</button><button class="cal-today-btn" onclick="calGoToday()">Hoje</button><button class="cal-nav-btn" onclick="calNav(1)">›</button><span class="cal-toolbar-title" style="margin-left:8px">’+title+’</span></div><div class="cal-view-btns"><button class="cal-view-btn '+(calView==='month'?'active':'')+'" onclick="setCalView(\'month\')">Mês</button><button class="cal-view-btn '+(calView==='week'?'active':'')+'" onclick="setCalView(\'week\')">Semana</button></div></div><div id="cal-body">’+(calView===‘month’?buildMonthGrid(db,todayStr):buildWeekGrid(db,todayStr))+’</div></div>’;
-document.getElementById(‘page-content’).innerHTML=’<div class="page" style="padding-bottom:20px">’+body+’</div>’;
+  var db=getDB();var todayStr=today();
+  var title='';
+  if(calView==='month'){title=calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});title=title.charAt(0).toUpperCase()+title.slice(1);}
+  else{var mon=weekStart(calDate);var sun=new Date(mon);sun.setDate(sun.getDate()+6);title=fmtDate(mon.toISOString().split('T')[0])+' – '+fmtDate(sun.toISOString().split('T')[0]);}
+  var body='<div class="cal-wrap"><div class="cal-toolbar"><div class="cal-toolbar-left"><button class="cal-nav-btn" onclick="calNav(-1)">‹</button><button class="cal-today-btn" onclick="calGoToday()">Hoje</button><button class="cal-nav-btn" onclick="calNav(1)">›</button><span class="cal-toolbar-title" style="margin-left:8px">'+title+'</span></div><div class="cal-view-btns"><button class="cal-view-btn '+(calView==='month'?'active':'')+'" onclick="setCalView(\'month\')">Mês</button><button class="cal-view-btn '+(calView==='week'?'active':'')+'" onclick="setCalView(\'week\')">Semana</button></div></div><div id="cal-body">'+(calView==='month'?buildMonthGrid(db,todayStr):buildWeekGrid(db,todayStr))+'</div></div>';
+  document.getElementById('page-content').innerHTML='<div class="page" style="padding-bottom:20px">'+body+'</div>';
 }
 function weekStart(d){var dt=new Date(d);var day=dt.getDay();var diff=day===0?-6:1-day;dt.setDate(dt.getDate()+diff);dt.setHours(0,0,0,0);return dt;}
 function buildMonthGrid(db,todayStr){
-var year=calDate.getFullYear(),month=calDate.getMonth();
-var first=new Date(year,month,1);var last=new Date(year,month+1,0);
-var startDow=first.getDay();startDow=startDow===0?6:startDow-1;
-var days=[‘Seg’,‘Ter’,‘Qua’,‘Qui’,‘Sex’,‘Sáb’,‘Dom’];
-var html=’<div class="month-grid">’;
-days.forEach(function(d){html+=’<div class="month-header">’+d+’</div>’;});
-for(var i=0;i<startDow;i++){html+=buildMonthDay(new Date(year,month,1-startDow+i),db,todayStr,true);}
-for(var d=1;d<=last.getDate();d++)html+=buildMonthDay(new Date(year,month,d),db,todayStr,false);
-var total=startDow+last.getDate();var rem=total%7===0?0:7-(total%7);
-for(var i=1;i<=rem;i++)html+=buildMonthDay(new Date(year,month+1,i),db,todayStr,true);
-return html+’</div>’;
+  var year=calDate.getFullYear(),month=calDate.getMonth();
+  var first=new Date(year,month,1);var last=new Date(year,month+1,0);
+  var startDow=first.getDay();startDow=startDow===0?6:startDow-1;
+  var days=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  var html='<div class="month-grid">';
+  days.forEach(function(d){html+='<div class="month-header">'+d+'</div>';});
+  for(var i=0;i<startDow;i++){html+=buildMonthDay(new Date(year,month,1-startDow+i),db,todayStr,true);}
+  for(var d=1;d<=last.getDate();d++)html+=buildMonthDay(new Date(year,month,d),db,todayStr,false);
+  var total=startDow+last.getDate();var rem=total%7===0?0:7-(total%7);
+  for(var i=1;i<=rem;i++)html+=buildMonthDay(new Date(year,month+1,i),db,todayStr,true);
+  return html+'</div>';
 }
 function buildMonthDay(dt,db,todayStr,other){
-var ds=dt.toISOString().split(‘T’)[0];var isToday=ds===todayStr;
-var sessions=db.sessions.filter(function(s){return s.date===ds;}).sort(function(a,b){return(a.time||’’).localeCompare(b.time||’’);});
-var show=sessions.slice(0,8);var extra=sessions.length-8;
-var chips=’’;
-show.forEach(function(s){
-var pkg=db.packages.find(function(p){return p.id===s.packageId;});
-var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||’’).localeCompare(b.time||’’);}):[];
-var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
-var total=pkg?pkg.totalSessions:0;
-var parts=clientName(s.clientId).split(’ ‘);
-var shortName=parts.length>=2?parts[0]+’ ‘+parts[1]:parts[0];
-var label=pkg?shortName+’ ‘+sessNum+’/’+total:shortName;
-var chipClass=(s.category||‘psicoterapia’)+(s.status===‘falta’?’ falta’:s.status===‘realizada’?’ realizada’:’’);
-chips+=’<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">’+(s.time?’<strong>’+s.time.slice(0,5)+’</strong> ‘:’’)+label+’</span>’;
-});
-if(extra>0)chips+=’<div class="cal-more">+’+extra+’ mais</div>’;
-return’<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">’+dt.getDate()+’</div>’+chips+’</div>’;
+  var ds=dt.toISOString().split('T')[0];var isToday=ds===todayStr;
+  var sessions=db.sessions.filter(function(s){return s.date===ds;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
+  var show=sessions.slice(0,8);var extra=sessions.length-8;
+  var chips='';
+  show.forEach(function(s){
+    var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+    var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'');}):[];
+    var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
+    var total=pkg?pkg.totalSessions:0;
+    var parts=clientName(s.clientId).split(' ');
+    var shortName=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
+    var label=pkg?shortName+' '+sessNum+'/'+total:shortName;
+    var chipClass=(s.category||'psicoterapia')+(s.status==='falta'?' falta':s.status==='realizada'?' realizada':'');
+    chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
+  });
+  if(extra>0)chips+='<div class="cal-more">+'+extra+' mais</div>';
+  return'<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">'+dt.getDate()+'</div>'+chips+'</div>';
 }
 function buildWeekGrid(db,todayStr){
-var mon=weekStart(calDate);var weekDays=[];for(var i=0;i<7;i++){var d=new Date(mon);d.setDate(d.getDate()+i);weekDays.push(d);}
-var dayNames=[‘Seg’,‘Ter’,‘Qua’,‘Qui’,‘Sex’,‘Sáb’,‘Dom’];var hours=[];for(var h=7;h<=21;h++)hours.push(h);
-var html=’<div style="overflow-x:auto"><div style="min-width:600px"><div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border)"><div style="border-right:1px solid var(--border)"></div>’;
-weekDays.forEach(function(d,i){var ds=d.toISOString().split(‘T’)[0];var isToday=ds===todayStr;html+=’<div class="week-day-header '+(isToday?'today':'')+'"><div class="week-day-name">’+dayNames[i]+’</div><div class="week-day-num">’+d.getDate()+’</div></div>’;});
-html+=’</div><div class="week-wrap"><div class="week-time-col">’;
-hours.forEach(function(h){html+=’<div class="week-time-cell">’+h+’:00</div>’;});
-html+=’</div><div class="week-days" style="grid-template-columns:repeat(7,1fr)">’;
-weekDays.forEach(function(d){
-var ds=d.toISOString().split(‘T’)[0];html+=’<div style="grid-row:span '+hours.length+'">’;
-hours.forEach(function(h){
-var hStr=String(h).padStart(2,‘0’);
-var sessions=db.sessions.filter(function(s){return s.date===ds&&(s.time||’’).startsWith(hStr);});
-var evts=’’;
-sessions.forEach(function(s){
-var pkg=db.packages.find(function(p){return p.id===s.packageId;});
-var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||’’).localeCompare(b.time||’’);}):[];
-var n=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;var t=pkg?pkg.totalSessions:0;
-var parts=clientName(s.clientId).split(’ ‘);var fn=parts.length>=2?parts[0]+’ ‘+parts[1]:parts[0];
-var lbl=pkg?fn+’ ‘+n+’/’+t:fn;
-evts+=’<span class="week-event '+(s.category||'psicoterapia')+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">’+lbl+’</span>’;
-});
-html+=’<div class="week-cell" onclick="dayClick(\''+ds+'\')">’+evts+’</div>’;
-});
-html+=’</div>’;
-});
-html+=’</div></div></div></div>’;return html;
+  var mon=weekStart(calDate);var weekDays=[];for(var i=0;i<7;i++){var d=new Date(mon);d.setDate(d.getDate()+i);weekDays.push(d);}
+  var dayNames=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];var hours=[];for(var h=7;h<=21;h++)hours.push(h);
+  var html='<div style="overflow-x:auto"><div style="min-width:600px"><div style="display:grid;grid-template-columns:52px repeat(7,1fr);border-bottom:1px solid var(--border)"><div style="border-right:1px solid var(--border)"></div>';
+  weekDays.forEach(function(d,i){var ds=d.toISOString().split('T')[0];var isToday=ds===todayStr;html+='<div class="week-day-header '+(isToday?'today':'')+'"><div class="week-day-name">'+dayNames[i]+'</div><div class="week-day-num">'+d.getDate()+'</div></div>';});
+  html+='</div><div class="week-wrap"><div class="week-time-col">';
+  hours.forEach(function(h){html+='<div class="week-time-cell">'+h+':00</div>';});
+  html+='</div><div class="week-days" style="grid-template-columns:repeat(7,1fr)">';
+  weekDays.forEach(function(d){
+    var ds=d.toISOString().split('T')[0];html+='<div style="grid-row:span '+hours.length+'">';
+    hours.forEach(function(h){
+      var hStr=String(h).padStart(2,'0');
+      var sessions=db.sessions.filter(function(s){return s.date===ds&&(s.time||'').startsWith(hStr);});
+      var evts='';
+      sessions.forEach(function(s){
+        var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+        var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'');}):[];
+        var n=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;var t=pkg?pkg.totalSessions:0;
+        var parts=clientName(s.clientId).split(' ');var fn=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
+        var lbl=pkg?fn+' '+n+'/'+t:fn;
+        evts+='<span class="week-event '+(s.category||'psicoterapia')+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+lbl+'</span>';
+      });
+      html+='<div class="week-cell" onclick="dayClick(\''+ds+'\')">'+evts+'</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div></div></div></div>';return html;
 }
 window.setCalView=function(v){calView=v;renderCalendar();};
-window.calNav=function(dir){if(calView===‘month’){calDate=new Date(calDate.getFullYear(),calDate.getMonth()+dir,1);}else{calDate.setDate(calDate.getDate()+dir*7);}renderCalendar();};
+window.calNav=function(dir){if(calView==='month'){calDate=new Date(calDate.getFullYear(),calDate.getMonth()+dir,1);}else{calDate.setDate(calDate.getDate()+dir*7);}renderCalendar();};
 window.calGoToday=function(){calDate=new Date();renderCalendar();};
 window.dayClick=function(dateStr){
-var db=getDB();var sessions=db.sessions.filter(function(s){return s.date===dateStr;}).sort(function(a,b){return(a.time||’’).localeCompare(b.time||’’);});
-var sessHtml=sessions.length===0?’<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>’:’<div>’;
-sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+=’<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">’+clientName(s.clientId)+’</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">’+catLabelShort(s.category)+’</span><span style="font-size:12px;color:var(--text2)">’+(s.time||’’)+’ · ‘+pkgName(s.packageId)+’</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">’+sb[1]+’</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>’;});
-if(sessions.length>0)sessHtml+=’</div>’;
-showModal(‘📅 ‘+fmtDate(dateStr),sessHtml+’<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>’);
+  var db=getDB();var sessions=db.sessions.filter(function(s){return s.date===dateStr;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
+  var sessHtml=sessions.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>':'<div>';
+  sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+(s.time||'')+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
+  if(sessions.length>0)sessHtml+='</div>';
+  showModal('📅 '+fmtDate(dateStr),sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
 };
 
 // ── FINANCIAL ──
 function renderFinancial(){
-var db=getDB();
-var nowDate=today();
-var currentMonth=nowDate.slice(0,7); // ‘YYYY-MM’
+  var db=getDB();
+  var nowDate=today();
+  var currentMonth=nowDate.slice(0,7); // 'YYYY-MM'
 
-// Helper: get the relevant date for a package (payment date or created date)
-function pkgMonth(p){
-var d=p.paymentDate||(p.createdAt?p.createdAt.split(‘T’)[0]:null);
-return d?d.slice(0,7):’’;
+  // Helper: get the relevant date for a package (payment date or created date)
+  function pkgMonth(p){
+    var d=p.paymentDate||(p.createdAt?p.createdAt.split('T')[0]:null);
+    return d?d.slice(0,7):'';
+  }
+
+  // Current month packages only - for top cards
+  var paidNow=db.packages.filter(function(p){return p.paymentStatus==='paid'&&pkgMonth(p)===currentMonth;});
+  var parcela1Now=db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&pkgMonth(p)===currentMonth;});
+  var pendingNow=db.packages.filter(function(p){return p.paymentStatus==='pending'&&pkgMonth(p)===currentMonth;});
+  // Also include parcela1 from any month that still has 2nd installment pending
+  var parcela1Any=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
+
+  var paidRev=paidNow.reduce(function(a,p){return a+p.price;},0);
+  var parcela1Rev=parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
+  var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
+
+  // Revenue by month (all history)
+  var revenueByMonth={};
+  db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
+    var d=p.paymentDate||(p.createdAt?p.createdAt.split('T')[0]:null);
+    if(d){var mon=d.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
+  });
+  db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).forEach(function(p){
+    if(p.paymentDate){var mon=p.paymentDate.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price/2;}
+  });
+  var sortedMonths=Object.keys(revenueByMonth).sort().reverse();
+  var monthRows='';
+  sortedMonths.forEach(function(mon){
+    var parts=mon.split('-');
+    var mn=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    var isCurrent=mon===currentMonth;
+    monthRows+='<tr '+(isCurrent?'style="background:rgba(52,217,138,0.05)"':'')+'>'+
+      '<td><strong>'+(isCurrent?'🟢 ':'')+mn.charAt(0).toUpperCase()+mn.slice(1)+(isCurrent?' (atual)':'')+'</strong></td>'+
+      '<td style="color:var(--green);font-weight:700">'+fmt(revenueByMonth[mon])+'</td></tr>';
+  });
+
+  // Pending list: show ALL pending + parcela1 regardless of month
+  var allPending=db.packages.filter(function(p){return p.paymentStatus==='pending';});
+  var allParcela1=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
+  var pendingRows='';
+  allParcela1.forEach(function(p){
+    pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
+      '<td style="font-weight:600">'+fmt(p.price/2)+'</td>'+
+      '<td><span class="badge badge-parcial">🔶 2ª Parcela Pendente</span></td>'+
+      '<td style="color:'+(p.paymentDate2&&p.paymentDate2<today()?'var(--red)':'var(--text2)')+'">'+
+      (p.paymentDate2?fmtDate(p.paymentDate2):'—')+'</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">2ª Parcela Paga</button></td></tr>';
+  });
+  allPending.forEach(function(p){
+    var mon=pkgMonth(p);
+    var isOld=mon&&mon<currentMonth;
+    pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
+      '<td style="color:'+(isOld?'var(--text3)':'var(--yellow)')+';font-weight:600">'+fmt(p.price)+
+      (isOld?' <span style="font-size:11px;color:var(--text3)">(mês anterior)</span>':'')+'</td>'+
+      '<td><span class="badge '+(isOld?'badge-gray':'badge-yellow')+'">'+( isOld?'⚠️ Antigo':'⏳ Pendente')+'</span></td>'+
+      '<td class="td-muted">—</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">Marcar pago</button></td></tr>';
+  });
+
+  var paidRows='';
+  db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
+    var st=pkgStats(p);
+    paidRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
+      '<td class="td-muted">'+(p.paymentDate?fmtDate(p.paymentDate):'—')+'</td>'+
+      '<td style="color:var(--green);font-weight:600">'+fmt(p.price)+'</td>'+
+      '<td><button class="btn btn-ghost btn-sm" onclick="(async function(){await markPending(\''+p.id+'\');})()">Reverter</button></td></tr>';
+  });
+
+  var html='<div class="page">';
+
+  // Top cards - current month only
+  var curMonthName=new Date(parseInt(currentMonth.split('-')[0]),parseInt(currentMonth.split('-')[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  curMonthName=curMonthName.charAt(0).toUpperCase()+curMonthName.slice(1);
+  html+='<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">📅 Resumo de '+curMonthName+'</div>';
+  html+='<div class="grid-4" style="margin-bottom:24px">';
+  html+='<div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">'+fmt(paidRev)+'</div><div class="stat-label">Recebido este mês</div></div>';
+  html+='<div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">'+fmt(parcela1Rev)+'</div><div class="stat-label">1ª Parcela este mês</div></div>';
+  html+='<div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">'+fmt(pendRev)+'</div><div class="stat-label">A Receber este mês</div></div>';
+  html+='<div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev+parcela1Rev)+'</div><div class="stat-label">Total recebido este mês</div></div>';
+  html+='</div>';
+
+  // Monthly history table
+  if(sortedMonths.length>0){
+    html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">📆 Histórico por Mês</div></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Mês</th><th>Receita Recebida</th></tr></thead><tbody>'+monthRows+'</tbody></table></div></div>';
+  }
+
+  // Pending payments
+  if(allPending.length>0||allParcela1.length>0){
+    html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>'+pendingRows+'</tbody></table></div></div>';
+  }
+
+  // Confirmed payments
+  html+='<div class="card"><div class="section-header"><div class="section-title">✅ Pagamentos Confirmados</div></div>'+
+    (db.packages.filter(function(p){return p.paymentStatus==='paid';}).length===0?
+      '<div class="empty" style="padding:20px"><p>Nenhum pagamento confirmado</p></div>':
+      '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Data Pgto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>')+
+    '</div>';
+
+  html+='</div>';
+  document.getElementById('page-content').innerHTML=html;
 }
-
-// Current month packages only - for top cards
-var paidNow=db.packages.filter(function(p){return p.paymentStatus===‘paid’&&pkgMonth(p)===currentMonth;});
-var parcela1Now=db.packages.filter(function(p){return p.paymentStatus===‘parcela1’&&pkgMonth(p)===currentMonth;});
-var pendingNow=db.packages.filter(function(p){return p.paymentStatus===‘pending’&&pkgMonth(p)===currentMonth;});
-// Also include parcela1 from any month that still has 2nd installment pending
-var parcela1Any=db.packages.filter(function(p){return p.paymentStatus===‘parcela1’;});
-
-var paidRev=paidNow.reduce(function(a,p){return a+p.price;},0);
-var parcela1Rev=parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
-var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
-
-// Revenue by month (all history)
-var revenueByMonth={};
-db.packages.filter(function(p){return p.paymentStatus===‘paid’;}).forEach(function(p){
-var d=p.paymentDate||(p.createdAt?p.createdAt.split(‘T’)[0]:null);
-if(d){var mon=d.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
-});
-db.packages.filter(function(p){return p.paymentStatus===‘parcela1’;}).forEach(function(p){
-if(p.paymentDate){var mon=p.paymentDate.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price/2;}
-});
-var sortedMonths=Object.keys(revenueByMonth).sort().reverse();
-var monthRows=’’;
-sortedMonths.forEach(function(mon){
-var parts=mon.split(’-’);
-var mn=new Date(parseInt(parts[0]),parseInt(parts[1])-1,1).toLocaleDateString(‘pt-BR’,{month:‘long’,year:‘numeric’});
-var isCurrent=mon===currentMonth;
-monthRows+=’<tr ‘+(isCurrent?‘style=“background:rgba(52,217,138,0.05)”’:’’)+’>’+
-‘<td><strong>’+(isCurrent?‘🟢 ‘:’’)+mn.charAt(0).toUpperCase()+mn.slice(1)+(isCurrent?’ (atual)’:’’)+’</strong></td>’+
-‘<td style="color:var(--green);font-weight:700">’+fmt(revenueByMonth[mon])+’</td></tr>’;
-});
-
-// Pending list: show ALL pending + parcela1 regardless of month
-var allPending=db.packages.filter(function(p){return p.paymentStatus===‘pending’;});
-var allParcela1=db.packages.filter(function(p){return p.paymentStatus===‘parcela1’;});
-var pendingRows=’’;
-allParcela1.forEach(function(p){
-pendingRows+=’<tr><td><strong>’+clientName(p.clientId)+’</strong></td><td class="td-muted">’+p.name+’</td>’+
-‘<td style="font-weight:600">’+fmt(p.price/2)+’</td>’+
-‘<td><span class="badge badge-parcial">🔶 2ª Parcela Pendente</span></td>’+
-‘<td style="color:'+(p.paymentDate2&&p.paymentDate2<today()?'var(--red)':'var(--text2)')+'">’+
-(p.paymentDate2?fmtDate(p.paymentDate2):’—’)+’</td>’+
-‘<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">2ª Parcela Paga</button></td></tr>’;
-});
-allPending.forEach(function(p){
-var mon=pkgMonth(p);
-var isOld=mon&&mon<currentMonth;
-pendingRows+=’<tr><td><strong>’+clientName(p.clientId)+’</strong></td><td class="td-muted">’+p.name+’</td>’+
-‘<td style="color:'+(isOld?'var(--text3)':'var(--yellow)')+';font-weight:600">’+fmt(p.price)+
-(isOld?’ <span style="font-size:11px;color:var(--text3)">(mês anterior)</span>’:’’)+’</td>’+
-‘<td><span class="badge '+(isOld?'badge-gray':'badge-yellow')+'">’+( isOld?‘⚠️ Antigo’:‘⏳ Pendente’)+’</span></td>’+
-‘<td class="td-muted">—</td>’+
-‘<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">Marcar pago</button></td></tr>’;
-});
-
-var paidRows=’’;
-db.packages.filter(function(p){return p.paymentStatus===‘paid’;}).forEach(function(p){
-var st=pkgStats(p);
-paidRows+=’<tr><td><strong>’+clientName(p.clientId)+’</strong></td><td class="td-muted">’+p.name+’</td>’+
-‘<td class="td-muted">’+(p.paymentDate?fmtDate(p.paymentDate):’—’)+’</td>’+
-‘<td style="color:var(--green);font-weight:600">’+fmt(p.price)+’</td>’+
-‘<td><button class="btn btn-ghost btn-sm" onclick="(async function(){await markPending(\''+p.id+'\');})()">Reverter</button></td></tr>’;
-});
-
-var html=’<div class="page">’;
-
-// Top cards - current month only
-var curMonthName=new Date(parseInt(currentMonth.split(’-’)[0]),parseInt(currentMonth.split(’-’)[1])-1,1).toLocaleDateString(‘pt-BR’,{month:‘long’,year:‘numeric’});
-curMonthName=curMonthName.charAt(0).toUpperCase()+curMonthName.slice(1);
-html+=’<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">📅 Resumo de ‘+curMonthName+’</div>’;
-html+=’<div class="grid-4" style="margin-bottom:24px">’;
-html+=’<div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">’+fmt(paidRev)+’</div><div class="stat-label">Recebido este mês</div></div>’;
-html+=’<div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">’+fmt(parcela1Rev)+’</div><div class="stat-label">1ª Parcela este mês</div></div>’;
-html+=’<div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">’+fmt(pendRev)+’</div><div class="stat-label">A Receber este mês</div></div>’;
-html+=’<div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">’+fmt(paidRev+parcela1Rev)+’</div><div class="stat-label">Total recebido este mês</div></div>’;
-html+=’</div>’;
-
-// Monthly history table
-if(sortedMonths.length>0){
-html+=’<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">📆 Histórico por Mês</div></div>’+
-‘<div class="table-wrap"><table><thead><tr><th>Mês</th><th>Receita Recebida</th></tr></thead><tbody>’+monthRows+’</tbody></table></div></div>’;
-}
-
-// Pending payments
-if(allPending.length>0||allParcela1.length>0){
-html+=’<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>’+
-‘<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>’+pendingRows+’</tbody></table></div></div>’;
-}
-
-// Confirmed payments
-html+=’<div class="card"><div class="section-header"><div class="section-title">✅ Pagamentos Confirmados</div></div>’+
-(db.packages.filter(function(p){return p.paymentStatus===‘paid’;}).length===0?
-‘<div class="empty" style="padding:20px"><p>Nenhum pagamento confirmado</p></div>’:
-‘<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Data Pgto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>’+paidRows+’</tbody></table></div>’)+
-‘</div>’;
-
-html+=’</div>’;
-document.getElementById(‘page-content’).innerHTML=html;
-}
-window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:‘paid’});renderFinancial();showToast(‘✅ Pagamento confirmado!’);};
-window.markParcela1=async function(id){await dbUpdatePackage(id,{paymentStatus:‘parcela1’});renderFinancial();showToast(‘🔶 1ª parcela registrada!’);};
-window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:‘pending’});renderFinancial();showToast(‘↩️ Revertido para pendente’);};
+window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pagamento confirmado!');};
+window.markParcela1=async function(id){await dbUpdatePackage(id,{paymentStatus:'parcela1'});renderFinancial();showToast('🔶 1ª parcela registrada!');};
+window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido para pendente');};
 
 // ── BILLS ──
 var _billsCache=null;
 
 async function loadBills(){
-var rows=await supaFetch(‘GET’,‘bills’,null,’?order=due_date&paid=eq.false’);
-var paid=await supaFetch(‘GET’,‘bills’,null,’?order=due_date.desc&paid=eq.true&limit=20’);
-_billsCache={pending:rows||[],paid:paid||[]};
-return _billsCache;
+  var rows=await supaFetch('GET','bills',null,'?order=due_date&paid=eq.false');
+  var paid=await supaFetch('GET','bills',null,'?order=due_date.desc&paid=eq.true&limit=20');
+  _billsCache={pending:rows||[],paid:paid||[]};
+  return _billsCache;
 }
 
 function billStatusInfo(bill){
-var now=today();
-var due=bill.due_date;
-var diff=Math.round((new Date(due+‘T12:00:00’)-new Date(now+‘T12:00:00’))/(1000*60*60*24));
-if(diff<0) return {cls:‘badge-red’,label:’⚠️ Vencido ’+Math.abs(diff)+‘d’,urgent:true};
-if(diff===0) return {cls:‘badge-red’,label:‘🔴 Vence hoje’,urgent:true};
-if(diff<=3) return {cls:‘badge-parcial’,label:’🟡 Vence em ’+diff+‘d’,urgent:true};
-return {cls:‘badge-yellow’,label:’📅 Vence em ’+diff+‘d’,urgent:false};
+  var now=today();
+  var due=bill.due_date;
+  var diff=Math.round((new Date(due+'T12:00:00')-new Date(now+'T12:00:00'))/(1000*60*60*24));
+  if(diff<0) return {cls:'badge-red',label:'⚠️ Vencido '+Math.abs(diff)+'d',urgent:true};
+  if(diff===0) return {cls:'badge-red',label:'🔴 Vence hoje',urgent:true};
+  if(diff<=3) return {cls:'badge-parcial',label:'🟡 Vence em '+diff+'d',urgent:true};
+  return {cls:'badge-yellow',label:'📅 Vence em '+diff+'d',urgent:false};
 }
 
 function renderBills(){
-document.getElementById(‘topbar-actions’).innerHTML=’<button class="btn btn-primary" onclick="showBillForm()">+ Novo Boleto</button>’;
-document.getElementById(‘page-content’).innerHTML=’<div class="page"><div style="text-align:center;padding:30px;color:var(--text2)">Carregando boletos…</div></div>’;
-loadBills().then(function(data){
-var pending=data.pending;
-var paid=data.paid;
-var pendingRows=’’;
-pending.forEach(function(b){
-var si=billStatusInfo(b);
-pendingRows+=’<tr>’+
-‘<td><strong>’+b.description+’</strong></td>’+
-‘<td style="color:var(--yellow);font-weight:600">’+fmt(b.amount)+’</td>’+
-‘<td>’+fmtDate(b.due_date)+’</td>’+
-‘<td><span class="badge '+si.cls+'">’+si.label+’</span></td>’+
-‘<td><div style="display:flex;gap:6px">’+
-(b.file_data?’<button class="btn-icon" onclick="viewBillFile(\''+b.id+'\')" title="Ver anexo">📄</button>’:’’)+
-‘<button class="btn-icon" onclick="showBillForm(\''+b.id+'\')" title="Editar">✏️</button>’+
-‘<button class="btn-icon" onclick="markBillPaid(\''+b.id+'\')" title="Marcar pago">✅</button>’+
-‘<button class="btn-icon" onclick="deleteBillConfirm(\''+b.id+'\')" title="Excluir">🗑️</button>’+
-‘</div></td></tr>’;
-});
-var paidRows=’’;
-paid.forEach(function(b){
-paidRows+=’<tr>’+
-‘<td><strong>’+b.description+’</strong></td>’+
-‘<td style="color:var(--green);font-weight:600">’+fmt(b.amount)+’</td>’+
-‘<td class="td-muted">’+fmtDate(b.due_date)+’</td>’+
-‘<td class="td-muted">’+(b.paid_date?fmtDate(b.paid_date):’—’)+’</td>’+
-‘<td><div style="display:flex;gap:6px">’+
-(b.file_data?’<button class="btn-icon" onclick="viewBillFile(\''+b.id+'\')" title="Ver comprovante">📄</button>’:’’)+
-‘<button class="btn-icon" onclick="deleteBillConfirm(\''+b.id+'\')" title="Excluir">🗑️</button>’+
-‘</div></td></tr>’;
-});
-var html=’<div class="page">’;
-// Stats
-var totalPending=pending.reduce(function(a,b){return a+b.amount;},0);
-var urgent=pending.filter(function(b){return billStatusInfo(b).urgent;});
-html+=’<div class="grid-3" style="margin-bottom:20px">’;
-html+=’<div class="stat-card yellow"><div class="stat-icon">📎</div><div class="stat-val" style="font-size:22px">’+fmt(totalPending)+’</div><div class="stat-label">Total a pagar (’+pending.length+’ boleto’+(pending.length!==1?‘s’:’’)+’)</div></div>’;
-html+=’<div class="stat-card '+(urgent.length>0?'red':'')+'" style="'+(urgent.length>0?'border-color:rgba(240,96,96,0.3)':'')+'"><div class="stat-icon">⚠️</div><div class="stat-val" style="font-size:28px">’+urgent.length+’</div><div class="stat-label">Urgente’+(urgent.length!==1?‘s’:’’)+’ (vence em 3 dias)</div></div>’;
-html+=’<div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-val" style="font-size:28px">’+paid.length+’</div><div class="stat-label">Pagos recentemente</div></div>’;
-html+=’</div>’;
-// Pending
-html+=’<div class="card" style="margin-bottom:20px">’;
-html+=’<div class="section-header"><div class="section-title">📎 Boletos a Pagar</div></div>’;
-html+=pending.length===0?
-‘<div class="empty" style="padding:24px"><div class="empty-icon">🎉</div><p>Nenhum boleto pendente!</p></div>’:
-‘<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>’+pendingRows+’</tbody></table></div>’;
-html+=’</div>’;
-// Paid
-if(paid.length>0){
-html+=’<div class="card">’;
-html+=’<div class="section-header"><div class="section-title">✅ Pagos Recentemente</div></div>’;
-html+=’<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Data Pgto</th><th>Ações</th></tr></thead><tbody>’+paidRows+’</tbody></table></div>’;
-html+=’</div>’;
-}
-html+=’</div>’;
-document.getElementById(‘page-content’).innerHTML=html;
-});
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showBillForm()">+ Novo Boleto</button>';
+  document.getElementById('page-content').innerHTML='<div class="page"><div style="text-align:center;padding:30px;color:var(--text2)">Carregando boletos...</div></div>';
+  loadBills().then(function(data){
+    var pending=data.pending;
+    var paid=data.paid;
+    var pendingRows='';
+    pending.forEach(function(b){
+      var si=billStatusInfo(b);
+      pendingRows+='<tr>'+
+        '<td><strong>'+b.description+'</strong></td>'+
+        '<td style="color:var(--yellow);font-weight:600">'+fmt(b.amount)+'</td>'+
+        '<td>'+fmtDate(b.due_date)+'</td>'+
+        '<td><span class="badge '+si.cls+'">'+si.label+'</span></td>'+
+        '<td><div style="display:flex;gap:6px">'+
+          (b.file_data?'<button class="btn-icon" onclick="viewBillFile(\''+b.id+'\')" title="Ver anexo">📄</button>':'')+
+          '<button class="btn-icon" onclick="showBillForm(\''+b.id+'\')" title="Editar">✏️</button>'+
+          '<button class="btn-icon" onclick="markBillPaid(\''+b.id+'\')" title="Marcar pago">✅</button>'+
+          '<button class="btn-icon" onclick="deleteBillConfirm(\''+b.id+'\')" title="Excluir">🗑️</button>'+
+        '</div></td></tr>';
+    });
+    var paidRows='';
+    paid.forEach(function(b){
+      paidRows+='<tr>'+
+        '<td><strong>'+b.description+'</strong></td>'+
+        '<td style="color:var(--green);font-weight:600">'+fmt(b.amount)+'</td>'+
+        '<td class="td-muted">'+fmtDate(b.due_date)+'</td>'+
+        '<td class="td-muted">'+(b.paid_date?fmtDate(b.paid_date):'—')+'</td>'+
+        '<td><div style="display:flex;gap:6px">'+
+          (b.file_data?'<button class="btn-icon" onclick="viewBillFile(\''+b.id+'\')" title="Ver comprovante">📄</button>':'')+
+          '<button class="btn-icon" onclick="deleteBillConfirm(\''+b.id+'\')" title="Excluir">🗑️</button>'+
+        '</div></td></tr>';
+    });
+    var html='<div class="page">';
+    // Stats
+    var totalPending=pending.reduce(function(a,b){return a+b.amount;},0);
+    var urgent=pending.filter(function(b){return billStatusInfo(b).urgent;});
+    html+='<div class="grid-3" style="margin-bottom:20px">';
+    html+='<div class="stat-card yellow"><div class="stat-icon">📎</div><div class="stat-val" style="font-size:22px">'+fmt(totalPending)+'</div><div class="stat-label">Total a pagar ('+pending.length+' boleto'+(pending.length!==1?'s':'')+')</div></div>';
+    html+='<div class="stat-card '+(urgent.length>0?'red':'')+'" style="'+(urgent.length>0?'border-color:rgba(240,96,96,0.3)':'')+'"><div class="stat-icon">⚠️</div><div class="stat-val" style="font-size:28px">'+urgent.length+'</div><div class="stat-label">Urgente'+(urgent.length!==1?'s':'')+' (vence em 3 dias)</div></div>';
+    html+='<div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-val" style="font-size:28px">'+paid.length+'</div><div class="stat-label">Pagos recentemente</div></div>';
+    html+='</div>';
+    // Pending
+    html+='<div class="card" style="margin-bottom:20px">';
+    html+='<div class="section-header"><div class="section-title">📎 Boletos a Pagar</div></div>';
+    html+=pending.length===0?
+      '<div class="empty" style="padding:24px"><div class="empty-icon">🎉</div><p>Nenhum boleto pendente!</p></div>':
+      '<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+pendingRows+'</tbody></table></div>';
+    html+='</div>';
+    // Paid
+    if(paid.length>0){
+      html+='<div class="card">';
+      html+='<div class="section-header"><div class="section-title">✅ Pagos Recentemente</div></div>';
+      html+='<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Data Pgto</th><th>Ações</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>';
+      html+='</div>';
+    }
+    html+='</div>';
+    document.getElementById('page-content').innerHTML=html;
+  });
 }
 
 function showBillForm(id){
-var title=id?‘Editar Boleto’:‘Novo Boleto’;
-var body=’<div id="bill-loading" style="text-align:center;padding:20px;color:var(--text2)">Carregando…</div>’;
-showModal(title,body);
-var loadData=id?supaFetch(‘GET’,‘bills’,null,’?id=eq.’+id):Promise.resolve([{}]);
-loadData.then(function(rows){
-var b=rows&&rows[0]?rows[0]:{};
-var formBody=’’;
-formBody+=’<div class="form-group"><label>Descrição *</label><input type="text" id="bl-desc" value="'+(b.description||'')+'" placeholder="Ex: Boleto Energia Elétrica"/></div>’;
-formBody+=’<div class="form-row"><div class="form-group"><label>Valor (R$) *</label><input type="number" id="bl-amount" value="'+(b.amount||'')+'" min="0" step="0.01" placeholder="0,00"/></div><div class="form-group"><label>Data de Vencimento *</label><input type="date" id="bl-due" value="'+(b.due_date||today())+'"/></div></div>’;
-formBody+=’<div class="form-group"><label>Anexo (PDF ou imagem)</label>’;
-formBody+=’<input type="file" id="bl-file" accept=".pdf,image/*" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px;color:var(--text);font-size:13px"/>’;
-if(b.file_name)formBody+=’<div style="font-size:12px;color:var(--green);margin-top:6px">📄 Anexo atual: ‘+b.file_name+’</div>’;
-formBody+=’</div>’;
-formBody+=’<div id="bl-error" class="alert alert-red" style="display:none"></div>’;
-formBody+=’<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="bl-save-btn">Salvar</button></div>’;
-var modal=document.getElementById(‘modal-container’);
-if(modal){
-var body2=modal.querySelector(’.modal-body’);
-if(body2)body2.innerHTML=formBody;
-}
-var saveBtn=document.getElementById(‘bl-save-btn’);
-if(saveBtn)saveBtn.onclick=function(){saveBill(id||null,b);};
-});
+  var title=id?'Editar Boleto':'Novo Boleto';
+  var body='<div id="bill-loading" style="text-align:center;padding:20px;color:var(--text2)">Carregando...</div>';
+  showModal(title,body);
+  var loadData=id?supaFetch('GET','bills',null,'?id=eq.'+id):Promise.resolve([{}]);
+  loadData.then(function(rows){
+    var b=rows&&rows[0]?rows[0]:{};
+    var formBody='';
+    formBody+='<div class="form-group"><label>Descrição *</label><input type="text" id="bl-desc" value="'+(b.description||'')+'" placeholder="Ex: Boleto Energia Elétrica"/></div>';
+    formBody+='<div class="form-row"><div class="form-group"><label>Valor (R$) *</label><input type="number" id="bl-amount" value="'+(b.amount||'')+'" min="0" step="0.01" placeholder="0,00"/></div><div class="form-group"><label>Data de Vencimento *</label><input type="date" id="bl-due" value="'+(b.due_date||today())+'"/></div></div>';
+    formBody+='<div class="form-group"><label>Anexo (PDF ou imagem)</label>';
+    formBody+='<input type="file" id="bl-file" accept=".pdf,image/*" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px;color:var(--text);font-size:13px"/>';
+    if(b.file_name)formBody+='<div style="font-size:12px;color:var(--green);margin-top:6px">📄 Anexo atual: '+b.file_name+'</div>';
+    formBody+='</div>';
+    formBody+='<div id="bl-error" class="alert alert-red" style="display:none"></div>';
+    formBody+='<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="bl-save-btn">Salvar</button></div>';
+    var modal=document.getElementById('modal-container');
+    if(modal){
+      var body2=modal.querySelector('.modal-body');
+      if(body2)body2.innerHTML=formBody;
+    }
+    var saveBtn=document.getElementById('bl-save-btn');
+    if(saveBtn)saveBtn.onclick=function(){saveBill(id||null,b);};
+  });
 }
 
 async function saveBill(id, existing){
-var desc=document.getElementById(‘bl-desc’).value.trim();
-var amount=parseFloat(document.getElementById(‘bl-amount’).value);
-var due=document.getElementById(‘bl-due’).value;
-var fileInput=document.getElementById(‘bl-file’);
-var err=document.getElementById(‘bl-error’);
-if(!desc||!due||isNaN(amount)){err.textContent=‘Preencha todos os campos obrigatórios’;err.style.display=‘flex’;return;}
-var fileData=existing?existing.file_data:null;
-var fileName=existing?existing.file_name:null;
-var fileType=existing?existing.file_type:null;
-if(fileInput&&fileInput.files&&fileInput.files[0]){
-var file=fileInput.files[0];
-if(file.size>2*1024*1024){err.textContent=‘Arquivo muito grande. Máximo 2MB.’;err.style.display=‘flex’;return;}
-fileName=file.name;
-fileType=file.type;
-fileData=await new Promise(function(res){
-var r=new FileReader();
-r.onload=function(e){res(e.target.result.split(’,’)[1]);};
-r.readAsDataURL(file);
-});
-}
-closeModal();
-showToast(‘⏳ Salvando boleto…’);
-var row={description:desc,amount:amount,due_date:due,file_data:fileData,file_name:fileName,file_type:fileType};
-if(id){
-await supaFetch(‘PATCH’,‘bills’,row,’?id=eq.’+id);
-} else {
-row.id=genId();row.paid=false;row.created_at=new Date().toISOString();
-await supaFetch(‘POST’,‘bills’,row);
-}
-showToast(‘✅ Boleto salvo!’);
-renderBills();
+  var desc=document.getElementById('bl-desc').value.trim();
+  var amount=parseFloat(document.getElementById('bl-amount').value);
+  var due=document.getElementById('bl-due').value;
+  var fileInput=document.getElementById('bl-file');
+  var err=document.getElementById('bl-error');
+  if(!desc||!due||isNaN(amount)){err.textContent='Preencha todos os campos obrigatórios';err.style.display='flex';return;}
+  var fileData=existing?existing.file_data:null;
+  var fileName=existing?existing.file_name:null;
+  var fileType=existing?existing.file_type:null;
+  if(fileInput&&fileInput.files&&fileInput.files[0]){
+    var file=fileInput.files[0];
+    if(file.size>2*1024*1024){err.textContent='Arquivo muito grande. Máximo 2MB.';err.style.display='flex';return;}
+    fileName=file.name;
+    fileType=file.type;
+    fileData=await new Promise(function(res){
+      var r=new FileReader();
+      r.onload=function(e){res(e.target.result.split(',')[1]);};
+      r.readAsDataURL(file);
+    });
+  }
+  closeModal();
+  showToast('⏳ Salvando boleto...');
+  var row={description:desc,amount:amount,due_date:due,file_data:fileData,file_name:fileName,file_type:fileType};
+  if(id){
+    await supaFetch('PATCH','bills',row,'?id=eq.'+id);
+  } else {
+    row.id=genId();row.paid=false;row.created_at=new Date().toISOString();
+    await supaFetch('POST','bills',row);
+  }
+  showToast('✅ Boleto salvo!');
+  renderBills();
 }
 
 window.markBillPaid=async function(id){
-var paidDate=window.prompt(‘Data do pagamento (AAAA-MM-DD, deixe vazio para hoje):’,’’);
-var d=paidDate&&paidDate.length===10?paidDate:today();
-await supaFetch(‘PATCH’,‘bills’,{paid:true,paid_date:d},’?id=eq.’+id);
-showToast(‘✅ Boleto marcado como pago!’);
-renderBills();
+  var paidDate=window.prompt('Data do pagamento (AAAA-MM-DD, deixe vazio para hoje):','');
+  var d=paidDate&&paidDate.length===10?paidDate:today();
+  await supaFetch('PATCH','bills',{paid:true,paid_date:d},'?id=eq.'+id);
+  showToast('✅ Boleto marcado como pago!');
+  renderBills();
 };
 
 window.viewBillFile=async function(id){
-var rows=await supaFetch(‘GET’,‘bills’,null,’?id=eq.’+id);
-if(!rows||!rows[0]||!rows[0].file_data){showToast(‘Nenhum arquivo anexado’,true);return;}
-var b=rows[0];
-var mtype=b.file_type||‘application/octet-stream’;
-var url=‘data:’+mtype+’;base64,’+b.file_data;
-if(mtype===‘application/pdf’){
-var win=window.open();
-win.document.write(’<iframe src="'+url+'" width="100%" height="100%" style="border:none"></iframe>’);
-} else {
-var win2=window.open();
-win2.document.write(’<img src="'+url+'" style="max-width:100%;"/>’);
-}
+  var rows=await supaFetch('GET','bills',null,'?id=eq.'+id);
+  if(!rows||!rows[0]||!rows[0].file_data){showToast('Nenhum arquivo anexado',true);return;}
+  var b=rows[0];
+  var mtype=b.file_type||'application/octet-stream';
+  var url='data:'+mtype+';base64,'+b.file_data;
+  if(mtype==='application/pdf'){
+    var win=window.open();
+    win.document.write('<iframe src="'+url+'" width="100%" height="100%" style="border:none"></iframe>');
+  } else {
+    var win2=window.open();
+    win2.document.write('<img src="'+url+'" style="max-width:100%;"/>');
+  }
 };
 
 function deleteBillConfirm(id){
-window._deleteBillId=id;
-showModal(‘Excluir Boleto’,’<p style="color:var(--text2);margin-bottom:20px">Tem certeza que deseja excluir este boleto?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._confirmDeleteBill()">Excluir</button></div>’);
+  window._deleteBillId=id;
+  showModal('Excluir Boleto','<p style="color:var(--text2);margin-bottom:20px">Tem certeza que deseja excluir este boleto?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._confirmDeleteBill()">Excluir</button></div>');
 }
 window._confirmDeleteBill=async function(){
-closeModal();
-await supaFetch(‘DELETE’,‘bills’,null,’?id=eq.’+window._deleteBillId);
-showToast(‘🗑️ Boleto excluído’);
-renderBills();
+  closeModal();
+  await supaFetch('DELETE','bills',null,'?id=eq.'+window._deleteBillId);
+  showToast('🗑️ Boleto excluído');
+  renderBills();
 };
 
 // ── NOTES ──
 function renderNotes(){
-document.getElementById(‘topbar-actions’).innerHTML=’’;
-document.getElementById(‘page-content’).innerHTML=’<div class="page"><div class="card" style="border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><span id="notes-status" style="font-size:12px;color:var(--text2)"></span></div><div id="notes-container" style="color:var(--text2);padding:10px 0">Carregando…</div><div style="margin-top:12px;text-align:right"><button class="btn btn-primary" id="save-notes-btn">💾 Salvar</button></div></div></div>’;
+  document.getElementById('topbar-actions').innerHTML='';
+  document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="border-color:rgba(245,200,66,0.25)"><div class="section-header"><div class="section-title">📝 Notas Importantes</div><span id="notes-status" style="font-size:12px;color:var(--text2)"></span></div><div id="notes-container" style="color:var(--text2);padding:10px 0">Carregando...</div><div style="margin-top:12px;text-align:right"><button class="btn btn-primary" id="save-notes-btn">💾 Salvar</button></div></div></div>';
 
-var _noteId=null;
+  var _noteId=null;
 
-async function saveNotes(content){
-var status=document.getElementById(‘notes-status’);
-if(status)status.textContent=‘Salvando…’;
-try{
-var res;
-if(_noteId){
-res=await fetch(SUPA_URL+’/rest/v1/notes?id=eq.’+_noteId,{
-method:‘PATCH’,
-headers:{‘apikey’:SUPA_KEY,‘Authorization’:‘Bearer ‘+SUPA_KEY,‘Content-Type’:‘application/json’,‘Prefer’:‘return=minimal’},
-body:JSON.stringify({content:content,updated_at:new Date().toISOString()})
-});
-} else {
-_noteId=‘note_admin’;
-res=await fetch(SUPA_URL+’/rest/v1/notes’,{
-method:‘POST’,
-headers:{‘apikey’:SUPA_KEY,‘Authorization’:’Bearer ’+SUPA_KEY,‘Content-Type’:‘application/json’,‘Prefer’:‘resolution=merge-duplicates,return=minimal’},
-body:JSON.stringify({id:‘note_admin’,user_id:‘admin’,content:content,updated_at:new Date().toISOString()})
-});
-}
-localStorage.setItem(‘dashboard_notes’,content);
-if(status)status.textContent=res.ok?‘✅ Salvo!’:‘⚠️ Erro: ‘+res.status;
-}catch(e){
-localStorage.setItem(‘dashboard_notes’,content);
-if(status)status.textContent=‘✅ Salvo localmente’;
-}
-setTimeout(function(){var s=document.getElementById(‘notes-status’);if(s)s.textContent=’’;},3000);
-}
+  async function saveNotes(content){
+    var status=document.getElementById('notes-status');
+    if(status)status.textContent='Salvando...';
+    try{
+      var res;
+      if(_noteId){
+        res=await fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+_noteId,{
+          method:'PATCH',
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({content:content,updated_at:new Date().toISOString()})
+        });
+      } else {
+        _noteId='note_admin';
+        res=await fetch(SUPA_URL+'/rest/v1/notes',{
+          method:'POST',
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          body:JSON.stringify({id:'note_admin',user_id:'admin',content:content,updated_at:new Date().toISOString()})
+        });
+      }
+      localStorage.setItem('dashboard_notes',content);
+      if(status)status.textContent=res.ok?'✅ Salvo!':'⚠️ Erro: '+res.status;
+    }catch(e){
+      localStorage.setItem('dashboard_notes',content);
+      if(status)status.textContent='✅ Salvo localmente';
+    }
+    setTimeout(function(){var s=document.getElementById('notes-status');if(s)s.textContent='';},3000);
+  }
 
-function buildUI(content){
-var ta=document.createElement(‘textarea’);
-ta.rows=18;
-ta.placeholder=‘Escreva seus lembretes aqui…’;
-ta.style.cssText=‘width:100%;background:var(–bg3);border:1px solid var(–border2);border-radius:var(–radius-sm);padding:14px;color:var(–text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.8;box-sizing:border-box;display:block;’;
-ta.value=content||’’;
-var container=document.getElementById(‘notes-container’);
-if(container){container.innerHTML=’’;container.appendChild(ta);}
-var btn=document.getElementById(‘save-notes-btn’);
-if(btn)btn.onclick=function(){saveNotes(ta.value);};
-}
+  function buildUI(content){
+    var ta=document.createElement('textarea');
+    ta.rows=18;
+    ta.placeholder='Escreva seus lembretes aqui...';
+    ta.style.cssText='width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:14px;color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.8;box-sizing:border-box;display:block;';
+    ta.value=content||'';
+    var container=document.getElementById('notes-container');
+    if(container){container.innerHTML='';container.appendChild(ta);}
+    var btn=document.getElementById('save-notes-btn');
+    if(btn)btn.onclick=function(){saveNotes(ta.value);};
+  }
 
-// Try to load from Supabase using fixed ID ‘note_admin’
-fetch(SUPA_URL+’/rest/v1/notes?id=eq.note_admin’,{
-headers:{‘apikey’:SUPA_KEY,‘Authorization’:‘Bearer ‘+SUPA_KEY}
-}).then(function(r){return r.json();}).then(function(rows){
-if(rows&&rows.length>0){
-_noteId=‘note_admin’;
-buildUI(rows[0].content||’’);
-} else {
-buildUI(localStorage.getItem(‘dashboard_notes’)||’’);
-}
-}).catch(function(){
-buildUI(localStorage.getItem(‘dashboard_notes’)||’’);
-});
+  // Try to load from Supabase using fixed ID 'note_admin'
+  fetch(SUPA_URL+'/rest/v1/notes?id=eq.note_admin',{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  }).then(function(r){return r.json();}).then(function(rows){
+    if(rows&&rows.length>0){
+      _noteId='note_admin';
+      buildUI(rows[0].content||'');
+    } else {
+      buildUI(localStorage.getItem('dashboard_notes')||'');
+    }
+  }).catch(function(){
+    buildUI(localStorage.getItem('dashboard_notes')||'');
+  });
 }
 
 // ── SETTINGS ──
 function renderSettings(){
-var creds=getCreds();
-var html=’<div class="page"><div class="grid-2"><div class="card"><div class="section-header"><div class="section-title">🔐 Alterar Acesso</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:18px">Altere seu nome, email e senha.</p>’;
-var creds2=getCreds();
-html+=’<div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="'+creds2.name+'"/></div>’;
-html+=’<div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="'+creds2.email+'"/></div>’;
-html+=’<div class="form-group"><label>Senha Atual *</label><input type="password" id="st-current" placeholder="Digite a senha atual"/></div>’;
-html+=’<div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>’;
-html+=’<div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>’;
-html+=’<div id="st-error" class="alert alert-red" style="display:none"></div><div id="st-ok" class="alert alert-green" style="display:none"></div>’;
-html+=’<button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>’;
-html+=’<div><div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>’;
-
-html+=’</div>’;
-html+=’<div>’;
-html+=’<div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>’;
-html+=’<div class="card"><div class="section-header"><div class="section-title" style="color:var(--red)">⚠️ Zona de Risco</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:14px">Apaga todos os dados permanentemente.</p><button class="btn btn-danger" style="width:100%;justify-content:center" onclick="resetAllData()">🗑️ Apagar Todos os Dados</button></div></div></div></div>’;
-document.getElementById(‘page-content’).innerHTML=html;
+  var creds=getCreds();
+  var html='<div class="page"><div class="grid-2"><div class="card"><div class="section-header"><div class="section-title">🔐 Alterar Acesso</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:18px">Altere seu nome, email e senha.</p>';
+  var creds2=getCreds();
+  html+='<div class="form-group"><label>Seu Nome</label><input type="text" id="st-name" value="'+creds2.name+'"/></div>';
+  html+='<div class="form-group"><label>Email de Login</label><input type="email" id="st-email" value="'+creds2.email+'"/></div>';
+  html+='<div class="form-group"><label>Senha Atual *</label><input type="password" id="st-current" placeholder="Digite a senha atual"/></div>';
+  html+='<div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>';
+  html+='<div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>';
+  html+='<div id="st-error" class="alert alert-red" style="display:none"></div><div id="st-ok" class="alert alert-green" style="display:none"></div>';
+  html+='<button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>';
+  html+='<div><div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
+  
+  html+='</div>';
+  html+='<div>';
+  html+='<div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
+  html+='<div class="card"><div class="section-header"><div class="section-title" style="color:var(--red)">⚠️ Zona de Risco</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:14px">Apaga todos os dados permanentemente.</p><button class="btn btn-danger" style="width:100%;justify-content:center" onclick="resetAllData()">🗑️ Apagar Todos os Dados</button></div></div></div></div>';
+  document.getElementById('page-content').innerHTML=html;
 }
 function saveSettings(){
-var creds=getCreds();
-var name=document.getElementById(‘st-name’).value.trim();
-var email=document.getElementById(‘st-email’).value.trim();
-var current=document.getElementById(‘st-current’).value;
-var np=document.getElementById(‘st-new’).value;
-var nc=document.getElementById(‘st-confirm’).value;
-var err=document.getElementById(‘st-error’);var ok=document.getElementById(‘st-ok’);
-err.style.display=‘none’;ok.style.display=‘none’;
-if(!name||!email){err.textContent=‘Nome e email obrigatórios’;err.style.display=‘flex’;return;}
-if(!current){err.textContent=‘Digite a senha atual’;err.style.display=‘flex’;return;}
-if(current!==creds.password){err.textContent=‘Senha atual incorreta’;err.style.display=‘flex’;return;}
-if(np&&np!==nc){err.textContent=‘Senhas não coincidem’;err.style.display=‘flex’;return;}
-if(np&&np.length<4){err.textContent=‘Mínimo 4 caracteres’;err.style.display=‘flex’;return;}
-creds.name=name;creds.email=email;if(np)creds.password=np;
-saveCreds(creds);document.getElementById(‘sidebar-user-name’).textContent=name;
-ok.textContent=‘✅ Salvo!’;ok.style.display=‘flex’;
-document.getElementById(‘st-current’).value=’’;document.getElementById(‘st-new’).value=’’;document.getElementById(‘st-confirm’).value=’’;
+  var creds=getCreds();
+  var name=document.getElementById('st-name').value.trim();
+  var email=document.getElementById('st-email').value.trim();
+  var current=document.getElementById('st-current').value;
+  var np=document.getElementById('st-new').value;
+  var nc=document.getElementById('st-confirm').value;
+  var err=document.getElementById('st-error');var ok=document.getElementById('st-ok');
+  err.style.display='none';ok.style.display='none';
+  if(!name||!email){err.textContent='Nome e email obrigatórios';err.style.display='flex';return;}
+  if(!current){err.textContent='Digite a senha atual';err.style.display='flex';return;}
+  if(current!==creds.password){err.textContent='Senha atual incorreta';err.style.display='flex';return;}
+  if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
+  if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
+  creds.name=name;creds.email=email;if(np)creds.password=np;
+  saveCreds(creds);document.getElementById('sidebar-user-name').textContent=name;
+  ok.textContent='✅ Salvo!';ok.style.display='flex';
+  document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
 }
 
 ;
 ;
 function resetAllData(){
-showModal(‘Apagar Todos os Dados’,’<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){if(document.getElementById(\'reset-confirm\').value!==\'APAGAR\'){showToast(\'Digite APAGAR para confirmar\',true);return;}closeModal();await supaFetch(\'DELETE\',\'sessions\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'packages\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'clients\',null,\'?id=neq.none\');await loadFromSupabase();navigate(\'dashboard\');showToast(\'Dados apagados\');})()">Apagar Tudo</button></div>’);
+  showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){if(document.getElementById(\'reset-confirm\').value!==\'APAGAR\'){showToast(\'Digite APAGAR para confirmar\',true);return;}closeModal();await supaFetch(\'DELETE\',\'sessions\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'packages\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'clients\',null,\'?id=neq.none\');await loadFromSupabase();navigate(\'dashboard\');showToast(\'Dados apagados\');})()">Apagar Tudo</button></div>');
 }
 
 // ── AUTO LOGIN ──
 if(localStorage.getItem(AUTH_KEY)){
-document.getElementById(‘login-screen’).style.display=‘none’;
-document.getElementById(‘app’).style.display=‘flex’;
-document.getElementById(‘sidebar-user-name’).textContent=getCreds().name;
-navigate(‘dashboard’);
-setTimeout(function(){loadFromSupabase().then(function(){navigate(‘dashboard’);}).catch(function(){});},200);
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('sidebar-user-name').textContent=getCreds().name;
+  navigate('dashboard');
+  setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
 }
 </script>
-
 </body>
 </html>
