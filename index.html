@@ -164,6 +164,13 @@ select option{background:var(--bg3);}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 .page{animation:fadeIn 0.2s ease;}
+
+.sidebar-logo{padding:20px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.sidebar-logo-img{width:44px;height:44px;border-radius:12px;object-fit:cover;flex-shrink:0;background:var(--bg3);}
+.sidebar-logo-text h2{font-size:15px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;}
+.sidebar-logo-text p{font-size:11px;color:var(--text3);margin-top:1px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;}
+.login-logo-img{width:64px;height:64px;border-radius:18px;object-fit:cover;margin:0 auto 14px;display:block;background:var(--bg3);}
+
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -179,9 +186,10 @@ select option{background:var(--bg3);}
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">
-      <div class="icon">🧠</div>
-      <h1>NeuroPsi</h1>
-      <p>Área restrita — faça seu login</p>
+      <img class="login-logo-img" src="logo.png" alt="Logo" onerror="this.style.display='none'"/>
+      <h1>Neuropsi</h1>
+      <p style="font-size:12px;color:var(--text3);font-weight:500;letter-spacing:0.04em;text-transform:uppercase;margin-top:2px">Consultório</p>
+      <p style="margin-top:10px">Área restrita — faça seu login</p>
     </div>
     <div class="login-hint">Acesso: <strong>admin@admin.com</strong> / <strong>1234</strong><br><small style="font-size:11px;margin-top:4px;display:block;">Altere nas ⚙️ Configurações após entrar.</small></div>
     <div id="login-error" class="alert alert-red" style="display:none">❌ Email ou senha incorretos</div>
@@ -193,7 +201,7 @@ select option{background:var(--bg3);}
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 <div id="app" style="display:none">
   <nav class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><h2>🧠 NeuroPsi</h2><p id="sidebar-user-name">Profissional</p></div>
+    <div class="sidebar-logo"><img class="sidebar-logo-img" src="logo.png" alt="Logo" onerror="this.style.display='none'"/><div class="sidebar-logo-text"><h2>Neuropsi</h2><p>Consultório</p></div></div>
     <div class="nav">
       <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard"><span class="ico">📊</span> Dashboard</button>
       <button class="nav-item" onclick="navigate('clients')" data-page="clients"><span class="ico">👥</span> Clientes</button>
@@ -744,7 +752,9 @@ function renderSessions(){
     var sessions=byClient[clientId];
     var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
     var faltaCount=sessions.filter(function(s){return s.status==='falta';}).length;
-    var rows='';
+    var completedRows='';
+    var activeRows='';
+    var collapsedUid='cl_'+clientId.replace(/[^a-z0-9]/gi,'_');
     sessions.forEach(function(s){
       var sb=statusBadge(s.status);
       var pkgSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date);});
@@ -756,20 +766,28 @@ function renderSessions(){
       var needsIndividualPay=isStandalone||isPerSession;
       var payStatus='pending';
       if(needsIndividualPay){
-        // Standalone or per-session: use session's own payment status
         payStatus=s.sessionPayStatus||'pending';
       } else if(pkg){
-        // Package payment: mirror from package
         payStatus=pkg.paymentStatus||'pending';
       }
       var payBadge=payStatus==='paid'?'badge-green':payStatus==='parcela1'?'badge-parcial':'badge-yellow';
       var payLabel=payStatus==='paid'?'💰 Pago':payStatus==='parcela1'?'🔶 1ª Parcela':'⏳ Pendente';
       var paidCell=needsIndividualPay?
-        '<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">'+payLabel+'</span></td>':
-        '<td><span class="badge '+payBadge+'">'+payLabel+'</span></td>';
-      rows+='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
+        '<td><span class=\"badge '+payBadge+'\" style=\"cursor:pointer\" onclick=\"window.cycleSessionPay(\\''+s.id+'\\',this)\">'+payLabel+'</span></td>':
+        '<td><span class=\"badge '+payBadge+'\">'+payLabel+'</span></td>';
+      var rowHtml='<tr><td><strong style=\"color:var(--text2);font-size:13px\">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class=\"td-muted\">'+(s.time||'—')+'</td><td><span class=\"badge '+catBadgeClass(s.category)+'\">'+catLabelShort(s.category)+'</span></td><td class=\"td-muted\">'+pkgName(s.packageId)+'</td><td><div style=\"position:relative;display:inline-block\"><span class=\"badge '+sb[0]+'\" style=\"cursor:pointer\" onclick=\"quickStatusMenu(\\''+s.id+'\\',this)\">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style=\"display:flex;gap:4px\"><button class=\"btn-icon\" onclick=\"showSessionEditForm(\\''+s.id+'\\')\">✏️</button><button class=\"btn-icon\" onclick=\"deleteSessionConfirm(\\''+s.id+'\\')\">🗑️</button></div></td></tr>';
+      if(s.status==='realizada'||s.status==='completed'||s.status==='falta'){
+        completedRows+=rowHtml;
+      } else {
+        activeRows+=rowHtml;
+      }
     });
-    html+='<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(clientName(clientId))+'</div><div><div style="font-weight:700;font-size:15px">'+clientName(clientId)+'</div><div style="font-size:12px;color:var(--text2);margin-top:2px">'+sessions.length+' sessão'+(sessions.length!==1?'ões:':':')+' <span style="color:var(--green)">'+completedCount+' realizada'+(completedCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div><div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+clientId+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+clientId+'\')">Ver perfil →</button></div></div><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    var collapsibleSection='';
+    if(completedRows){
+      collapsibleSection='<tr id=\"toggle-row-'+collapsedUid+'\" style=\"cursor:pointer;background:rgba(255,255,255,0.02)\" onclick=\"(function(){var b=document.getElementById(\\'body-'+collapsedUid+'\\');var a=document.getElementById(\\'arrow-'+collapsedUid+'\\');var hidden=b.style.display===\\'none\\';b.style.display=hidden?\\'\\':'none';a.textContent=hidden?'▼':'▶';})()\" ><td colspan=\"8\" style=\"padding:8px 16px;font-size:12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border)\"><span id=\"arrow-'+collapsedUid+'\" style=\"margin-right:6px;font-size:10px\">▶</span>'+completedCount+' sessão'+(completedCount!==1?'ões realizadas':'  realizada')+(faltaCount>0?' · '+faltaCount+' falta'+(faltaCount!==1?'s':''):'')+'   — clique para expandir</td></tr>'+'<tbody id=\"body-'+collapsedUid+'\" style=\"display:none\">'+completedRows+'</tbody>';
+    }
+    html+='<div class=\"card\" style=\"margin-bottom:16px\"><div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)\"><div style=\"display:flex;align-items:center;gap:12px\"><div style=\"width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px\">'+getInitials(clientName(clientId))+'</div><div><div style=\"font-weight:700;font-size:15px\">'+clientName(clientId)+'</div><div style=\"font-size:12px;color:var(--text2);margin-top:2px\">+(sessions.length===1?'1 sessão:':sessions.length+' sessões:')+' <span style=\"color:var(--green)\">'+completedCount+' realizada'+(completedCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style=\"color:var(--red)\">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div><div style=\"display:flex;gap:8px\"><button class=\"btn btn-ghost btn-sm\" onclick=\"showProntuario(\\''+clientId+'\\')\">📋 Prontuário</button><button class=\"btn btn-ghost btn-sm\" onclick=\"showClientDetail(\\''+clientId+'\\')\">Ver perfil →</button></div></div><div class=\"table-wrap\"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+collapsibleSection+activeRows+'</tbody></table></div></div>';
+  });
   });
   html+='</div>';
   document.getElementById('page-content').innerHTML=html;
