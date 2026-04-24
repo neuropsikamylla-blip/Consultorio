@@ -293,8 +293,14 @@ async function loadFromSupabase(){
 
 // ── CRUD ──
 async function dbAddClient(data){const row=Object.assign({id:genId(),created_at:new Date().toISOString()},data);await supaFetch('POST','clients',row);await loadFromSupabase();return row;}
-async function dbUpdateClient(id,data){await supaFetch('PATCH','clients',data,'?id=eq.'+id);await loadFromSupabase();}
-async function dbDeleteClient(id){await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();}
+async function dbUpdateClient(id,data){
+  await supaFetch('PATCH','clients',data,'?id=eq.'+id);
+  if(_cache){var idx=_cache.clients.findIndex(function(c){return c.id===id;});if(idx>=0)_cache.clients[idx]=Object.assign(_cache.clients[idx],data);}
+}
+async function dbDeleteClient(id){
+  await supaFetch('DELETE','clients',null,'?id=eq.'+id);
+  if(_cache){_cache.clients=_cache.clients.filter(function(c){return c.id!==id;});_cache.packages=_cache.packages.filter(function(p){return p.clientId!==id;});_cache.sessions=_cache.sessions.filter(function(s){return s.clientId!==id;});}
+}
 
 async function dbUpdatePackage(id,data){
   var row={};
@@ -308,14 +314,20 @@ async function dbUpdatePackage(id,data){
   if(data.paymentDate2!==undefined)row.payment_date2=data.paymentDate2||null;
   if(data.paymentType!==undefined)row.payment_type=data.paymentType;
   await supaFetch('PATCH','packages',row,'?id=eq.'+id);
-  if(data.newTime){await supaFetch('PATCH','sessions',{time:data.newTime},'?package_id=eq.'+id+'&date=gte.'+today()+'&status=eq.agendada');}
-  await loadFromSupabase();
+  if(data.newTime){
+    await supaFetch('PATCH','sessions',{time:data.newTime},'?package_id=eq.'+id+'&date=gte.'+today()+'&status=eq.agendada');
+    if(_cache){_cache.sessions.forEach(function(s){if(s.packageId===id&&s.date>=today()&&s.status==='agendada')s.time=data.newTime;});}
+  }
+  if(_cache){var pidx=_cache.packages.findIndex(function(p){return p.id===id;});if(pidx>=0)_cache.packages[pidx]=Object.assign(_cache.packages[pidx],{name:row.name||_cache.packages[pidx].name,totalSessions:row.total_sessions||_cache.packages[pidx].totalSessions,price:row.price!==undefined?row.price:_cache.packages[pidx].price,paymentStatus:row.payment_status||_cache.packages[pidx].paymentStatus,notes:row.notes!==undefined?row.notes:_cache.packages[pidx].notes,paymentDate:row.payment_date!==undefined?row.payment_date:_cache.packages[pidx].paymentDate,paymentDate2:row.payment_date2!==undefined?row.payment_date2:_cache.packages[pidx].paymentDate2,paymentType:row.payment_type||_cache.packages[pidx].paymentType});}
 }
-async function dbDeletePackage(id){await supaFetch('DELETE','packages',null,'?id=eq.'+id);await loadFromSupabase();}
+async function dbDeletePackage(id){
+  await supaFetch('DELETE','packages',null,'?id=eq.'+id);
+  if(_cache){_cache.packages=_cache.packages.filter(function(p){return p.id!==id;});_cache.sessions=_cache.sessions.filter(function(s){return s.packageId!==id;});}
+}
 
 async function dbAddSession(data){
   var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||'agendada',category:data.category||'psicoterapia',notes:data.notes||null,interval_days:data.intervalDays||null,created_at:new Date().toISOString()};
-  await supaFetch('POST','sessions',row);await loadFromSupabase();return row;
+  await supaFetch('POST','sessions',row);if(_cache){_cache.sessions.push(Object.assign({},row,{clientId:row.client_id,packageId:row.package_id,intervalDays:row.interval_days,createdAt:row.created_at,sessionPaid:false,sessionPayStatus:'pending'}));}return row;
 }
 async function dbUpdateSession(id,data){
   var row={};
@@ -326,10 +338,17 @@ async function dbUpdateSession(id,data){
   if(data.category)row.category=data.category;
   if(data.sessionPaid!==undefined)row.session_paid=data.sessionPaid;
   if(data.sessionPayStatus!==undefined)row.session_pay_status=data.sessionPayStatus;
-  await supaFetch('PATCH','sessions',row,'?id=eq.'+id);await loadFromSupabase();
+  await supaFetch('PATCH','sessions',row,'?id=eq.'+id);
+  if(_cache){var sidx=_cache.sessions.findIndex(function(s){return s.id===id;});if(sidx>=0)_cache.sessions[sidx]=Object.assign(_cache.sessions[sidx],{date:row.date||_cache.sessions[sidx].date,time:row.time!==undefined?row.time:_cache.sessions[sidx].time,status:row.status||_cache.sessions[sidx].status,notes:row.notes!==undefined?row.notes:_cache.sessions[sidx].notes,category:row.category||_cache.sessions[sidx].category,sessionPaid:row.session_paid!==undefined?row.session_paid:_cache.sessions[sidx].sessionPaid,sessionPayStatus:row.session_pay_status||_cache.sessions[sidx].sessionPayStatus});}
 }
-async function dbDeleteSession(id){await supaFetch('DELETE','sessions',null,'?id=eq.'+id);await loadFromSupabase();}
-async function dbUpdateSessionsBatch(updates){await Promise.all(updates.map(function(u){return supaFetch('PATCH','sessions',u.data,'?id=eq.'+u.id);}));await loadFromSupabase();}
+async function dbDeleteSession(id){
+  await supaFetch('DELETE','sessions',null,'?id=eq.'+id);
+  if(_cache){_cache.sessions=_cache.sessions.filter(function(s){return s.id!==id;});}
+}
+async function dbUpdateSessionsBatch(updates){
+  await Promise.all(updates.map(function(u){return supaFetch('PATCH','sessions',u.data,'?id=eq.'+u.id);}));
+  if(_cache){updates.forEach(function(u){var sidx=_cache.sessions.findIndex(function(s){return s.id===u.id;});if(sidx>=0)_cache.sessions[sidx]=Object.assign(_cache.sessions[sidx],u.data);});}
+}
 
 // ── AUTH ──
 function doLogin(){
@@ -574,7 +593,7 @@ function deleteClientConfirm(id){
   var c=getDB().clients.find(function(c){return c.id===id;});
   showModal('Excluir Cliente','<div class="alert alert-red">⚠️ Excluir <strong>'+c.name+'</strong> e todos os seus dados?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){await deleteClientDo(\''+id+'\');})()">Excluir</button></div>');
 }
-async function deleteClientDo(id){closeModal();var db=getDB();db.clients.filter(function(c){return c.id===id;});await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();renderClients();showToast('🗑️ Cliente excluído');}
+async function deleteClientDo(id){closeModal();var db=getDB();db.clients.filter(function(c){return c.id===id;});await supaFetch('DELETE','clients',null,'?id=eq.'+id);if(_cache){_cache.clients=_cache.clients.filter(function(c){return c.id!==id;});_cache.packages=_cache.packages.filter(function(p){return p.clientId!==id;});_cache.sessions=_cache.sessions.filter(function(s){return s.clientId!==id;});}renderClients();showToast('🗑️ Cliente excluído');}
 
 function showClientDetail(id){
   var db=getDB();var c=db.clients.find(function(c){return c.id===id;});if(!c)return;
@@ -690,7 +709,12 @@ function showProntuario(clientId){
   });
   showModal('📋 Prontuário — '+(client?client.name:''),html,true);
 }
-window.saveProntuario=async function(pkgId){var notes=document.getElementById('pron-'+pkgId)?document.getElementById('pron-'+pkgId).value||'':'';await supaFetch('PATCH','packages',{notes:notes},'?id=eq.'+pkgId);await loadFromSupabase();showToast('✅ Prontuário salvo!');};
+window.saveProntuario=async function(pkgId){
+  var notes=document.getElementById('pron-'+pkgId)?document.getElementById('pron-'+pkgId).value||'':'';
+  await supaFetch('PATCH','packages',{notes:notes},'?id=eq.'+pkgId);
+  if(_cache){var pidx=_cache.packages.findIndex(function(p){return p.id===pkgId;});if(pidx>=0)_cache.packages[pidx].notes=notes;}
+  showToast('✅ Prontuário salvo!');
+};
 
 window.quickStatusMenu=function(sessionId,el){
   document.querySelectorAll('.quick-status-menu').forEach(function(m){m.remove();});
