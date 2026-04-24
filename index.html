@@ -201,6 +201,7 @@ select option{background:var(--bg3);}
       <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões</button>
       <button class="nav-item" onclick="navigate('agenda')" data-page="agenda"><span class="ico">🗓️</span> Agenda</button>
       <button class="nav-item" onclick="navigate('financial')" data-page="financial"><span class="ico">💰</span> Financeiro</button>
+      <button class="nav-item" onclick="navigate('bills')" data-page="bills"><span class="ico">📎</span> Boletos</button>
       <button class="nav-item" onclick="navigate('notes')" data-page="notes"><span class="ico">📝</span> Notas</button>
       <button class="nav-item" onclick="navigate('settings')" data-page="settings"><span class="ico">⚙️</span> Configurações</button>
     </div>
@@ -344,11 +345,11 @@ function navigate(page){
   var main=document.querySelector('.main');
   if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
   document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
-  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',notes:'Notas Importantes',settings:'Configurações'};
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações'};
   document.getElementById('page-title').textContent=titles[page]||page;
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('page-content').innerHTML='';
-  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,notes:renderNotes,settings:renderSettings};
+  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings};
   if(pages[page])pages[page]();
 }
 function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
@@ -449,6 +450,33 @@ function renderDashboard(){
   html+='</div>';
 
   if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
+  // Bills alert - load async
+  supaFetch('GET','bills',null,'?paid=eq.false&order=due_date').then(function(bills){
+    if(!bills||!bills.length)return;
+    var now=today();
+    var urgent=bills.filter(function(b){
+      var diff=Math.round((new Date(b.due_date+'T12:00:00')-new Date(now+'T12:00:00'))/(1000*60*60*24));
+      return diff<=3;
+    });
+    if(urgent.length>0){
+      var alertDiv=document.createElement('div');
+      alertDiv.className='alert alert-red';
+      alertDiv.style.marginBottom='20px';
+      alertDiv.style.cursor='pointer';
+      alertDiv.onclick=function(){navigate('bills');};
+      var labels=urgent.map(function(b){
+        var diff=Math.round((new Date(b.due_date+'T12:00:00')-new Date(now+'T12:00:00'))/(1000*60*60*24));
+        return b.description+(diff<0?' (vencido)':diff===0?' (hoje)':' ('+diff+'d)');
+      }).join(', ');
+      alertDiv.innerHTML='📎 <strong>'+urgent.length+' boleto'+(urgent.length!==1?'s':'')+' urgente'+(urgent.length!==1?'s':'')+' → clique para ver:</strong> '+labels;
+      var pageContent=document.getElementById('page-content');
+      if(pageContent){
+        var firstAlert=pageContent.querySelector('.alert');
+        if(firstAlert){firstAlert.parentNode.insertBefore(alertDiv,firstAlert);}
+        else{var page=pageContent.querySelector('.page');if(page)page.insertBefore(alertDiv,page.firstChild);}
+      }
+    }
+  }).catch(function(){});
 
   html+='<div class="grid-2">';
   html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>'+upcomingHtml+'</div>';
@@ -1027,6 +1055,181 @@ window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid
 window.markParcela1=async function(id){await dbUpdatePackage(id,{paymentStatus:'parcela1'});renderFinancial();showToast('🔶 1ª parcela registrada!');};
 window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido para pendente');};
 
+// ── BILLS ──
+var _billsCache=null;
+
+async function loadBills(){
+  var rows=await supaFetch('GET','bills',null,'?order=due_date&paid=eq.false');
+  var paid=await supaFetch('GET','bills',null,'?order=due_date.desc&paid=eq.true&limit=20');
+  _billsCache={pending:rows||[],paid:paid||[]};
+  return _billsCache;
+}
+
+function billStatusInfo(bill){
+  var now=today();
+  var due=bill.due_date;
+  var diff=Math.round((new Date(due+'T12:00:00')-new Date(now+'T12:00:00'))/(1000*60*60*24));
+  if(diff<0) return {cls:'badge-red',label:'⚠️ Vencido '+Math.abs(diff)+'d',urgent:true};
+  if(diff===0) return {cls:'badge-red',label:'🔴 Vence hoje',urgent:true};
+  if(diff<=3) return {cls:'badge-parcial',label:'🟡 Vence em '+diff+'d',urgent:true};
+  return {cls:'badge-yellow',label:'📅 Vence em '+diff+'d',urgent:false};
+}
+
+function renderBills(){
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showBillForm()">+ Novo Boleto</button>';
+  document.getElementById('page-content').innerHTML='<div class="page"><div style="text-align:center;padding:30px;color:var(--text2)">Carregando boletos...</div></div>';
+  loadBills().then(function(data){
+    var pending=data.pending;
+    var paid=data.paid;
+    var pendingRows='';
+    pending.forEach(function(b){
+      var si=billStatusInfo(b);
+      pendingRows+='<tr>'+
+        '<td><strong>'+b.description+'</strong></td>'+
+        '<td style="color:var(--yellow);font-weight:600">'+fmt(b.amount)+'</td>'+
+        '<td>'+fmtDate(b.due_date)+'</td>'+
+        '<td><span class="badge '+si.cls+'">'+si.label+'</span></td>'+
+        '<td><div style="display:flex;gap:6px">'+
+          (b.file_data?'<button class="btn-icon" onclick="viewBillFile(\''+b.id+'\')" title="Ver anexo">📄</button>':'')+
+          '<button class="btn-icon" onclick="showBillForm(\''+b.id+'\')" title="Editar">✏️</button>'+
+          '<button class="btn-icon" onclick="markBillPaid(\''+b.id+'\')" title="Marcar pago">✅</button>'+
+          '<button class="btn-icon" onclick="deleteBillConfirm(\''+b.id+'\')" title="Excluir">🗑️</button>'+
+        '</div></td></tr>';
+    });
+    var paidRows='';
+    paid.forEach(function(b){
+      paidRows+='<tr>'+
+        '<td><strong>'+b.description+'</strong></td>'+
+        '<td style="color:var(--green);font-weight:600">'+fmt(b.amount)+'</td>'+
+        '<td class="td-muted">'+fmtDate(b.due_date)+'</td>'+
+        '<td class="td-muted">'+(b.paid_date?fmtDate(b.paid_date):'—')+'</td>'+
+        '<td><div style="display:flex;gap:6px">'+
+          (b.file_data?'<button class="btn-icon" onclick="viewBillFile(\''+b.id+'\')" title="Ver comprovante">📄</button>':'')+
+          '<button class="btn-icon" onclick="deleteBillConfirm(\''+b.id+'\')" title="Excluir">🗑️</button>'+
+        '</div></td></tr>';
+    });
+    var html='<div class="page">';
+    // Stats
+    var totalPending=pending.reduce(function(a,b){return a+b.amount;},0);
+    var urgent=pending.filter(function(b){return billStatusInfo(b).urgent;});
+    html+='<div class="grid-3" style="margin-bottom:20px">';
+    html+='<div class="stat-card yellow"><div class="stat-icon">📎</div><div class="stat-val" style="font-size:22px">'+fmt(totalPending)+'</div><div class="stat-label">Total a pagar ('+pending.length+' boleto'+(pending.length!==1?'s':'')+')</div></div>';
+    html+='<div class="stat-card '+(urgent.length>0?'red':'')+'" style="'+(urgent.length>0?'border-color:rgba(240,96,96,0.3)':'')+'"><div class="stat-icon">⚠️</div><div class="stat-val" style="font-size:28px">'+urgent.length+'</div><div class="stat-label">Urgente'+(urgent.length!==1?'s':'')+' (vence em 3 dias)</div></div>';
+    html+='<div class="stat-card green"><div class="stat-icon">✅</div><div class="stat-val" style="font-size:28px">'+paid.length+'</div><div class="stat-label">Pagos recentemente</div></div>';
+    html+='</div>';
+    // Pending
+    html+='<div class="card" style="margin-bottom:20px">';
+    html+='<div class="section-header"><div class="section-title">📎 Boletos a Pagar</div></div>';
+    html+=pending.length===0?
+      '<div class="empty" style="padding:24px"><div class="empty-icon">🎉</div><p>Nenhum boleto pendente!</p></div>':
+      '<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+pendingRows+'</tbody></table></div>';
+    html+='</div>';
+    // Paid
+    if(paid.length>0){
+      html+='<div class="card">';
+      html+='<div class="section-header"><div class="section-title">✅ Pagos Recentemente</div></div>';
+      html+='<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Data Pgto</th><th>Ações</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>';
+      html+='</div>';
+    }
+    html+='</div>';
+    document.getElementById('page-content').innerHTML=html;
+  });
+}
+
+function showBillForm(id){
+  var title=id?'Editar Boleto':'Novo Boleto';
+  var body='<div id="bill-loading" style="text-align:center;padding:20px;color:var(--text2)">Carregando...</div>';
+  showModal(title,body);
+  var loadData=id?supaFetch('GET','bills',null,'?id=eq.'+id):Promise.resolve([{}]);
+  loadData.then(function(rows){
+    var b=rows&&rows[0]?rows[0]:{};
+    var formBody='';
+    formBody+='<div class="form-group"><label>Descrição *</label><input type="text" id="bl-desc" value="'+(b.description||'')+'" placeholder="Ex: Boleto Energia Elétrica"/></div>';
+    formBody+='<div class="form-row"><div class="form-group"><label>Valor (R$) *</label><input type="number" id="bl-amount" value="'+(b.amount||'')+'" min="0" step="0.01" placeholder="0,00"/></div><div class="form-group"><label>Data de Vencimento *</label><input type="date" id="bl-due" value="'+(b.due_date||today())+'"/></div></div>';
+    formBody+='<div class="form-group"><label>Anexo (PDF ou imagem)</label>';
+    formBody+='<input type="file" id="bl-file" accept=".pdf,image/*" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px;color:var(--text);font-size:13px"/>';
+    if(b.file_name)formBody+='<div style="font-size:12px;color:var(--green);margin-top:6px">📄 Anexo atual: '+b.file_name+'</div>';
+    formBody+='</div>';
+    formBody+='<div id="bl-error" class="alert alert-red" style="display:none"></div>';
+    formBody+='<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="bl-save-btn">Salvar</button></div>';
+    var modal=document.getElementById('modal-container');
+    if(modal){
+      var body2=modal.querySelector('.modal-body');
+      if(body2)body2.innerHTML=formBody;
+    }
+    var saveBtn=document.getElementById('bl-save-btn');
+    if(saveBtn)saveBtn.onclick=function(){saveBill(id||null,b);};
+  });
+}
+
+async function saveBill(id, existing){
+  var desc=document.getElementById('bl-desc').value.trim();
+  var amount=parseFloat(document.getElementById('bl-amount').value);
+  var due=document.getElementById('bl-due').value;
+  var fileInput=document.getElementById('bl-file');
+  var err=document.getElementById('bl-error');
+  if(!desc||!due||isNaN(amount)){err.textContent='Preencha todos os campos obrigatórios';err.style.display='flex';return;}
+  var fileData=existing?existing.file_data:null;
+  var fileName=existing?existing.file_name:null;
+  var fileType=existing?existing.file_type:null;
+  if(fileInput&&fileInput.files&&fileInput.files[0]){
+    var file=fileInput.files[0];
+    if(file.size>2*1024*1024){err.textContent='Arquivo muito grande. Máximo 2MB.';err.style.display='flex';return;}
+    fileName=file.name;
+    fileType=file.type;
+    fileData=await new Promise(function(res){
+      var r=new FileReader();
+      r.onload=function(e){res(e.target.result.split(',')[1]);};
+      r.readAsDataURL(file);
+    });
+  }
+  closeModal();
+  showToast('⏳ Salvando boleto...');
+  var row={description:desc,amount:amount,due_date:due,file_data:fileData,file_name:fileName,file_type:fileType};
+  if(id){
+    await supaFetch('PATCH','bills',row,'?id=eq.'+id);
+  } else {
+    row.id=genId();row.paid=false;row.created_at=new Date().toISOString();
+    await supaFetch('POST','bills',row);
+  }
+  showToast('✅ Boleto salvo!');
+  renderBills();
+}
+
+window.markBillPaid=async function(id){
+  var paidDate=window.prompt('Data do pagamento (AAAA-MM-DD, deixe vazio para hoje):','');
+  var d=paidDate&&paidDate.length===10?paidDate:today();
+  await supaFetch('PATCH','bills',{paid:true,paid_date:d},'?id=eq.'+id);
+  showToast('✅ Boleto marcado como pago!');
+  renderBills();
+};
+
+window.viewBillFile=async function(id){
+  var rows=await supaFetch('GET','bills',null,'?id=eq.'+id);
+  if(!rows||!rows[0]||!rows[0].file_data){showToast('Nenhum arquivo anexado',true);return;}
+  var b=rows[0];
+  var mtype=b.file_type||'application/octet-stream';
+  var url='data:'+mtype+';base64,'+b.file_data;
+  if(mtype==='application/pdf'){
+    var win=window.open();
+    win.document.write('<iframe src="'+url+'" width="100%" height="100%" style="border:none"></iframe>');
+  } else {
+    var win2=window.open();
+    win2.document.write('<img src="'+url+'" style="max-width:100%;"/>');
+  }
+};
+
+function deleteBillConfirm(id){
+  window._deleteBillId=id;
+  showModal('Excluir Boleto','<p style="color:var(--text2);margin-bottom:20px">Tem certeza que deseja excluir este boleto?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._confirmDeleteBill()">Excluir</button></div>');
+}
+window._confirmDeleteBill=async function(){
+  closeModal();
+  await supaFetch('DELETE','bills',null,'?id=eq.'+window._deleteBillId);
+  showToast('🗑️ Boleto excluído');
+  renderBills();
+};
+
 // ── NOTES ──
 function renderNotes(){
   document.getElementById('topbar-actions').innerHTML='';
@@ -1129,12 +1332,13 @@ function saveSettings(){
   document.getElementById('st-current').value='';document.getElementById('st-new').value='';document.getElementById('st-confirm').value='';
 }
 
-;
-;
-function resetAllData(){
-  showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){if(document.getElementById(\'reset-confirm\').value!==\'APAGAR\'){showToast(\'Digite APAGAR para confirmar\',true);return;}closeModal();await supaFetch(\'DELETE\',\'sessions\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'packages\',null,\'?id=neq.none\');await supaFetch(\'DELETE\',\'clients\',null,\'?id=neq.none\');await loadFromSupabase();navigate(\'dashboard\');showToast(\'Dados apagados\');})()">Apagar Tudo</button></div>');
-}
 
+
+
+function resetAllData(){
+  window._doReset=async function(){if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}closeModal();await supaFetch('DELETE','sessions',null,'?id=neq.none');await supaFetch('DELETE','packages',null,'?id=neq.none');await supaFetch('DELETE','clients',null,'?id=neq.none');await loadFromSupabase();navigate('dashboard');showToast('Dados apagados');};
+  showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._doReset()">Apagar Tudo</button></div>');
+}
 // ── AUTO LOGIN ──
 if(localStorage.getItem(AUTH_KEY)){
   document.getElementById('login-screen').style.display='none';
