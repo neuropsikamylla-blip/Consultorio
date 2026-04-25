@@ -770,7 +770,7 @@ function renderSessions(){
       var rowHtml='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
       if(s.status==='realizada'||s.status==='completed'||s.status==='falta'){doneRows+=rowHtml;}else{rows+=rowHtml;}
     });
-    var doneRowsFalta=faltaCount>0?' ('+faltaCount+' falta'+(faltaCount!==1?'s':'')+')':\'\'; var collapseId='col-sess-'+clientId;
+    var doneRowsFalta=faltaCount>0?' ('+faltaCount+' falta'+(faltaCount!==1?'s':'')+')':""; var collapseId='col-sess-'+clientId;
     html+='<div class="card" style="margin-bottom:16px">';
     // Header
     html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">';
