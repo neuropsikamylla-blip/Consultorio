@@ -197,8 +197,8 @@ select option{background:var(--bg3);}
     <div class="nav">
       <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard"><span class="ico">📊</span> Dashboard</button>
       <button class="nav-item" onclick="navigate('clients')" data-page="clients"><span class="ico">👥</span> Clientes</button>
-      <button class="nav-item" onclick="navigate('packages')" data-page="packages"><span class="ico">📦</span> Pacotes</button>
-      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões</button>
+      <button class="nav-item" onclick="navigate('anexos')" data-page="anexos"><span class="ico">📁</span> Anexos</button>
+      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões/Pacotes</button>
       <button class="nav-item" onclick="navigate('agenda')" data-page="agenda"><span class="ico">🗓️</span> Agenda</button>
       <button class="nav-item" onclick="navigate('financial')" data-page="financial"><span class="ico">💰</span> Financeiro</button>
       <button class="nav-item" onclick="navigate('bills')" data-page="bills"><span class="ico">📎</span> Boletos</button>
@@ -345,11 +345,11 @@ function navigate(page){
   var main=document.querySelector('.main');
   if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
   document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
-  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações'};
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões/Pacotes',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações'};
   document.getElementById('page-title').textContent=titles[page]||page;
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('page-content').innerHTML='';
-  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings};
+  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,anexos:renderAnexos,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings};
   if(pages[page])pages[page]();
 }
 function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
@@ -1290,6 +1290,141 @@ function renderNotes(){
   }).catch(function(){
     buildUI(localStorage.getItem('dashboard_notes')||'');
   });
+}
+
+
+// ── ANEXOS ──
+function renderAnexos(){
+  var db=getDB();
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showAnexoForm()">+ Novo Anexo</button>';
+
+  function buildAnexosUI(docs){
+    // Group by client
+    var byClient={};
+    docs.forEach(function(d){
+      var cid=d.client_id||'sem_cliente';
+      if(!byClient[cid])byClient[cid]=[];
+      byClient[cid].push(d);
+    });
+
+    var clientIds=Object.keys(byClient).sort(function(a,b){
+      return (a==='sem_cliente'?'zzz':clientName(a)).localeCompare(b==='sem_cliente'?'zzz':clientName(b));
+    });
+
+    if(docs.length===0){
+      document.getElementById('page-content').innerHTML='<div class="page"><div class="card"><div class="empty"><div class="empty-icon">📁</div><p>Nenhum anexo cadastrado</p><small>Clique em "+ Novo Anexo" para adicionar documentos</small></div></div></div>';
+      return;
+    }
+
+    var html='<div class="page">';
+    clientIds.forEach(function(cid){
+      var items=byClient[cid];
+      var name=cid==='sem_cliente'?'Sem cliente':clientName(cid);
+      var rows='';
+      items.sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
+      items.forEach(function(d){
+        var ext=(d.filename||'').split('.').pop().toLowerCase();
+        var ico=ext==='pdf'?'📄':ext==='doc'||ext==='docx'?'📝':ext==='xls'||ext==='xlsx'?'📊':ext==='jpg'||ext==='jpeg'||ext==='png'?'🖼️':'📎';
+        var fmtSize=d.size_bytes?'('+Math.round(d.size_bytes/1024)+'KB)':'';
+        var dateStr=d.created_at?fmtDate(d.created_at.slice(0,10)):'—';
+        rows+='<tr>';
+        rows+='<td><span style="font-size:18px">'+ico+'</span></td>';
+        rows+='<td><strong>'+d.filename+'</strong> <span style="color:var(--text3);font-size:11px">'+fmtSize+'</span>';
+        if(d.description)'<br><span style="font-size:12px;color:var(--text2)">'+d.description+'</span>';
+        if(d.description)rows+='<br><span style="font-size:12px;color:var(--text2)">'+d.description+'</span>';
+        rows+='</td>';
+        rows+='<td class="td-muted">'+dateStr+'</td>';
+        rows+='<td>';
+        if(d.url){rows+='<a href="'+d.url+'" target="_blank" class="btn btn-ghost btn-sm" style="margin-right:4px">⬇️ Abrir</a>';}
+        rows+='<button class="btn-icon" onclick="deleteAnexoConfirm(\''+d.id+'\')">🗑️</button>';
+        rows+='</td></tr>';
+      });
+      html+='<div class="card" style="margin-bottom:16px">';
+      html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">';
+      html+='<div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(name)+'</div>';
+      html+='<div><div style="font-weight:700;font-size:15px">'+name+'</div>';
+      html+='<div style="font-size:12px;color:var(--text2)">'+items.length+' documento'+(items.length!==1?'s':'')+'</div></div></div>';
+      html+='<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Arquivo</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+      html+='</div>';
+    });
+    html+='</div>';
+    document.getElementById('page-content').innerHTML=html;
+  }
+
+  // Load from Supabase
+  document.getElementById('page-content').innerHTML='<div class="page"><div class="card"><div class="empty"><div class="empty-icon">⏳</div><p>Carregando...</p></div></div></div>';
+  fetch(SUPA_URL+'/rest/v1/documents?order=created_at.desc',{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  }).then(function(r){return r.json();}).then(function(docs){
+    buildAnexosUI(Array.isArray(docs)?docs:[]);
+  }).catch(function(){
+    buildAnexosUI([]);
+  });
+}
+
+function deleteAnexoConfirm(id){
+  showModal('Excluir Anexo','<div class="alert alert-red">⚠️ Tem certeza que deseja excluir este documento?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await fetch(SUPA_URL+\'/rest/v1/documents?id=eq.\'+\''+id+'\',{method:\'DELETE\',headers:{\'apikey\':SUPA_KEY,\'Authorization\':\'Bearer \'+SUPA_KEY}});renderAnexos();showToast(\'🗑️ Anexo excluído\');})()" >Excluir</button></div>');
+}
+
+function showAnexoForm(){
+  var db=getDB();
+  var clientOpts='<option value="">— Sem cliente —</option>'+db.clients.map(function(c){return '<option value="'+c.id+'">'+c.name+'</option>';}).join('');
+  showModal('Novo Anexo',
+    '<div class="form-group"><label>Cliente</label><select id="ax-client">'+clientOpts+'</select></div>'+
+    '<div class="form-group"><label>Descrição (opcional)</label><input type="text" id="ax-desc" placeholder="Ex: Relatório de avaliação, Termo de consentimento..."/></div>'+
+    '<div class="form-group"><label>Arquivo</label><input type="file" id="ax-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt" style="color:var(--text);background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px;width:100%;box-sizing:border-box;"/></div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-bottom:16px">Formatos aceitos: PDF, Word, Excel, imagens. Máx. 10MB.</p>'+
+    '<div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="submitAnexo()">📎 Anexar</button></div>',
+    true
+  );
+}
+
+async function submitAnexo(){
+  var fileInput=document.getElementById('ax-file');
+  var clientId=document.getElementById('ax-client').value||null;
+  var desc=document.getElementById('ax-desc').value.trim();
+  var file=fileInput&&fileInput.files[0];
+
+  if(!file){showToast('❌ Selecione um arquivo.',true);return;}
+  if(file.size>10*1024*1024){showToast('❌ Arquivo maior que 10MB.',true);return;}
+
+  showToast('⏳ Enviando...');
+
+  try{
+    // Upload to Supabase Storage bucket 'documents'
+    var path=(clientId||'geral')+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    var uploadRes=await fetch(SUPA_URL+'/storage/v1/object/documents/'+path,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type,'x-upsert':'true'},
+      body:file
+    });
+
+    var publicUrl=SUPA_URL+'/storage/v1/object/public/documents/'+path;
+    var ok=uploadRes.ok||uploadRes.status===200||uploadRes.status===201;
+
+    // Save metadata to documents table
+    var meta={
+      id:genId(),
+      client_id:clientId||null,
+      filename:file.name,
+      description:desc||null,
+      url:ok?publicUrl:null,
+      size_bytes:file.size,
+      created_at:new Date().toISOString()
+    };
+
+    await fetch(SUPA_URL+'/rest/v1/documents',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(meta)
+    });
+
+    closeModal();
+    showToast('✅ Documento anexado!');
+    renderAnexos();
+  }catch(e){
+    showToast('⚠️ Erro ao enviar. Verifique o bucket "documents" no Supabase.',true);
+  }
 }
 
 // ── SETTINGS ──
