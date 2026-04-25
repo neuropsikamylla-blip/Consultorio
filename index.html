@@ -188,6 +188,7 @@ select option{background:var(--bg3);}
     <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com"/></div>
     <div class="form-group"><label>Senha</label><input type="password" id="login-pass" placeholder="••••••••"/></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="doLogin()">Entrar →</button>
+    <div style="text-align:center;margin-top:14px"><button onclick="(function(){if(confirm('Redefinir acesso para o padrão?')){localStorage.removeItem('consultorio_creds');localStorage.removeItem('consultorio_auth');alert('Acesso redefinido! Use: neuropsi.kamylla@gmail.com / 1234');location.reload();}})()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit">Esqueci meu acesso</button></div>
   </div>
 </div>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -237,7 +238,19 @@ function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return day+'/'
 function fmtDateTime(d,t){return t?fmtDate(d)+' às '+t:fmtDate(d);}
 function getInitials(name){if(!name)return'?';return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();}
 
-function getCreds(){const raw=localStorage.getItem(CREDS_KEY);if(raw)return JSON.parse(raw);return{email:'neuropsi.kamylla@gmail.com',password:'1234',name:'Profissional'};}
+function getCreds(){
+  const raw=localStorage.getItem(CREDS_KEY);
+  if(raw){
+    const parsed=JSON.parse(raw);
+    // Migrate: if stored email is old default, clear and use new default
+    if(parsed.email==='admin@admin.com'){
+      localStorage.removeItem(CREDS_KEY);
+      return{email:'neuropsi.kamylla@gmail.com',password:'1234',name:'Profissional'};
+    }
+    return parsed;
+  }
+  return{email:'neuropsi.kamylla@gmail.com',password:'1234',name:'Profissional'};
+}
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
 function getDB(){return _cache||{clients:[],packages:[],sessions:[]};}
 
