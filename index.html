@@ -1450,30 +1450,42 @@ function showAnexoForm(){
   );
 }
 
+var _submitingAnexo=false;
 async function submitAnexo(){
+  if(_submitingAnexo)return;
+  _submitingAnexo=true;
+
   var fileInput=document.getElementById('ax-file');
   var clientId=document.getElementById('ax-client').value||null;
   var desc=document.getElementById('ax-desc').value.trim();
   var file=fileInput&&fileInput.files[0];
 
-  if(!file){showToast('❌ Selecione um arquivo.',true);return;}
-  if(file.size>10*1024*1024){showToast('❌ Arquivo maior que 10MB.',true);return;}
+  if(!file){showToast('❌ Selecione um arquivo.',true);_submitingAnexo=false;return;}
+  if(file.size>10*1024*1024){showToast('❌ Arquivo maior que 10MB.',true);_submitingAnexo=false;return;}
 
-  showToast('⏳ Enviando...');
+  // Fechar modal imediatamente e mostrar progresso
+  closeModal();
+  showToast('⏳ Enviando arquivo...');
 
   try{
-    // Upload to Supabase Storage bucket 'documents'
+    // Detectar MIME type correto
+    var mimeType=file.type;
+    if(!mimeType||mimeType==='application/octet-stream'){
+      var ext=file.name.split('.').pop().toLowerCase();
+      var mimeMap={'pdf':'application/pdf','doc':'application/msword','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','xls':'application/vnd.ms-excel','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','txt':'text/plain'};
+      mimeType=mimeMap[ext]||'application/octet-stream';
+    }
+
     var path=(clientId||'geral')+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     var uploadRes=await fetch(SUPA_URL+'/storage/v1/object/documents/'+path,{
       method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type,'x-upsert':'true'},
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':mimeType,'x-upsert':'true','Cache-Control':'3600'},
       body:file
     });
 
     var publicUrl=SUPA_URL+'/storage/v1/object/public/documents/'+path;
     var ok=uploadRes.ok||uploadRes.status===200||uploadRes.status===201;
 
-    // Save metadata to documents table
     var meta={
       id:genId(),
       client_id:clientId||null,
@@ -1490,11 +1502,12 @@ async function submitAnexo(){
       body:JSON.stringify(meta)
     });
 
-    closeModal();
     showToast('✅ Documento anexado!');
     renderAnexos();
   }catch(e){
     showToast('⚠️ Erro ao enviar. Verifique o bucket "documents" no Supabase.',true);
+  }finally{
+    _submitingAnexo=false;
   }
 }
 
