@@ -1330,19 +1330,37 @@ function renderNotes(){
     if(btn)btn.onclick=function(){saveNotes(ta.value);};
   }
 
-  // Try to load from Supabase using fixed ID 'note_admin'
+  // Carrega localStorage imediatamente (sem esperar Supabase)
+  var localContent=localStorage.getItem('dashboard_notes')||'';
+  buildUI(localContent);
+
+  // Depois tenta sincronizar com Supabase
   fetch(SUPA_URL+'/rest/v1/notes?id=eq.note_admin',{
     headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
   }).then(function(r){return r.json();}).then(function(rows){
     if(rows&&rows.length>0){
       _noteId='note_admin';
-      buildUI(rows[0].content||'');
-    } else {
-      buildUI(localStorage.getItem('dashboard_notes')||'');
+      var ta=document.querySelector('#notes-container textarea');
+      if(ta&&rows[0].content){
+        ta.value=rows[0].content;
+        localStorage.setItem('dashboard_notes',rows[0].content);
+      }
     }
-  }).catch(function(){
-    buildUI(localStorage.getItem('dashboard_notes')||'');
-  });
+  }).catch(function(){});
+
+  // Auto-save enquanto digita (debounce 2s)
+  setTimeout(function(){
+    var ta=document.querySelector('#notes-container textarea');
+    if(ta){
+      var _debounce=null;
+      ta.addEventListener('input',function(){
+        var status=document.getElementById('notes-status');
+        if(status)status.textContent='✏️ Digitando...';
+        clearTimeout(_debounce);
+        _debounce=setTimeout(function(){saveNotes(ta.value);},2000);
+      });
+    }
+  },300);
 }
 
 
@@ -1388,7 +1406,7 @@ function renderAnexos(){
         rows+='</td>';
         rows+='<td class="td-muted">'+dateStr+'</td>';
         rows+='<td>';
-        if(d.url){rows+='<a href="'+d.url+'" target="_blank" class="btn btn-ghost btn-sm" style="margin-right:4px">⬇️ Abrir</a>';}
+        if(d.url){rows+='<a href="'+d.url+'" download="'+d.filename+'" class="btn btn-ghost btn-sm" style="margin-right:4px">⬇️ Baixar</a>';}
         rows+='<button class="btn-icon" onclick="deleteAnexoConfirm(\''+d.id+'\')">🗑️</button>';
         rows+='</td></tr>';
       });
