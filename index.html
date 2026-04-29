@@ -6,6 +6,7 @@
 <title>NeuroPsi</title>
 <style>
 :root{--bg:#0f1117;--bg2:#181c27;--bg3:#1e2333;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#9099b0;--text3:#5a6278;--green:#34d98a;--green-bg:rgba(52,217,138,0.10);--green-bg2:rgba(52,217,138,0.18);--red:#f06060;--red-bg:rgba(240,96,96,0.12);--yellow:#f5c842;--yellow-bg:rgba(245,200,66,0.12);--blue:#60a5fa;--blue-bg:rgba(96,165,250,0.12);--purple:#a78bfa;--purple-bg:rgba(167,139,250,0.12);--radius:14px;--radius-sm:9px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
+body.light-mode{--bg:#f0f4f8;--bg2:#ffffff;--bg3:#e8edf3;--border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.15);--text:#1a2035;--text2:#4a5568;--text3:#8a94a6;--green:#1db873;--green-bg:rgba(29,184,115,0.10);--green-bg2:rgba(29,184,115,0.18);--red:#e05252;--red-bg:rgba(224,82,82,0.10);--yellow:#d4a017;--yellow-bg:rgba(212,160,23,0.10);--blue:#3b82f6;--blue-bg:rgba(59,130,246,0.10);--purple:#7c3aed;--purple-bg:rgba(124,58,237,0.10);--shadow:0 4px 24px rgba(0,0,0,0.10);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
 h1,h2,h3,h4{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;letter-spacing:-0.02em;font-weight:600;}
@@ -216,7 +217,7 @@ select option{background:var(--bg3);}
     <div class="topbar">
       <button class="hamburger" onclick="openSidebar()">☰</button>
       <div class="page-title" id="page-title">Dashboard</div>
-      <div id="topbar-actions"></div>
+      <div style="display:flex;align-items:center;gap:8px"><div id="topbar-actions"></div><button id="theme-toggle" onclick="toggleTheme()" title="Alternar tema" style="background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:5px 10px;cursor:pointer;font-size:14px;color:var(--text2);display:flex;align-items:center;gap:5px;transition:all 0.2s">🌙</button></div>
     </div>
     <div id="page-content"></div>
   </main>
@@ -1558,6 +1559,25 @@ function resetAllData(){
   window._doReset=async function(){if(document.getElementById('reset-confirm').value!=='APAGAR'){showToast('Digite APAGAR para confirmar',true);return;}closeModal();await supaFetch('DELETE','sessions',null,'?id=neq.none');await supaFetch('DELETE','packages',null,'?id=neq.none');await supaFetch('DELETE','clients',null,'?id=neq.none');await loadFromSupabase();navigate('dashboard');showToast('Dados apagados');};
   showModal('Apagar Todos os Dados','<div class="alert alert-red">Isso apaga todos os clientes, pacotes e sessões.</div><p style="color:var(--text2);font-size:13px;margin:14px 0">Digite <strong style="color:var(--red)">APAGAR</strong> para confirmar:</p><input type="text" id="reset-confirm" placeholder="APAGAR"/><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="window._doReset()">Apagar Tudo</button></div>');
 }
+
+function toggleTheme(){
+  var isLight=document.body.classList.toggle('light-mode');
+  localStorage.setItem('neuropsi_theme', isLight?'light':'dark');
+  document.getElementById('theme-toggle').textContent=isLight?'☀️':'🌙';
+}
+// Apply saved theme on load
+(function(){
+  var saved=localStorage.getItem('neuropsi_theme');
+  if(saved==='light'){
+    document.body.classList.add('light-mode');
+    // Set icon after DOM ready
+    document.addEventListener('DOMContentLoaded',function(){
+      var btn=document.getElementById('theme-toggle');
+      if(btn)btn.textContent='☀️';
+    });
+  }
+})();
+
 // ── AUTO LOGIN ──
 (async function(){
   var stored=localStorage.getItem(AUTH_KEY);
