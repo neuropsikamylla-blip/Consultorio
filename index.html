@@ -1049,11 +1049,15 @@ function renderFinancial(){
   var nowDate=today();
   var currentMonth=nowDate.slice(0,7); // 'YYYY-MM'
 
-  // Helper: get the relevant date for a package — paymentDate first, then first session, then createdAt
+  // Helper: get the relevant month for a package
+  // Paid/parcela1 sem paymentDate → createdAt (quando entrou no sistema)
+  // Pending sem paymentDate → primeira sessão (quando o pagamento é esperado)
   function pkgMonth(p){
     if(p.paymentDate)return p.paymentDate.slice(0,7);
-    var firstSess=db.sessions.filter(function(s){return s.packageId===p.id;}).sort(function(a,b){return a.date.localeCompare(b.date);})[0];
-    if(firstSess)return firstSess.date.slice(0,7);
+    if(p.paymentStatus==='pending'){
+      var firstSess=db.sessions.filter(function(s){return s.packageId===p.id;}).sort(function(a,b){return a.date.localeCompare(b.date);})[0];
+      if(firstSess)return firstSess.date.slice(0,7);
+    }
     return p.createdAt?p.createdAt.split('T')[0].slice(0,7):'';
   }
 
