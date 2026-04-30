@@ -725,8 +725,21 @@ window.quickStatusMenu=function(sessionId,el){
     item.onmouseenter=function(){item.style.background='var(--bg3)';};item.onmouseleave=function(){item.style.background='';};
     item.onclick=async function(){
       menu.remove();
-      if(opt.value==='falta'&&!window.confirm('Confirmar falta para esta sessão?'))return;
-      await dbUpdateSession(sessionId,{status:opt.value});renderSessions();
+      if(opt.value==='falta'&&!window.confirm('Confirmar falta para esta sessão?\n\nFalta sem aviso = sessão cobrada e marcada como realizada no financeiro.'))return;
+      // Falta = cobrado (marcar como pago se for sessão avulsa ou por sessão)
+      var updateData={status:opt.value};
+      if(opt.value==='falta'){
+        var db=getDB();
+        var s=db.sessions.find(function(x){return x.id===sessionId;});
+        var pkg=s&&db.packages.find(function(p){return p.id===s.packageId;});
+        var isPerSession=pkg&&pkg.paymentType==='sessao';
+        var isStandalone=s&&!s.packageId;
+        if(isPerSession||isStandalone){
+          updateData.sessionPaid=true;
+          updateData.sessionPayStatus='paid';
+        }
+      }
+      await dbUpdateSession(sessionId,updateData);renderSessions();
       showToast(opt.value==='realizada'?'✅ Sessão realizada!':opt.value==='falta'?'❌ Falta registrada':'📅 Agendada');
     };
     menu.appendChild(item);
@@ -1020,12 +1033,30 @@ function renderFinancial(){
 
   // Revenue by month (all history)
   var revenueByMonth={};
-  db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
-    var d=p.paymentDate||(p.createdAt?p.createdAt.split('T')[0]:null);
+  // Pacotes pagos — usa paymentDate (data em que recebeu, não data de criação)
+  db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao';}).forEach(function(p){
+    var d=p.paymentDate;
     if(d){var mon=d.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
   });
+  // Parcelados — 1ª parcela no paymentDate, 2ª em paymentDate2
   db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).forEach(function(p){
     if(p.paymentDate){var mon=p.paymentDate.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price/2;}
+  });
+  // Por sessão e avulsas — conta cada sessão paga (ou falta) no mês da sessão
+  db.sessions.filter(function(s){return s.sessionPayStatus==='paid'||(s.status==='falta');}).forEach(function(s){
+    var d=s.date;
+    if(d){
+      var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+      var isPerSession=pkg&&pkg.paymentType==='sessao';
+      var isStandalone=!s.packageId;
+      if(isPerSession||isStandalone){
+        var mon=d.slice(0,7);
+        if(!revenueByMonth[mon])revenueByMonth[mon]=0;
+        // Valor por sessão = preço do pacote / total de sessões (ou preço avulso)
+        var val=isPerSession&&pkg?pkg.price/pkg.totalSessions:0;
+        revenueByMonth[mon]+=val;
+      }
+    }
   });
   var sortedMonths=Object.keys(revenueByMonth).sort().reverse();
   var monthRows='';
