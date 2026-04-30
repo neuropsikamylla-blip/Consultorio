@@ -255,10 +255,19 @@ function getCreds(){
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
 function getDB(){return _cache||{clients:[],packages:[],sessions:[]};}
 
+function getAuthToken(){
+  try{
+    var stored=localStorage.getItem(AUTH_KEY);
+    if(stored){var auth=JSON.parse(stored);if(auth&&auth.access_token)return auth.access_token;}
+  }catch(e){}
+  return SUPA_KEY;
+}
 async function supaFetch(method,table,body,query){
   const url=SUPA_URL+'/rest/v1/'+table+(query||'');
-  const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'};
+  const token=getAuthToken();
+  const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'};
   if(method==='POST'||method==='PATCH')headers['Prefer']='return=representation';
+  if(method==='DELETE')headers['Prefer']='return=minimal';
   const opts={method:method,headers:headers};
   if(body!=null)opts.body=JSON.stringify(body);
   try{
@@ -710,7 +719,19 @@ async function savePackage(id){
 }
 
 async function cyclePayment(id){var db=getDB();var pkg=db.packages.find(function(p){return p.id===id;});var cycle={pending:'parcela1',parcela1:'paid',paid:'pending'};var newStatus=cycle[pkg.paymentStatus]||'parcela1';await dbUpdatePackage(id,{paymentStatus:newStatus});renderPackages();showToast('✅ '+paymentLabel(newStatus));}
-function deletePackageConfirm(id){var p=getDB().packages.find(function(p){return p.id===id;});showModal('Excluir Pacote','<div class="alert alert-red">⚠️ Excluir <strong>'+p.name+'</strong> e todas as sessões?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeletePackage(\''+id+'\');renderPackages();showToast(\'🗑️ Pacote excluído\');})()">Excluir</button></div>');}
+function deletePackageConfirm(id){
+  var p=getDB().packages.find(function(pkg){return pkg.id===id;});
+  var sessCount=getDB().sessions.filter(function(s){return s.packageId===id;}).length;
+  showModal('Excluir Pacote',
+    '<div class="alert alert-red" style="margin-bottom:14px">⚠️ Excluir pacote <strong>'+p.name+'</strong>?</div>'+
+    '<p style="color:var(--text2);font-size:13px;margin-bottom:18px">'+sessCount+' sessão(ões) vinculada(s).</p>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button class="btn btn-danger" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');await dbDeletePackage(\''+id+'\');closeSidebar();renderPackages();showToast(\'🗑️ Pacote e sessões excluídos!\');})()" >🗑️ Excluir pacote + '+sessCount+' sessão(ões)</button>'+
+    '<button class="btn btn-secondary" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');await fetch(SUPA_URL+\'/rest/v1/packages?id=eq.'+id+'\',{method:\'DELETE\',headers:{\'apikey\':SUPA_KEY,\'Authorization\':\'Bearer \'+getAuthToken(),\'Prefer\':\'return=minimal\'}});_cache=null;await loadFromSupabase();closeSidebar();renderPackages();showToast(\'🗑️ Pacote excluído (sessões mantidas)!\');})()" >📋 Excluir só o pacote</button>'+
+    '<button class="btn btn-ghost" style="width:100%" onclick="closeModal()">Cancelar</button>'+
+    '</div>'
+  );
+}
 
 // ── SESSIONS ──
 function showProntuario(clientId){
