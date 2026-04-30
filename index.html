@@ -313,7 +313,15 @@ async function dbUpdatePackage(id,data){
   if(data.newTime){await supaFetch('PATCH','sessions',{time:data.newTime},'?package_id=eq.'+id+'&date=gte.'+today()+'&status=eq.agendada');}
   await loadFromSupabase();
 }
-async function dbDeletePackage(id){await supaFetch('DELETE','packages',null,'?id=eq.'+id);await loadFromSupabase();}
+async function dbDeletePackage(id){
+  // Deletar sessões vinculadas primeiro
+  await supaFetch('DELETE','sessions',null,'?package_id=eq.'+id);
+  // Depois deletar o pacote
+  await supaFetch('DELETE','packages',null,'?id=eq.'+id);
+  // Forçar reset do cache antes de recarregar
+  _cache=null;
+  await loadFromSupabase();
+}
 
 async function dbAddSession(data){
   var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||'agendada',category:data.category||'psicoterapia',notes:data.notes||null,interval_days:data.intervalDays||null,created_at:new Date().toISOString()};
@@ -330,7 +338,11 @@ async function dbUpdateSession(id,data){
   if(data.sessionPayStatus!==undefined)row.session_pay_status=data.sessionPayStatus;
   await supaFetch('PATCH','sessions',row,'?id=eq.'+id);await loadFromSupabase();
 }
-async function dbDeleteSession(id){await supaFetch('DELETE','sessions',null,'?id=eq.'+id);await loadFromSupabase();}
+async function dbDeleteSession(id){
+  await supaFetch('DELETE','sessions',null,'?id=eq.'+id);
+  _cache=null;
+  await loadFromSupabase();
+}
 async function dbUpdateSessionsBatch(updates){await Promise.all(updates.map(function(u){return supaFetch('PATCH','sessions',u.data,'?id=eq.'+u.id);}));await loadFromSupabase();}
 
 // ── AUTH ──
@@ -398,7 +410,7 @@ function catColor(cat){if(!cat||cat==='psicoterapia')return'var(--blue)';if(cat=
 function catBadgeClass(cat){if(!cat||cat==='psicoterapia')return'badge-psico';if(cat==='reabilitacao')return'badge-reab';if(cat==='avaliacao')return'badge-aval';return'badge-blue';}
 function catLabelShort(cat){if(!cat||cat==='psicoterapia')return'Psicoterapia';if(cat==='reabilitacao')return'Reabilitação';if(cat==='avaliacao')return'Avaliação';return cat||'—';}
 function statusBadge(s){if(s==='realizada'||s==='completed')return['badge-realizada','✅ Realizada'];if(s==='falta')return['badge-falta','❌ Falta'];return['badge-agendada','📅 Agendada'];}
-function pkgStats(pkg){var db=getDB();var used=db.sessions.filter(function(s){return s.packageId===pkg.id&&(s.status==='realizada'||s.status==='completed'||s.status==='falta');}).length;var total=db.sessions.filter(function(s){return s.packageId===pkg.id;}).length;return{used:used,remaining:pkg.totalSessions-used,totalRegistered:total,isExhausted:(pkg.totalSessions-used)<=0,canAdd:total<pkg.totalSessions,pct:Math.round((used/pkg.totalSessions)*100)};}
+function pkgStats(pkg){var db=getDB();var used=db.sessions.filter(function(s){return s.packageId===pkg.id&&(s.status==='realizada'||s.status==='completed'||s.status==='falta'||s.status==='falta');}).length;var total=db.sessions.filter(function(s){return s.packageId===pkg.id;}).length;return{used:used,remaining:pkg.totalSessions-used,totalRegistered:total,isExhausted:(pkg.totalSessions-used)<=0,canAdd:total<pkg.totalSessions,pct:Math.round((used/pkg.totalSessions)*100)};}
 function clientName(id){var c=getDB().clients.find(function(c){return c.id===id;});return c?c.name:'—';}
 function pkgName(id){var p=getDB().packages.find(function(p){return p.id===id;});return p?p.name:'—';}
 
@@ -444,7 +456,7 @@ function renderDashboard(){
     return;
   }
   var totalClients=db.clients.length;
-  var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+  var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
   var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var now=today();
@@ -537,7 +549,7 @@ function renderClients(){closeSidebar();
     var rows='';
     filtered.forEach(function(c){
       var pkgs=db.packages.filter(function(p){return p.clientId===c.id;});
-      var done=db.sessions.filter(function(s){return s.clientId===c.id&&(s.status==='realizada'||s.status==='completed');}).length;
+      var done=db.sessions.filter(function(s){return s.clientId===c.id&&(s.status==='realizada'||s.status==='completed'||s.status==='falta');}).length;
       var age='';if(c.birthDate){var bd=new Date(c.birthDate+'T12:00:00');var now2=new Date();age=' · '+(now2.getFullYear()-bd.getFullYear()-(now2<new Date(now2.getFullYear(),bd.getMonth(),bd.getDate())?1:0))+' anos';}
     rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0">'+getInitials(c.name)+'</div><div><div style="font-weight:600">'+c.name+'</div>'+(c.email?'<div style="font-size:12px;color:var(--text2)">'+c.email+age+'</div>':'<div style="font-size:12px;color:var(--text2)">'+age.replace(' · ','')+'</div>')+'</div></div></td><td class="td-muted">'+(c.phone||'—')+'</td><td><span class="badge badge-blue">'+pkgs.length+' pacote'+(pkgs.length!==1?'s':'')+'</span></td><td><span class="badge badge-green">'+done+' realizada'+(done!==1?'s':'')+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showClientDetail(\''+c.id+'\')">👁️</button><button class="btn-icon" onclick="showSessionForm(\''+c.id+'\')">📝</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></td></tr>';
     });
@@ -710,7 +722,7 @@ function showProntuario(clientId){
     var sessionsInPkg=db.sessions.filter(function(s){return s.packageId===pkg.id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
     var firstDate=sessionsInPkg.length>0?sessionsInPkg[0].date:null;
     var lastDate=sessionsInPkg.length>0?sessionsInPkg[sessionsInPkg.length-1].date:null;
-    var done=sessionsInPkg.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+    var done=sessionsInPkg.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
     var pkgLabel=pkg.name+(firstDate?' ('+fmtDate(firstDate)+(lastDate&&lastDate!==firstDate?' – '+fmtDate(lastDate):'')+')':'');
     html+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div><div style="font-weight:700;font-size:14px">'+pkgLabel+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">'+done+'/'+pkg.totalSessions+' sessões · '+fmt(pkg.price)+' · <span class="badge '+paymentBadgeClass(pkg.paymentStatus)+'">'+paymentLabel(pkg.paymentStatus,pkg.paymentType)+'</span></div></div></div><textarea id="pron-'+pkg.id+'" rows="5" placeholder="Anotações clínicas..." style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);font-size:13.5px;font-family:inherit;outline:none;resize:vertical;line-height:1.6">'+( pkg.notes||'')+'</textarea><div style="text-align:right;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="saveProntuario(\''+pkg.id+'\')">💾 Salvar</button></div></div>';
   });
@@ -793,7 +805,7 @@ function renderSessions(){closeSidebar();
   var html='<div class="page">';
   clientIds.forEach(function(clientId){
     var sessions=byClient[clientId];
-    var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+    var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta'||s.status==='falta';}).length;
     var faltaCount=sessions.filter(function(s){return s.status==='falta';}).length;
     var rows='';var doneRows='';
     sessions.forEach(function(s){
@@ -819,7 +831,7 @@ function renderSessions(){closeSidebar();
         '<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">'+payLabel+'</span></td>':
         '<td><span class="badge '+payBadge+'">'+payLabel+'</span></td>';
       var rowHtml='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
-      if(s.status==='realizada'||s.status==='completed'||s.status==='falta'){doneRows+=rowHtml;}else{rows+=rowHtml;}
+      if(s.status==='realizada'||s.status==='completed'||s.status==='falta'||s.status==='falta'){doneRows+=rowHtml;}else{rows+=rowHtml;}
     });
     var doneRowsFalta=faltaCount>0?' ('+faltaCount+' falta'+(faltaCount!==1?'s':'')+')':""; var collapseId='col-sess-'+clientId;
     html+='<div class="card" style="margin-bottom:16px">';
@@ -900,7 +912,7 @@ function showSessionEditForm(id){
   var futureSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date;}).length;
   var body='<div class="form-group"><label>Categoria</label><select id="se-cat"><option value="psicoterapia" '+(( s.category||'psicoterapia')==='psicoterapia'?'selected':'')+'>🔵 Psicoterapia</option><option value="reabilitacao" '+(s.category==='reabilitacao'?'selected':'')+'>🟣 Reabilitação</option><option value="avaliacao" '+(s.category==='avaliacao'?'selected':'')+'>🟢 Avaliação</option></select></div>';
   body+='<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="se-date" value="'+s.date+'"/></div><div class="form-group"><label>Horário</label><input type="time" id="se-time" value="'+(s.time||'09:00')+'"/></div></div>';
-  body+='<div class="form-group"><label>Status</label><select id="se-status"><option value="agendada" '+((s.status==='agendada'||s.status==='pending')?'selected':'')+'>📅 Agendada</option><option value="realizada" '+((s.status==='realizada'||s.status==='completed')?'selected':'')+'>✅ Realizada</option><option value="falta" '+(s.status==='falta'?'selected':'')+'>❌ Falta</option></select></div>';
+  body+='<div class="form-group"><label>Status</label><select id="se-status"><option value="agendada" '+((s.status==='agendada'||s.status==='pending')?'selected':'')+'>📅 Agendada</option><option value="realizada" '+((s.status==='realizada'||s.status==='completed'||s.status==='falta')?'selected':'')+'>✅ Realizada</option><option value="falta" '+(s.status==='falta'?'selected':'')+'>❌ Falta</option></select></div>';
   body+='<div class="form-group"><label>Notas</label><textarea id="se-notes">'+(s.notes||'')+'</textarea></div>';
   if(futureSessions>0){body+='<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer;font-weight:500"><input type="checkbox" id="se-propagate" style="width:auto;flex-shrink:0"/> Propagar data/hora para as '+futureSessions+' sessão(ões) futuras</label></div>';}
   body+='<div id="se-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="(async function(){await saveSessionEdit(\''+id+'\');})()">Salvar</button></div>';
