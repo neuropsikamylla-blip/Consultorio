@@ -670,17 +670,19 @@ async function savePackage(id){
   var interval=document.getElementById('pf-interval')?parseInt(document.getElementById('pf-interval').value)||7:7;
   var category=document.getElementById('pf-category')?document.getElementById('pf-category').value||'psicoterapia':'psicoterapia';
   var finalStatus=paymentType==='sessao'?'paid':paymentStatus;
-  closeModal();
   if(id){
     var db=getDB();var st=pkgStats(db.packages.find(function(p){return p.id===id;}));
     if(totalSessions<st.used){showToast('Não pode reduzir abaixo das já realizadas',true);return;}
     var editTime=document.getElementById('pf-edit-time')?document.getElementById('pf-edit-time').value:null;
     var propagateTime=document.getElementById('pf-propagate-time')?document.getElementById('pf-propagate-time').checked:false;
     var pkgNotes=document.getElementById('pf-pkg-notes')?document.getElementById('pf-pkg-notes').value||'':'';
+    closeModal();
     await dbUpdatePackage(id,{clientId:clientId,name:name,totalSessions:totalSessions,price:price,paymentStatus:finalStatus,notes:pkgNotes,paymentDate:paymentDate,paymentDate2:paymentDate2,paymentType:paymentType,newTime:propagateTime&&editTime?editTime:null});
     showToast(propagateTime?'✅ Pacote e horários atualizados!':'✅ Pacote atualizado!');
     renderPackages();return;
   }
+  // Fechar modal ANTES de começar o processo e mostrar toast de progresso
+  closeModal();
   showToast('⏳ Criando pacote e sessões...');
   var pkgId=genId();
   var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
