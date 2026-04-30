@@ -448,7 +448,7 @@ function loadBackupFile(e){
       if(!data.clients||!data.packages||!data.sessions)throw new Error();
       showToast('⏳ Restaurando...');
       for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()});}
-      for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',created_at:p.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',payment_type:p.paymentType||'pacote',payment_date:p.paymentDate||null,payment_date2:p.paymentDate2||null,created_at:p.createdAt||new Date().toISOString()});}
       for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString()});}
       await loadFromSupabase();navigate(currentPage);showToast('✅ Backup restaurado!');
     }catch(err){console.error(err);showToast('❌ Arquivo inválido',true);}
@@ -466,7 +466,7 @@ function renderDashboard(){
   }
   var totalClients=db.clients.length;
   var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
-  var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
+  var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao';}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0);
   var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending';}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).reduce(function(a,p){return a+p.price/2;},0);
   var now=today();
   var in7=new Date();in7.setDate(in7.getDate()+7);
@@ -1049,29 +1049,31 @@ function renderFinancial(){
   var nowDate=today();
   var currentMonth=nowDate.slice(0,7); // 'YYYY-MM'
 
-  // Helper: get the relevant date for a package (payment date or created date)
+  // Helper: get the relevant date for a package — paymentDate first, then first session, then createdAt
   function pkgMonth(p){
-    var d=p.paymentDate||(p.createdAt?p.createdAt.split('T')[0]:null);
-    return d?d.slice(0,7):'';
+    if(p.paymentDate)return p.paymentDate.slice(0,7);
+    var firstSess=db.sessions.filter(function(s){return s.packageId===p.id;}).sort(function(a,b){return a.date.localeCompare(b.date);})[0];
+    if(firstSess)return firstSess.date.slice(0,7);
+    return p.createdAt?p.createdAt.split('T')[0].slice(0,7):'';
   }
 
-  // Current month packages only - for top cards
-  var paidNow=db.packages.filter(function(p){return p.paymentStatus==='paid'&&pkgMonth(p)===currentMonth;});
+  // Current month packages only - for top cards (sessao-type excluded from paidNow — counted per session below)
+  var paidNow=db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&pkgMonth(p)===currentMonth;});
   var parcela1Now=db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&pkgMonth(p)===currentMonth;});
   var pendingNow=db.packages.filter(function(p){return p.paymentStatus==='pending'&&pkgMonth(p)===currentMonth;});
-  // Also include parcela1 from any month that still has 2nd installment pending
-  var parcela1Any=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
 
   var paidRev=paidNow.reduce(function(a,p){return a+p.price;},0);
+  // Sessão-a-sessão: soma apenas sessões efetivamente pagas/falta neste mês
+  paidRev+=db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0);
   var parcela1Rev=parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
   var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
 
   // Revenue by month (all history)
   var revenueByMonth={};
-  // Pacotes pagos — usa paymentDate (data em que recebeu, não data de criação)
+  // Pacotes pagos — usa pkgMonth para consistência com os cards do topo
   db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao';}).forEach(function(p){
-    var d=p.paymentDate;
-    if(d){var mon=d.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
+    var mon=pkgMonth(p);
+    if(mon){if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
   });
   // Parcelados — 1ª parcela no paymentDate, 2ª em paymentDate2
   db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).forEach(function(p){
