@@ -267,7 +267,7 @@ async function supaFetch(method,table,body,query){
   const token=getAuthToken();
   const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'};
   if(method==='POST'||method==='PATCH')headers['Prefer']='return=representation';
-  if(method==='DELETE')headers['Prefer']='return=minimal';
+  if(method==='DELETE')headers['Prefer']='return=representation';
   const opts={method:method,headers:headers};
   if(body!=null)opts.body=JSON.stringify(body);
   try{
@@ -323,11 +323,9 @@ async function dbUpdatePackage(id,data){
   await loadFromSupabase();
 }
 async function dbDeletePackage(id){
-  // Deletar sessões vinculadas primeiro
   await supaFetch('DELETE','sessions',null,'?package_id=eq.'+id);
-  // Depois deletar o pacote
-  await supaFetch('DELETE','packages',null,'?id=eq.'+id);
-  // Forçar reset do cache antes de recarregar
+  var deleted=await supaFetch('DELETE','packages',null,'?id=eq.'+id);
+  if(!deleted||deleted.length===0){throw new Error('Sem permissão para excluir. Verifique as configurações do banco.');}
   _cache=null;
   await loadFromSupabase();
 }
@@ -671,7 +669,12 @@ function showPackageForm(clientId,pkgId){
   body+='<div id="pf-error" class="alert alert-red" style="display:none"></div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="window._savePkg()">Salvar</button></div>';
   showModal(pkgId?'Editar Pacote':'Novo Pacote',body);
   var _pkgId=pkgId||'';
-  window._savePkg=async function(){await savePackage(_pkgId);};
+  var _pkgSaving=false;
+  window._savePkg=async function(){
+    if(_pkgSaving)return;
+    _pkgSaving=true;
+    try{await savePackage(_pkgId);}finally{_pkgSaving=false;}
+  };
 }
 
 async function savePackage(id){
@@ -701,21 +704,23 @@ async function savePackage(id){
     closeModal();
     await dbUpdatePackage(id,{clientId:clientId,name:name,totalSessions:totalSessions,price:price,paymentStatus:finalStatus,notes:pkgNotes,paymentDate:paymentDate,paymentDate2:paymentDate2,paymentType:paymentType,newTime:propagateTime&&editTime?editTime:null});
     showToast(propagateTime?'✅ Pacote e horários atualizados!':'✅ Pacote atualizado!');
-    closeSidebar();renderPackages();return;
+    navigate('packages');return;
   }
   // Fechar modal ANTES de começar o processo e mostrar toast de progresso
   closeModal();
   showToast('⏳ Criando pacote e sessões...');
   var pkgId=genId();
-  var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
+  var authTok=getAuthToken();
+  var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+authTok,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
   if(!pkgRes.ok){showToast('❌ Erro ao criar pacote.',true);return;}
   var successCount=0;
   for(var i=0;i<totalSessions;i++){
     var d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+(i*interval));
-    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
+    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+authTok,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
     if(sessRes.ok)successCount++;
   }
-  await loadFromSupabase();closeSidebar();renderPackages();
+  await loadFromSupabase();
+  navigate('packages');
   showToast(successCount===totalSessions?'✅ Pacote criado com '+totalSessions+' sessões!':'⚠️ '+successCount+'/'+totalSessions+' sessões criadas.',successCount!==totalSessions);
 }
 
@@ -727,8 +732,8 @@ function deletePackageConfirm(id){
     '<div class="alert alert-red" style="margin-bottom:14px">⚠️ Excluir pacote <strong>'+p.name+'</strong>?</div>'+
     '<p style="color:var(--text2);font-size:13px;margin-bottom:18px">'+sessCount+' sessão(ões) vinculada(s).</p>'+
     '<div style="display:flex;flex-direction:column;gap:8px">'+
-    '<button class="btn btn-danger" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');await dbDeletePackage(\''+id+'\');closeSidebar();renderPackages();showToast(\'🗑️ Pacote e sessões excluídos!\');})()" >🗑️ Excluir pacote + '+sessCount+' sessão(ões)</button>'+
-    '<button class="btn btn-secondary" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');await fetch(SUPA_URL+\'/rest/v1/packages?id=eq.'+id+'\',{method:\'DELETE\',headers:{\'apikey\':SUPA_KEY,\'Authorization\':\'Bearer \'+getAuthToken(),\'Prefer\':\'return=minimal\'}});_cache=null;await loadFromSupabase();closeSidebar();renderPackages();showToast(\'🗑️ Pacote excluído (sessões mantidas)!\');})()" >📋 Excluir só o pacote</button>'+
+    '<button class="btn btn-danger" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');try{await dbDeletePackage(\''+id+'\');navigate(\'packages\');showToast(\'🗑️ Pacote e sessões excluídos!\');}catch(e){showToast(\'❌ \'+e.message,true);}})()">🗑️ Excluir pacote + '+sessCount+' sessão(ões)</button>'+
+    '<button class="btn btn-secondary" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');var r=await supaFetch(\'DELETE\',\'packages\',null,\'?id=eq.'+id+'\');if(!r||r.length===0){showToast(\'❌ Sem permissão para excluir.\',true);return;}_cache=null;await loadFromSupabase();navigate(\'packages\');showToast(\'🗑️ Pacote excluído (sessões mantidas)!\');})()">📋 Excluir só o pacote</button>'+
     '<button class="btn btn-ghost" style="width:100%" onclick="closeModal()">Cancelar</button>'+
     '</div>'
   );
