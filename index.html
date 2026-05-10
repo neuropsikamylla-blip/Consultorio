@@ -175,6 +175,7 @@ select option{background:var(--bg3);}
 <link rel="icon" type="image/png" href="icon.png">
 
 <link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="login-screen">
@@ -206,11 +207,14 @@ select option{background:var(--bg3);}
       <button class="nav-item" onclick="navigate('bills')" data-page="bills"><span class="ico">📎</span> Boletos</button>
       <button class="nav-item" onclick="navigate('notes')" data-page="notes"><span class="ico">📝</span> Notas</button>
       <button class="nav-item" onclick="navigate('settings')" data-page="settings"><span class="ico">⚙️</span> Configurações</button>
+      <button class="nav-item" onclick="navigate('anamnese')" data-page="anamnese"><span class="ico">🧠</span> Anamnese</button>
     </div>
     <div class="sidebar-footer">
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;" onclick="exportBackup()">⬇️ Backup</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;" onclick="importBackup()">⬆️ Restaurar</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;color:var(--red);" onclick="doLogout()">Sair</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;font-size:11px;opacity:0.6;" onclick="window.location.href=window.location.href.split('?')[0]+'?v='+Date.now()">🔄 Atualizar App</button>
+      <div style="text-align:center;font-size:10px;color:var(--text2);margin-top:6px;opacity:0.5">v20260509</div>
     </div>
   </nav>
   <main class="main">
@@ -295,7 +299,7 @@ async function loadFromSupabase(){
     _cache={
       clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
-      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending'});})
+      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending',sessionPrice:s.session_price||null});})
     };
   }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
   showLoadingOverlay(false);
@@ -331,7 +335,7 @@ async function dbDeletePackage(id){
 }
 
 async function dbAddSession(data){
-  var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||'agendada',category:data.category||'psicoterapia',notes:data.notes||null,interval_days:data.intervalDays||null,created_at:new Date().toISOString()};
+  var row={id:genId(),client_id:data.clientId,package_id:data.packageId,date:data.date,time:data.time||null,status:data.status||'agendada',category:data.category||'psicoterapia',notes:data.notes||null,interval_days:data.intervalDays||null,session_price:data.standalonePrice||null,session_pay_status:data.standalonePayStatus||null,created_at:new Date().toISOString()};
   await supaFetch('POST','sessions',row);await loadFromSupabase();return row;
 }
 async function dbUpdateSession(id,data){
@@ -384,7 +388,7 @@ async function doLogin(){
     document.getElementById('app').style.display='flex';
     document.getElementById('sidebar-user-name').textContent=email.split('@')[0];
     navigate('dashboard');
-    setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
+    setTimeout(function(){loadFromSupabase().then(function(){if(currentPage==='dashboard')renderDashboard();}).catch(function(){});},200);
   }catch(e){
     if(err){err.textContent='Erro de conexão. Tente novamente.';err.style.display='flex';}
     if(btn){btn.textContent='Entrar →';btn.disabled=false;}
@@ -396,15 +400,15 @@ document.getElementById('login-pass').addEventListener('keydown',function(e){if(
 // ── NAVIGATION ──
 var currentPage='dashboard';
 function navigate(page){
-  currentPage=page;closeSidebar();
+  closeModal();currentPage=page;closeSidebar();
   var main=document.querySelector('.main');
   if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
   document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
-  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões/Pacotes',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações'};
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões/Pacotes',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações',anamnese:'Anamnese Neuropsicológica'};
   document.getElementById('page-title').textContent=titles[page]||page;
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('page-content').innerHTML='';
-  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,anexos:renderAnexos,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings};
+  var pages={dashboard:renderDashboard,clients:renderClients,packages:renderPackages,sessions:renderSessions,anexos:renderAnexos,agenda:renderAgenda,financial:renderFinancial,bills:renderBills,notes:renderNotes,settings:renderSettings,anamnese:renderAnamnese};
   if(pages[page])pages[page]();
 }
 function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebar-overlay').classList.add('open');}
@@ -465,7 +469,9 @@ function loadBackupFile(e){
 }
 
 // ── DASHBOARD ──
+var _dashGen=0;
 function renderDashboard(){
+  var myGen=++_dashGen;
   var db=getDB();
   if(!db.clients.length&&!db.packages.length){
     document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados...</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar</button></div></div>';
@@ -476,8 +482,8 @@ function renderDashboard(){
   var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
   var curMon=today().slice(0,7);
   var hasSess=function(p){return db.sessions.some(function(s){return s.packageId===p.id;});};
-  var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0);
-  var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0);
+  var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0)+db.sessions.filter(function(s){return !s.packageId&&(s.sessionPayStatus==='paid'||s.status==='falta')&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
+  var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
   var now=today();
   var in7=new Date();in7.setDate(in7.getDate()+7);
   var in7s=in7.toISOString().split('T')[0];
@@ -519,6 +525,7 @@ function renderDashboard(){
   if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
   // Bills alert - load async
   supaFetch('GET','bills',null,'?paid=eq.false&order=due_date').then(function(bills){
+    if(myGen!==_dashGen)return;
     if(!bills||!bills.length)return;
     var now=today();
     var urgent=bills.filter(function(b){
@@ -526,7 +533,10 @@ function renderDashboard(){
       return diff<=3;
     });
     if(urgent.length>0){
+      var existing=document.getElementById('bills-urgent-alert');
+      if(existing)existing.remove();
       var alertDiv=document.createElement('div');
+      alertDiv.id='bills-urgent-alert';
       alertDiv.className='alert alert-red';
       alertDiv.style.marginBottom='20px';
       alertDiv.style.cursor='pointer';
@@ -537,7 +547,7 @@ function renderDashboard(){
       }).join(', ');
       alertDiv.innerHTML='📎 <strong>'+urgent.length+' boleto'+(urgent.length!==1?'s':'')+' urgente'+(urgent.length!==1?'s':'')+' → clique para ver:</strong> '+labels;
       var pageContent=document.getElementById('page-content');
-      if(pageContent){
+      if(pageContent&&currentPage==='dashboard'){
         var firstAlert=pageContent.querySelector('.alert');
         if(firstAlert){firstAlert.parentNode.insertBefore(alertDiv,firstAlert);}
         else{var page=pageContent.querySelector('.page');if(page)page.insertBefore(alertDiv,page.firstChild);}
@@ -629,7 +639,7 @@ function deleteClientConfirm(id){
   var c=getDB().clients.find(function(c){return c.id===id;});
   showModal('Excluir Cliente','<div class="alert alert-red">⚠️ Excluir <strong>'+c.name+'</strong> e todos os seus dados?</div><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){await deleteClientDo(\''+id+'\');})()">Excluir</button></div>');
 }
-async function deleteClientDo(id){closeModal();var db=getDB();db.clients.filter(function(c){return c.id===id;});await supaFetch('DELETE','clients',null,'?id=eq.'+id);await loadFromSupabase();renderClients();showToast('🗑️ Cliente excluído');}
+async function deleteClientDo(id){closeModal();await supaFetch('DELETE','sessions',null,'?client_id=eq.'+id);await supaFetch('DELETE','packages',null,'?client_id=eq.'+id);await supaFetch('DELETE','clients',null,'?id=eq.'+id);_cache=null;await loadFromSupabase();renderClients();showToast('🗑️ Cliente e dados excluídos');}
 
 function showClientDetail(id){
   var db=getDB();var c=db.clients.find(function(c){return c.id===id;});if(!c)return;
@@ -640,6 +650,7 @@ function showClientDetail(id){
   var sessHtml='<table style="width:100%;border-collapse:collapse"><thead><tr><th>Data</th><th>Hora</th><th>Categoria</th><th>Status</th><th></th></tr></thead><tbody>';
   sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<tr><td>'+fmtDate(s.date)+'</td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td><span class="badge '+sb[0]+'">'+sb[1]+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="(async function(){await dbDeleteSession(\''+s.id+'\');showToast(\'🗑️ Removida\');showClientDetail(\''+id+'\');})()">🗑️</button></div></td></tr>';});
   sessHtml+='</tbody></table>';
+  var ageStr='';if(c.birthDate){var _bd=new Date(c.birthDate+'T12:00:00');var _n2=new Date();ageStr=' ('+( _n2.getFullYear()-_bd.getFullYear()-(_n2<new Date(_n2.getFullYear(),_bd.getMonth(),_bd.getDate())?1:0))+' anos)';}
   var detailHeader='<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px"><div class="client-avatar">'+getInitials(c.name)+'</div><div>'+(c.phone?'<div style="font-size:13px;color:var(--text2)">📱 '+c.phone+'</div>':'')+(c.email?'<div style="font-size:13px;color:var(--text2)">✉️ '+c.email+'</div>':'')+(c.birthDate?'<div style="font-size:13px;color:var(--text2)">🎂 '+fmtDate(c.birthDate)+ageStr+'</div>':'')+(c.cpf?'<div style="font-size:13px;color:var(--text2)">🪪 '+c.cpf+'</div>':'')+(c.education?'<div style="font-size:13px;color:var(--text2)">🎓 '+c.education+'</div>':'')+(c.address?'<div style="font-size:13px;color:var(--text2)">📍 '+c.address+'</div>':'')+(c.notes?'<div style="font-size:12px;color:var(--text3);margin-top:4px">'+c.notes+'</div>':'')+'</div></div>';
   showModal('Cliente: '+c.name,detailHeader+'<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\');">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\');">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\');">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
 }
@@ -731,7 +742,7 @@ async function savePackage(id){
     closeModal();
     await dbUpdatePackage(id,{clientId:clientId,name:name,totalSessions:totalSessions,price:price,paymentStatus:finalStatus,notes:pkgNotes,paymentDate:paymentDate,paymentDate2:paymentDate2,paymentType:paymentType,newTime:propagateTime&&editTime?editTime:null});
     showToast(propagateTime?'✅ Pacote e horários atualizados!':'✅ Pacote atualizado!');
-    navigate('packages');return;
+    navigate('sessions');return;
   }
   // Fechar modal ANTES de começar o processo e mostrar toast de progresso
   closeModal();
@@ -747,7 +758,7 @@ async function savePackage(id){
     if(sessRes.ok)successCount++;
   }
   await loadFromSupabase();
-  navigate('packages');
+  navigate('sessions');
   showToast(successCount===totalSessions?'✅ Pacote criado com '+totalSessions+' sessões!':'⚠️ '+successCount+'/'+totalSessions+' sessões criadas.',successCount!==totalSessions);
 }
 
@@ -1010,7 +1021,7 @@ async function saveSession(){
       if(sRes.ok)sIds.push(i);
     }
     await loadFromSupabase();
-    navigate('packages');
+    navigate('sessions');
     showToast('✅ Pacote "'+pkgName2+'" criado com '+sIds.length+'/'+pkgSess+' sessões!',sIds.length!==pkgSess);
     return;
   }
@@ -1178,7 +1189,7 @@ function renderFinancial(){
         var mon=d.slice(0,7);
         if(!revenueByMonth[mon])revenueByMonth[mon]=0;
         // Valor por sessão = preço do pacote / total de sessões (ou preço avulso)
-        var val=isPerSession&&pkg?pkg.price/pkg.totalSessions:0;
+        var val=isPerSession&&pkg?pkg.price/pkg.totalSessions:(isStandalone?s.sessionPrice||0:0);
         revenueByMonth[mon]+=val;
       }
     }
@@ -1452,17 +1463,18 @@ function renderNotes(){
     if(status)status.textContent='Salvando...';
     try{
       var res;
+      var _nt=getAuthToken();
       if(_noteId){
         res=await fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+_noteId,{
           method:'PATCH',
-          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_nt,'Content-Type':'application/json','Prefer':'return=minimal'},
           body:JSON.stringify({content:content,updated_at:new Date().toISOString()})
         });
       } else {
         _noteId='note_admin';
         res=await fetch(SUPA_URL+'/rest/v1/notes',{
           method:'POST',
-          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_nt,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
           body:JSON.stringify({id:'note_admin',user_id:'admin',content:content,updated_at:new Date().toISOString()})
         });
       }
@@ -1493,7 +1505,7 @@ function renderNotes(){
 
   // Depois tenta sincronizar com Supabase
   fetch(SUPA_URL+'/rest/v1/notes?id=eq.note_admin',{
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+getAuthToken()}
   }).then(function(r){return r.json();}).then(function(rows){
     if(rows&&rows.length>0){
       _noteId='note_admin';
@@ -1746,7 +1758,7 @@ function toggleTheme(){
         document.getElementById('app').style.display='flex';
         document.getElementById('sidebar-user-name').textContent=auth.email.split('@')[0];
         navigate('dashboard');
-        setTimeout(function(){loadFromSupabase().then(function(){navigate('dashboard');}).catch(function(){});},200);
+        setTimeout(function(){loadFromSupabase().then(function(){if(currentPage==='dashboard')renderDashboard();}).catch(function(){});},200);
         return;
       }
     }catch(e){}
@@ -1754,6 +1766,391 @@ function toggleTheme(){
   }
   document.getElementById('login-screen').style.display='flex';
 })();
+
+// ===== ANAMNESE NEUROPSICOLÓGICA =====
+var _ANA_CLIENT=null,_ANA_FAIXA='c';
+var _ANA_SECS=[
+  {id:'enc',tit:'1. Motivo do Encaminhamento',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'O que motivou a avaliação?'},
+    {id:'2',lbl:'Quem solicitou a avaliação?'},
+    {id:'3',lbl:'Quais dificuldades são percebidas?'},
+    {id:'4',lbl:'Quando as dificuldades começaram?'},
+    {id:'5',lbl:'Em quais contextos aparecem?'},
+    {id:'6',lbl:'O problema é constante ou varia?'},
+  ]},
+  {id:'ges',tit:'2. Gestação e Nascimento',fx:['c','a'],campos:[
+    {id:'1',lbl:'A gravidez foi planejada?',t:'s'},
+    {id:'2',lbl:'Houve intercorrências na gestação?',t:'s'},
+    {id:'3',lbl:'Uso de álcool, drogas ou medicamentos na gestação?',t:'s'},
+    {id:'4',lbl:'Parto prematuro?',t:'s'},
+    {id:'5',lbl:'Sofrimento fetal?',t:'s'},
+    {id:'6',lbl:'Necessidade de UTI neonatal?',t:'s'},
+    {id:'7',lbl:'Observações adicionais sobre gestação/nascimento'},
+  ]},
+  {id:'dev',tit:'3. Desenvolvimento Neuropsicomotor',fx:['c','a'],campos:[
+    {id:'1',lbl:'Quando começou a sentar, engatinhar e andar?'},
+    {id:'2',lbl:'Houve atraso na fala?',t:'s'},
+    {id:'3',lbl:'Como foi o processo de desfralde?'},
+    {id:'4',lbl:'Há dificuldades motoras finas ou grossas?',t:'s'},
+    {id:'5',lbl:'Existiram regressões no desenvolvimento?',t:'s'},
+    {id:'6',lbl:'Detalhes sobre desenvolvimento neuropsicomotor'},
+  ]},
+  {id:'sau',tit:'4. Saúde Geral',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Histórico de convulsões, TCE ou meningite?',t:'s'},
+    {id:'2',lbl:'Problemas auditivos ou visuais?',t:'s'},
+    {id:'3',lbl:'Uso atual de medicamentos?',t:'s'},
+    {id:'4',lbl:'Qualidade do sono?'},
+    {id:'5',lbl:'Alimentação seletiva?',t:'s'},
+    {id:'6',lbl:'Outros aspectos de saúde relevantes'},
+  ]},
+  {id:'cog',tit:'5. Aspectos Cognitivos e Escolares',fx:['c','a'],campos:[
+    {id:'1',lbl:'Como está o aprendizado escolar?'},
+    {id:'2',lbl:'Dificuldades em leitura, escrita ou matemática?',t:'s'},
+    {id:'3',lbl:'Como é a atenção em sala de aula?'},
+    {id:'4',lbl:'Esquece tarefas?',t:'s'},
+    {id:'5',lbl:'Como é a organização escolar?'},
+    {id:'6',lbl:'Já repetiu de ano?',t:'s'},
+    {id:'7',lbl:'Recebe apoio pedagógico?',t:'s'},
+  ]},
+  {id:'com',tit:'6. Comportamento e Emoções',fx:['c','a'],campos:[
+    {id:'1',lbl:'Irritabilidade?',t:'s'},
+    {id:'2',lbl:'Crises emocionais?',t:'s'},
+    {id:'3',lbl:'Ansiedade?',t:'s'},
+    {id:'4',lbl:'Medos intensos?',t:'s'},
+    {id:'5',lbl:'Hiperatividade?',t:'s'},
+    {id:'6',lbl:'Impulsividade?',t:'s'},
+    {id:'7',lbl:'Rigidez comportamental?',t:'s'},
+    {id:'8',lbl:'Observações sobre comportamento e emoções'},
+  ]},
+  {id:'soc',tit:'7. Socialização',fx:['c','a'],campos:[
+    {id:'1',lbl:'Faz amizades com facilidade?',t:'s'},
+    {id:'2',lbl:'Brinca simbolicamente?',t:'s'},
+    {id:'3',lbl:'Entende regras sociais?',t:'s'},
+    {id:'4',lbl:'Prefere ficar sozinho?',t:'s'},
+    {id:'5',lbl:'Como reage a frustrações?'},
+  ]},
+  {id:'fam',tit:'8. Dinâmica Familiar',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Com quem mora?'},
+    {id:'2',lbl:'Como é a rotina familiar?'},
+    {id:'3',lbl:'Separações, lutos ou conflitos recentes?',t:'s'},
+    {id:'4',lbl:'Histórico familiar de TDAH?',t:'s'},
+    {id:'5',lbl:'Histórico familiar de TEA?',t:'s'},
+    {id:'6',lbl:'Histórico familiar de dificuldades de aprendizagem?',t:'s'},
+    {id:'7',lbl:'Histórico familiar de transtornos psiquiátricos?',t:'s'},
+    {id:'8',lbl:'Histórico familiar de deficiência intelectual?',t:'s'},
+    {id:'9',lbl:'Observações sobre dinâmica familiar'},
+  ]},
+  {id:'aca',tit:'9. Funcionamento Acadêmico',fx:['a'],campos:[
+    {id:'1',lbl:'Queda recente no rendimento escolar?',t:'s'},
+    {id:'2',lbl:'Dificuldade em planejamento?',t:'s'},
+    {id:'3',lbl:'Procrastinação?',t:'s'},
+    {id:'4',lbl:'Como é a organização dos estudos?'},
+    {id:'5',lbl:'Preparação para vestibular?'},
+  ]},
+  {id:'exe',tit:'10. Funções Executivas',fx:['a','d'],campos:[
+    {id:'1',lbl:'Consegue iniciar tarefas?',t:'s'},
+    {id:'2',lbl:'Mantém o foco?',t:'s'},
+    {id:'3',lbl:'Gerencia bem o tempo?',t:'s'},
+    {id:'4',lbl:'Perde objetos frequentemente?',t:'s'},
+    {id:'5',lbl:'Esquece compromissos?',t:'s'},
+    {id:'6',lbl:'Observações sobre funções executivas'},
+  ]},
+  {id:'emo',tit:'11. Aspectos Emocionais',fx:['a'],campos:[
+    {id:'1',lbl:'Sintomas depressivos?',t:'s'},
+    {id:'2',lbl:'Ansiedade social?',t:'s'},
+    {id:'3',lbl:'Oscilações de humor?',t:'s'},
+    {id:'4',lbl:'Automutilação?',t:'s'},
+    {id:'5',lbl:'Ideação suicida?',t:'s'},
+    {id:'6',lbl:'Baixa autoestima?',t:'s'},
+    {id:'7',lbl:'Observações emocionais'},
+  ]},
+  {id:'rel',tit:'12. Relações Sociais',fx:['a'],campos:[
+    {id:'1',lbl:'Sofre bullying?',t:'s'},
+    {id:'2',lbl:'Isolamento social?',t:'s'},
+    {id:'3',lbl:'Conflitos familiares significativos?',t:'s'},
+    {id:'4',lbl:'Como são os relacionamentos afetivos?'},
+  ]},
+  {id:'sub',tit:'13. Uso de Substâncias',fx:['a','d'],campos:[
+    {id:'1',lbl:'Álcool?',t:'s'},
+    {id:'2',lbl:'Vape?',t:'s'},
+    {id:'3',lbl:'Cannabis?',t:'s'},
+    {id:'4',lbl:'Outras drogas?',t:'s'},
+    {id:'5',lbl:'Comportamentos impulsivos de risco?',t:'s'},
+    {id:'6',lbl:'Detalhes sobre uso de substâncias'},
+  ]},
+  {id:'son',tit:'14. Sono e Rotina Digital',fx:['a','d'],campos:[
+    {id:'1',lbl:'Horário habitual de dormir e acordar?'},
+    {id:'2',lbl:'Tempo de tela diário?'},
+    {id:'3',lbl:'Uso excessivo de jogos?',t:'s'},
+    {id:'4',lbl:'Alterações de sono?',t:'s'},
+    {id:'5',lbl:'Observações sobre sono e tecnologia'},
+  ]},
+  {id:'qui',tit:'15. Queixa Principal e Impacto Funcional',fx:['d'],campos:[
+    {id:'1',lbl:'Quais dificuldades cognitivas percebe?'},
+    {id:'2',lbl:'Desde quando?'},
+    {id:'3',lbl:'Interfere no trabalho, estudos ou vida diária?',t:'s'},
+    {id:'4',lbl:'Houve piora progressiva?',t:'s'},
+    {id:'5',lbl:'Detalhes sobre a queixa principal'},
+  ]},
+  {id:'hip',tit:'16. Histórico Acadêmico e Profissional',fx:['d'],campos:[
+    {id:'1',lbl:'Como era o desempenho escolar?'},
+    {id:'2',lbl:'Dificuldades de atenção ou aprendizagem na infância?',t:'s'},
+    {id:'3',lbl:'Mudanças frequentes de emprego?',t:'s'},
+    {id:'4',lbl:'Dificuldade organizacional no trabalho?',t:'s'},
+    {id:'5',lbl:'Situação profissional atual'},
+  ]},
+  {id:'fco',tit:'17. Funções Cognitivas',fx:['d'],campos:[
+    {id:'1',lbl:'Atenção: distrai-se facilmente?',t:'s'},
+    {id:'2',lbl:'Atenção: consegue terminar tarefas?',t:'s'},
+    {id:'3',lbl:'Memória: esquece conversas recentes?',t:'s'},
+    {id:'4',lbl:'Memória: repete perguntas?',t:'s'},
+    {id:'5',lbl:'Memória: perde objetos frequentemente?',t:'s'},
+    {id:'6',lbl:'Linguagem: dificuldade para encontrar palavras?',t:'s'},
+    {id:'7',lbl:'Linguagem: troca nomes?',t:'s'},
+    {id:'8',lbl:'Linguagem: problemas de compreensão?',t:'s'},
+    {id:'9',lbl:'Planejamento, organização e tomada de decisão'},
+    {id:'10',lbl:'Observações gerais sobre funções cognitivas'},
+  ]},
+  {id:'sme',tit:'18. Saúde Mental',fx:['d'],campos:[
+    {id:'1',lbl:'Diagnósticos psiquiátricos prévios?',t:'s'},
+    {id:'2',lbl:'Tratamento psicológico atual ou anterior?',t:'s'},
+    {id:'3',lbl:'Uso de psicotrópicos?',t:'s'},
+    {id:'4',lbl:'Episódios depressivos?',t:'s'},
+    {id:'5',lbl:'Ansiedade?',t:'s'},
+    {id:'6',lbl:'Burnout?',t:'s'},
+    {id:'7',lbl:'Detalhes sobre saúde mental'},
+  ]},
+  {id:'neu',tit:'19. Histórico Médico e Neurológico',fx:['d'],campos:[
+    {id:'1',lbl:'TCE?',t:'s'},
+    {id:'2',lbl:'AVC?',t:'s'},
+    {id:'3',lbl:'Epilepsia?',t:'s'},
+    {id:'4',lbl:'COVID com sequelas cognitivas?',t:'s'},
+    {id:'5',lbl:'Doenças autoimunes?',t:'s'},
+    {id:'6',lbl:'Distúrbios do sono diagnosticados?',t:'s'},
+    {id:'7',lbl:'Outros históricos médicos relevantes'},
+  ]},
+  {id:'aut',tit:'20. Funcionamento Social e Autonomia',fx:['d'],campos:[
+    {id:'1',lbl:'Como é a administração financeira?'},
+    {id:'2',lbl:'Como é a organização doméstica?'},
+    {id:'3',lbl:'Como são os relacionamentos interpessoais?'},
+    {id:'4',lbl:'Dirige veículos?',t:'s'},
+    {id:'5',lbl:'Nível de autonomia geral'},
+  ]},
+  {id:'lin',tit:'21. Linha do Tempo',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Quando começaram exatamente os sintomas?'},
+    {id:'2',lbl:'O que mudou antes disso?'},
+    {id:'3',lbl:'Houve algum gatilho identificável?'},
+  ]},
+  {id:'frq',tit:'22. Intensidade e Frequência',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'O problema acontece todos os dias?',t:'s'},
+    {id:'2',lbl:'Em quais situações piora?'},
+    {id:'3',lbl:'Existe alguma situação que melhora?'},
+  ]},
+  {id:'imp',tit:'23. Impacto Funcional',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'O quanto isso interfere na vida diária?'},
+    {id:'2',lbl:'Áreas mais afetadas (escola, trabalho, família, social)?'},
+  ]},
+  {id:'for',tit:'24. Pontos Fortes e Habilidades Preservadas',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Em que a pessoa vai bem?'},
+    {id:'2',lbl:'Quais habilidades estão preservadas?'},
+    {id:'3',lbl:'Recursos e apoios disponíveis'},
+  ]},
+  {id:'std',tit:'25. Hipótese: TDAH',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Desatenção desde a infância?',t:'s'},
+    {id:'2',lbl:'Esquecimentos frequentes?',t:'s'},
+    {id:'3',lbl:'Impulsividade?',t:'s'},
+    {id:'4',lbl:'Dificuldade em manter rotina?',t:'s'},
+    {id:'5',lbl:'Observações sobre hipótese de TDAH'},
+  ]},
+  {id:'tea',tit:'26. Hipótese: TEA',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Sensibilidade sensorial?',t:'s'},
+    {id:'2',lbl:'Interesses restritos?',t:'s'},
+    {id:'3',lbl:'Dificuldade social desde cedo?',t:'s'},
+    {id:'4',lbl:'Rigidez cognitiva?',t:'s'},
+    {id:'5',lbl:'Observações sobre hipótese de TEA'},
+  ]},
+  {id:'apr',tit:'27. Hipótese: Transtorno de Aprendizagem',fx:['c','a'],campos:[
+    {id:'1',lbl:'Trocas de letras?',t:'s'},
+    {id:'2',lbl:'Lentidão de leitura?',t:'s'},
+    {id:'3',lbl:'Dificuldade matemática persistente?',t:'s'},
+    {id:'4',lbl:'Observações sobre transtorno de aprendizagem'},
+  ]},
+  {id:'dem',tit:'28. Hipótese: Demência / Comprometimento Cognitivo',fx:['d'],campos:[
+    {id:'1',lbl:'Perda funcional progressiva?',t:'s'},
+    {id:'2',lbl:'Esquecimentos recentes significativos?',t:'s'},
+    {id:'3',lbl:'Mudança de personalidade?',t:'s'},
+    {id:'4',lbl:'Observações sobre comprometimento cognitivo'},
+  ]},
+  {id:'obs',tit:'29. Observações do Examinador',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Linguagem espontânea durante a entrevista'},
+    {id:'2',lbl:'Contato visual'},
+    {id:'3',lbl:'Comportamento durante a entrevista'},
+    {id:'4',lbl:'Tolerância à frustração observada'},
+    {id:'5',lbl:'Insight sobre as próprias dificuldades'},
+    {id:'6',lbl:'Outras observações clínicas'},
+  ]},
+];
+
+function renderAnamnese(){
+  var db=getDB(),clients=db.clients||[];
+  var stl='width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;box-sizing:border-box';
+  var clientSel=clients.length
+    ?'<select id="ana-client" onchange="_anaSelectClient(this.value)" style="'+stl+'"><option value="">Selecione um paciente…</option>'+clients.map(function(c){return'<option value="'+c.id+'"'+(c.id===_ANA_CLIENT?' selected':'')+'>'+c.name+'</option>';}).join('')+'</select>'
+    :'<p style="color:var(--text2);font-size:13px">Nenhum paciente cadastrado. Cadastre primeiro em Clientes.</p>';
+  var fxBtn=function(id,lbl){return'<button id="ana-fx-'+id+'" onclick="_anaFaixa(\''+id+'\')" style="padding:7px 16px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;background:'+(id===_ANA_FAIXA?'var(--green)':'var(--bg3)')+';color:'+(id===_ANA_FAIXA?'#000':'var(--text)')+'">'+lbl+'</button>';};
+  var html='<div class="page"><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:220px"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Paciente</label>'+clientSel+'</div>'
+    +'<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Faixa Etária</label><div style="display:flex;gap:8px">'+fxBtn('c','👶 Criança')+fxBtn('a','🧒 Adolescente')+fxBtn('d','🧑 Adulto')+'</div></div>'
+    +'<div style="display:flex;gap:8px;margin-left:auto"><button class="btn btn-primary" onclick="_anaSave()">&#x1F4BE; Salvar</button><button class="btn btn-ghost" onclick="_anaExportPDF()">&#x1F4C4; Exportar PDF</button></div>'
+    +'</div></div>'
+    +'<div id="ana-form">'+_anaRenderForm()+'</div></div>';
+  document.getElementById('page-content').innerHTML=html;
+  if(_ANA_CLIENT)_anaLoad(_ANA_CLIENT);
+}
+
+function _anaFaixa(f){
+  _ANA_FAIXA=f;
+  ['c','a','d'].forEach(function(x){
+    var b=document.getElementById('ana-fx-'+x);
+    if(!b)return;
+    b.style.background=x===f?'var(--green)':'var(--bg3)';
+    b.style.color=x===f?'#000':'var(--text)';
+  });
+  document.getElementById('ana-form').innerHTML=_anaRenderForm();
+  if(_ANA_CLIENT)_anaLoad(_ANA_CLIENT);
+}
+
+function _anaRenderForm(){
+  var stlTA='width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;resize:vertical;box-sizing:border-box';
+  var stlSel='padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px';
+  var stlInp='flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px';
+  var opts='<option value="">—</option><option>Sim</option><option>Não</option><option>Às vezes</option><option>Não informado</option><option>Não se aplica</option>';
+  return _ANA_SECS.filter(function(s){return s.fx.indexOf(_ANA_FAIXA)>=0;}).map(function(sec){
+    return'<div class="card" style="margin-bottom:14px"><div class="section-title" style="margin-bottom:14px">'+sec.tit+'</div>'
+      +sec.campos.map(function(c){
+        var fid='ana_'+sec.id+'_'+c.id;
+        if(c.t==='s'){
+          return'<div style="margin-bottom:14px"><label style="font-size:12px;color:var(--text2);display:block;margin-bottom:5px">'+c.lbl+'</label>'
+            +'<div style="display:flex;gap:8px;align-items:center">'
+            +'<select id="'+fid+'_s" style="'+stlSel+'">'+opts+'</select>'
+            +'<input id="'+fid+'_d" placeholder="Detalhes…" style="'+stlInp+'">'
+            +'</div></div>';
+        }
+        return'<div style="margin-bottom:14px"><label style="font-size:12px;color:var(--text2);display:block;margin-bottom:5px">'+c.lbl+'</label>'
+          +'<textarea id="'+fid+'" rows="2" style="'+stlTA+'"></textarea></div>';
+      }).join('')+'</div>';
+  }).join('');
+}
+
+function _anaSelectClient(id){_ANA_CLIENT=id;if(id)_anaLoad(id);}
+
+function _anaCollect(){
+  var d={};
+  _ANA_SECS.filter(function(s){return s.fx.indexOf(_ANA_FAIXA)>=0;}).forEach(function(sec){
+    sec.campos.forEach(function(c){
+      var fid='ana_'+sec.id+'_'+c.id;
+      if(c.t==='s'){
+        var sv=document.getElementById(fid+'_s'),dv=document.getElementById(fid+'_d');
+        if(sv&&(sv.value||(dv&&dv.value)))d[fid]={s:sv?sv.value:'',dt:dv?dv.value:''};
+      } else {
+        var el=document.getElementById(fid);
+        if(el&&el.value.trim())d[fid]=el.value.trim();
+      }
+    });
+  });
+  return d;
+}
+
+async function _anaSave(){
+  if(!_ANA_CLIENT){showToast('Selecione um paciente antes de salvar.',true);return;}
+  var dados=_anaCollect();
+  var db=getDB(),client=(db.clients||[]).find(function(c){return c.id===_ANA_CLIENT;})||{name:''};
+  var now=new Date().toISOString();
+  showToast('⏳ Salvando anamnese…');
+  try{
+    var ex=await supaFetch('GET','anamneses',null,'?client_id=eq.'+_ANA_CLIENT);
+    if(ex&&ex.length){
+      await supaFetch('PATCH','anamneses',{dados:dados,faixa_etaria:_ANA_FAIXA,updated_at:now},'?client_id=eq.'+_ANA_CLIENT);
+    } else {
+      await supaFetch('POST','anamneses',{id:'ana_'+_ANA_CLIENT+'_'+Date.now(),client_id:_ANA_CLIENT,client_name:client.name,faixa_etaria:_ANA_FAIXA,dados:dados,created_at:now,updated_at:now});
+    }
+    showToast('✅ Anamnese salva!');
+  }catch(e){
+    if(e&&e.message&&e.message.indexOf('relation')>=0&&e.message.indexOf('exist')>=0){
+      showToast('Tabela "anamneses" não existe. Crie-a no Supabase.',true);
+    } else {
+      showToast('Erro ao salvar: '+(e&&e.message?e.message:e),true);
+    }
+  }
+}
+
+async function _anaLoad(clientId){
+  try{
+    var rows=await supaFetch('GET','anamneses',null,'?client_id=eq.'+clientId);
+    if(!rows||!rows.length)return;
+    var row=rows[0];
+    if(row.faixa_etaria&&row.faixa_etaria!==_ANA_FAIXA){_anaFaixa(row.faixa_etaria);return;}
+    var d=row.dados||{};
+    Object.keys(d).forEach(function(fid){
+      var v=d[fid];
+      if(v&&typeof v==='object'){
+        var se=document.getElementById(fid+'_s'),de=document.getElementById(fid+'_d');
+        if(se)se.value=v.s||'';
+        if(de)de.value=v.dt||'';
+      } else {
+        var el=document.getElementById(fid);
+        if(el)el.value=v;
+      }
+    });
+  }catch(e){}
+}
+
+function _anaExportPDF(){
+  if(!_ANA_CLIENT){showToast('Selecione um paciente antes de exportar.',true);return;}
+  var jsPDFLib=window.jspdf&&window.jspdf.jsPDF?window.jspdf.jsPDF:(window.jsPDF||null);
+  if(!jsPDFLib){showToast('jsPDF ainda carregando, tente em instantes.',true);return;}
+  var db=getDB(),client=(db.clients||[]).find(function(c){return c.id===_ANA_CLIENT;})||{name:'Paciente'};
+  var fxLbl={c:'Criança',a:'Adolescente',d:'Adulto'}[_ANA_FAIXA]||_ANA_FAIXA;
+  var dados=_anaCollect();
+  var doc=new jsPDFLib({unit:'mm',format:'a4'});
+  var mg=20,pw=210,maxW=pw-mg*2,y=20,lh=6,ph=297;
+  function nl(){y+=lh/2;}
+  function pg(){if(y>ph-25){doc.addPage();y=20;}}
+  function wr(txt,bold,sz){
+    doc.setFontSize(sz||10);doc.setFont('helvetica',bold?'bold':'normal');
+    doc.splitTextToSize(txt,maxW).forEach(function(l){pg();doc.text(l,mg,y);y+=lh;});
+  }
+  wr('AVALIAÇÃO NEUROPSICOLÓGICA — ANAMNESE',true,14);nl();
+  wr('Paciente: '+client.name,false,10);
+  wr('Faixa Etária: '+fxLbl,false,10);
+  wr('Data: '+new Date().toLocaleDateString('pt-BR'),false,10);
+  wr('Avaliadora: _____________________________________________',false,10);
+  y+=lh;
+  var temConteudo=false;
+  _ANA_SECS.filter(function(s){return s.fx.indexOf(_ANA_FAIXA)>=0;}).forEach(function(sec){
+    var linhas=[];
+    sec.campos.forEach(function(c){
+      var fid='ana_'+sec.id+'_'+c.id,v=dados[fid];
+      if(!v)return;
+      if(typeof v==='object'){
+        var txt=v.s||'';if(v.dt)txt+=(txt?' — ':'')+v.dt;
+        if(txt)linhas.push(c.lbl+': '+txt);
+      } else linhas.push(c.lbl+': '+v);
+    });
+    if(linhas.length){
+      temConteudo=true;pg();
+      wr(sec.tit,true,11);nl();
+      linhas.forEach(function(l){wr(l,false,10);});
+      nl();
+    }
+  });
+  if(!temConteudo){showToast('Preencha pelo menos um campo antes de exportar.',true);return;}
+  var fname='anamnese_'+client.name.replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.pdf';
+  doc.save(fname);
+  showToast('✅ PDF gerado: '+fname);
+}
+
+
 </script>
 </body>
 </html>
