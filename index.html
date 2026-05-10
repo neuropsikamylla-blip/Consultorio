@@ -214,7 +214,7 @@ select option{background:var(--bg3);}
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;" onclick="importBackup()">⬆️ Restaurar</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;color:var(--red);" onclick="doLogout()">Sair</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;font-size:11px;opacity:0.6;" onclick="window.location.href=window.location.href.split('?')[0]+'?v='+Date.now()">🔄 Atualizar App</button>
-      <div style="text-align:center;font-size:10px;color:var(--text2);margin-top:6px;opacity:0.5">v20260509</div>
+      <div style="text-align:center;font-size:10px;color:var(--text2);margin-top:6px;opacity:0.5">v20260509b</div>
     </div>
   </nav>
   <main class="main">
@@ -1770,15 +1770,22 @@ function toggleTheme(){
 // ===== ANAMNESE NEUROPSICOLÓGICA =====
 var _ANA_CLIENT=null,_ANA_FAIXA='c';
 var _ANA_SECS=[
-  {id:'enc',tit:'1. Motivo do Encaminhamento',fx:['c','a','d'],campos:[
-    {id:'1',lbl:'O que motivou a avaliação?'},
+  {id:'enc',tit:'1. Queixa Principal e Motivo da Avaliação',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'O que motivou a busca pela avaliação?'},
     {id:'2',lbl:'Quem solicitou a avaliação?'},
     {id:'3',lbl:'Quais dificuldades são percebidas?'},
-    {id:'4',lbl:'Quando as dificuldades começaram?'},
-    {id:'5',lbl:'Em quais contextos aparecem?'},
-    {id:'6',lbl:'O problema é constante ou varia?'},
+    {id:'4',lbl:'Em quais contextos as dificuldades aparecem?'},
+    {id:'5',lbl:'O problema é constante ou varia?'},
+    {id:'6',lbl:'Já realizou avaliação ou acompanhamento anterior?',t:'s'},
+    {id:'7',lbl:'Há diagnóstico prévio?',t:'s'},
   ]},
-  {id:'ges',tit:'2. Gestação e Nascimento',fx:['c','a'],campos:[
+  {id:'lin',tit:'2. Linha do Tempo dos Sintomas',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Quando exatamente começaram os sintomas?'},
+    {id:'2',lbl:'O que mudou antes disso?'},
+    {id:'3',lbl:'Houve algum gatilho identificável?'},
+    {id:'4',lbl:'Como evoluiu desde o início?'},
+  ]},
+  {id:'ges',tit:'3. Gestação e Nascimento',fx:['c','a'],campos:[
     {id:'1',lbl:'A gravidez foi planejada?',t:'s'},
     {id:'2',lbl:'Houve intercorrências na gestação?',t:'s'},
     {id:'3',lbl:'Uso de álcool, drogas ou medicamentos na gestação?',t:'s'},
@@ -1787,7 +1794,7 @@ var _ANA_SECS=[
     {id:'6',lbl:'Necessidade de UTI neonatal?',t:'s'},
     {id:'7',lbl:'Observações adicionais sobre gestação/nascimento'},
   ]},
-  {id:'dev',tit:'3. Desenvolvimento Neuropsicomotor',fx:['c','a'],campos:[
+  {id:'dev',tit:'4. Desenvolvimento Neuropsicomotor',fx:['c','a'],campos:[
     {id:'1',lbl:'Quando começou a sentar, engatinhar e andar?'},
     {id:'2',lbl:'Houve atraso na fala?',t:'s'},
     {id:'3',lbl:'Como foi o processo de desfralde?'},
@@ -1795,24 +1802,32 @@ var _ANA_SECS=[
     {id:'5',lbl:'Existiram regressões no desenvolvimento?',t:'s'},
     {id:'6',lbl:'Detalhes sobre desenvolvimento neuropsicomotor'},
   ]},
-  {id:'sau',tit:'4. Saúde Geral',fx:['c','a','d'],campos:[
-    {id:'1',lbl:'Histórico de convulsões, TCE ou meningite?',t:'s'},
-    {id:'2',lbl:'Problemas auditivos ou visuais?',t:'s'},
-    {id:'3',lbl:'Uso atual de medicamentos?',t:'s'},
-    {id:'4',lbl:'Qualidade do sono?'},
-    {id:'5',lbl:'Alimentação seletiva?',t:'s'},
-    {id:'6',lbl:'Outros aspectos de saúde relevantes'},
+  {id:'ali',tit:'5. Alimentação',fx:['c','a'],campos:[
+    {id:'1',lbl:'Amamentou? Por quanto tempo?'},
+    {id:'2',lbl:'Como foi a introdução alimentar?'},
+    {id:'3',lbl:'Apresenta seletividade alimentar?',t:'s'},
+    {id:'4',lbl:'Recusa alimentos por textura, cheiro ou cor?',t:'s'},
+    {id:'5',lbl:'Ganho de peso e crescimento adequados?',t:'s'},
+    {id:'6',lbl:'Observações sobre alimentação'},
   ]},
-  {id:'cog',tit:'5. Aspectos Cognitivos e Escolares',fx:['c','a'],campos:[
+  {id:'esc',tit:'6. Início Escolar',fx:['c','a'],campos:[
+    {id:'1',lbl:'Com que idade ingressou na escola?'},
+    {id:'2',lbl:'Como foi a adaptação inicial?'},
+    {id:'3',lbl:'Apresentou dificuldade de separação?',t:'s'},
+    {id:'4',lbl:'Frequência de faltas?'},
+    {id:'5',lbl:'Já trocou de escola? Por quê?'},
+    {id:'6',lbl:'Como é a relação com os professores?'},
+  ]},
+  {id:'cog',tit:'7. Aspectos Cognitivos e Escolares',fx:['c','a'],campos:[
     {id:'1',lbl:'Como está o aprendizado escolar?'},
     {id:'2',lbl:'Dificuldades em leitura, escrita ou matemática?',t:'s'},
     {id:'3',lbl:'Como é a atenção em sala de aula?'},
-    {id:'4',lbl:'Esquece tarefas?',t:'s'},
+    {id:'4',lbl:'Esquece tarefas e deveres?',t:'s'},
     {id:'5',lbl:'Como é a organização escolar?'},
     {id:'6',lbl:'Já repetiu de ano?',t:'s'},
     {id:'7',lbl:'Recebe apoio pedagógico?',t:'s'},
   ]},
-  {id:'com',tit:'6. Comportamento e Emoções',fx:['c','a'],campos:[
+  {id:'com',tit:'8. Comportamento, Emoções e Socialização',fx:['c','a','d'],campos:[
     {id:'1',lbl:'Irritabilidade?',t:'s'},
     {id:'2',lbl:'Crises emocionais?',t:'s'},
     {id:'3',lbl:'Ansiedade?',t:'s'},
@@ -1820,16 +1835,14 @@ var _ANA_SECS=[
     {id:'5',lbl:'Hiperatividade?',t:'s'},
     {id:'6',lbl:'Impulsividade?',t:'s'},
     {id:'7',lbl:'Rigidez comportamental?',t:'s'},
-    {id:'8',lbl:'Observações sobre comportamento e emoções'},
+    {id:'8',lbl:'Faz amizades com facilidade?',t:'s'},
+    {id:'9',lbl:'Brinca simbolicamente?',t:'s'},
+    {id:'10',lbl:'Entende regras sociais?',t:'s'},
+    {id:'11',lbl:'Prefere ficar sozinho?',t:'s'},
+    {id:'12',lbl:'Como reage a frustrações?'},
+    {id:'13',lbl:'Observações sobre comportamento e socialização'},
   ]},
-  {id:'soc',tit:'7. Socialização',fx:['c','a'],campos:[
-    {id:'1',lbl:'Faz amizades com facilidade?',t:'s'},
-    {id:'2',lbl:'Brinca simbolicamente?',t:'s'},
-    {id:'3',lbl:'Entende regras sociais?',t:'s'},
-    {id:'4',lbl:'Prefere ficar sozinho?',t:'s'},
-    {id:'5',lbl:'Como reage a frustrações?'},
-  ]},
-  {id:'fam',tit:'8. Dinâmica Familiar',fx:['c','a','d'],campos:[
+  {id:'fam',tit:'9. Dinâmica Familiar',fx:['c','a','d'],campos:[
     {id:'1',lbl:'Com quem mora?'},
     {id:'2',lbl:'Como é a rotina familiar?'},
     {id:'3',lbl:'Separações, lutos ou conflitos recentes?',t:'s'},
@@ -1840,37 +1853,24 @@ var _ANA_SECS=[
     {id:'8',lbl:'Histórico familiar de deficiência intelectual?',t:'s'},
     {id:'9',lbl:'Observações sobre dinâmica familiar'},
   ]},
-  {id:'aca',tit:'9. Funcionamento Acadêmico',fx:['a'],campos:[
-    {id:'1',lbl:'Queda recente no rendimento escolar?',t:'s'},
-    {id:'2',lbl:'Dificuldade em planejamento?',t:'s'},
-    {id:'3',lbl:'Procrastinação?',t:'s'},
-    {id:'4',lbl:'Como é a organização dos estudos?'},
-    {id:'5',lbl:'Preparação para vestibular?'},
+  {id:'sau',tit:'10. Saúde Geral e Histórico Médico',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Histórico de convulsões, TCE ou meningite?',t:'s'},
+    {id:'2',lbl:'Problemas auditivos ou visuais?',t:'s'},
+    {id:'3',lbl:'Uso atual de medicamentos?',t:'s'},
+    {id:'4',lbl:'AVC?',t:'s'},
+    {id:'5',lbl:'Epilepsia?',t:'s'},
+    {id:'6',lbl:'COVID com sequelas cognitivas?',t:'s'},
+    {id:'7',lbl:'Doenças autoimunes?',t:'s'},
+    {id:'8',lbl:'Outros aspectos de saúde relevantes'},
   ]},
-  {id:'exe',tit:'10. Funções Executivas',fx:['a','d'],campos:[
-    {id:'1',lbl:'Consegue iniciar tarefas?',t:'s'},
-    {id:'2',lbl:'Mantém o foco?',t:'s'},
-    {id:'3',lbl:'Gerencia bem o tempo?',t:'s'},
-    {id:'4',lbl:'Perde objetos frequentemente?',t:'s'},
-    {id:'5',lbl:'Esquece compromissos?',t:'s'},
-    {id:'6',lbl:'Observações sobre funções executivas'},
+  {id:'son',tit:'11. Sono e Rotina Digital',fx:['c','a','d'],campos:[
+    {id:'1',lbl:'Horário habitual de dormir e acordar?'},
+    {id:'2',lbl:'Tempo de tela diário?'},
+    {id:'3',lbl:'Uso excessivo de jogos?',t:'s'},
+    {id:'4',lbl:'Alterações de sono?',t:'s'},
+    {id:'5',lbl:'Observações sobre sono e tecnologia'},
   ]},
-  {id:'emo',tit:'11. Aspectos Emocionais',fx:['a'],campos:[
-    {id:'1',lbl:'Sintomas depressivos?',t:'s'},
-    {id:'2',lbl:'Ansiedade social?',t:'s'},
-    {id:'3',lbl:'Oscilações de humor?',t:'s'},
-    {id:'4',lbl:'Automutilação?',t:'s'},
-    {id:'5',lbl:'Ideação suicida?',t:'s'},
-    {id:'6',lbl:'Baixa autoestima?',t:'s'},
-    {id:'7',lbl:'Observações emocionais'},
-  ]},
-  {id:'rel',tit:'12. Relações Sociais',fx:['a'],campos:[
-    {id:'1',lbl:'Sofre bullying?',t:'s'},
-    {id:'2',lbl:'Isolamento social?',t:'s'},
-    {id:'3',lbl:'Conflitos familiares significativos?',t:'s'},
-    {id:'4',lbl:'Como são os relacionamentos afetivos?'},
-  ]},
-  {id:'sub',tit:'13. Uso de Substâncias',fx:['a','d'],campos:[
+  {id:'sub',tit:'12. Uso de Substâncias',fx:['a','d'],campos:[
     {id:'1',lbl:'Álcool?',t:'s'},
     {id:'2',lbl:'Vape?',t:'s'},
     {id:'3',lbl:'Cannabis?',t:'s'},
@@ -1878,28 +1878,48 @@ var _ANA_SECS=[
     {id:'5',lbl:'Comportamentos impulsivos de risco?',t:'s'},
     {id:'6',lbl:'Detalhes sobre uso de substâncias'},
   ]},
-  {id:'son',tit:'14. Sono e Rotina Digital',fx:['a','d'],campos:[
-    {id:'1',lbl:'Horário habitual de dormir e acordar?'},
-    {id:'2',lbl:'Tempo de tela diário?'},
-    {id:'3',lbl:'Uso excessivo de jogos?',t:'s'},
-    {id:'4',lbl:'Alterações de sono?',t:'s'},
-    {id:'5',lbl:'Observações sobre sono e tecnologia'},
+  {id:'aca',tit:'13. Funcionamento Acadêmico',fx:['a'],campos:[
+    {id:'1',lbl:'Queda recente no rendimento escolar?',t:'s'},
+    {id:'2',lbl:'Dificuldade em planejamento?',t:'s'},
+    {id:'3',lbl:'Procrastinação?',t:'s'},
+    {id:'4',lbl:'Como é a organização dos estudos?'},
+    {id:'5',lbl:'Preparação para vestibular?'},
   ]},
-  {id:'qui',tit:'15. Queixa Principal e Impacto Funcional',fx:['d'],campos:[
-    {id:'1',lbl:'Quais dificuldades cognitivas percebe?'},
-    {id:'2',lbl:'Desde quando?'},
-    {id:'3',lbl:'Interfere no trabalho, estudos ou vida diária?',t:'s'},
-    {id:'4',lbl:'Houve piora progressiva?',t:'s'},
-    {id:'5',lbl:'Detalhes sobre a queixa principal'},
+  {id:'exe',tit:'14. Funções Executivas',fx:['a','d'],campos:[
+    {id:'1',lbl:'Consegue iniciar tarefas?',t:'s'},
+    {id:'2',lbl:'Mantém o foco?',t:'s'},
+    {id:'3',lbl:'Gerencia bem o tempo?',t:'s'},
+    {id:'4',lbl:'Perde objetos frequentemente?',t:'s'},
+    {id:'5',lbl:'Esquece compromissos?',t:'s'},
+    {id:'6',lbl:'Observações sobre funções executivas'},
   ]},
-  {id:'hip',tit:'16. Histórico Acadêmico e Profissional',fx:['d'],campos:[
+  {id:'emo',tit:'15. Aspectos Emocionais e Saúde Mental',fx:['a','d'],campos:[
+    {id:'1',lbl:'Sintomas depressivos?',t:'s'},
+    {id:'2',lbl:'Ansiedade social?',t:'s'},
+    {id:'3',lbl:'Oscilações de humor?',t:'s'},
+    {id:'4',lbl:'Automutilação?',t:'s'},
+    {id:'5',lbl:'Ideação suicida?',t:'s'},
+    {id:'6',lbl:'Baixa autoestima?',t:'s'},
+    {id:'7',lbl:'Diagnósticos psiquiátricos prévios?',t:'s'},
+    {id:'8',lbl:'Tratamento psicológico atual ou anterior?',t:'s'},
+    {id:'9',lbl:'Uso de psicotrópicos?',t:'s'},
+    {id:'10',lbl:'Burnout?',t:'s'},
+    {id:'11',lbl:'Observações sobre saúde emocional e mental'},
+  ]},
+  {id:'rel',tit:'16. Relações Sociais',fx:['a'],campos:[
+    {id:'1',lbl:'Sofre bullying?',t:'s'},
+    {id:'2',lbl:'Isolamento social?',t:'s'},
+    {id:'3',lbl:'Conflitos familiares significativos?',t:'s'},
+    {id:'4',lbl:'Como são os relacionamentos afetivos?'},
+  ]},
+  {id:'hip',tit:'17. Histórico Acadêmico e Profissional',fx:['d'],campos:[
     {id:'1',lbl:'Como era o desempenho escolar?'},
     {id:'2',lbl:'Dificuldades de atenção ou aprendizagem na infância?',t:'s'},
     {id:'3',lbl:'Mudanças frequentes de emprego?',t:'s'},
     {id:'4',lbl:'Dificuldade organizacional no trabalho?',t:'s'},
     {id:'5',lbl:'Situação profissional atual'},
   ]},
-  {id:'fco',tit:'17. Funções Cognitivas',fx:['d'],campos:[
+  {id:'fco',tit:'18. Funções Cognitivas',fx:['d'],campos:[
     {id:'1',lbl:'Atenção: distrai-se facilmente?',t:'s'},
     {id:'2',lbl:'Atenção: consegue terminar tarefas?',t:'s'},
     {id:'3',lbl:'Memória: esquece conversas recentes?',t:'s'},
@@ -1911,77 +1931,54 @@ var _ANA_SECS=[
     {id:'9',lbl:'Planejamento, organização e tomada de decisão'},
     {id:'10',lbl:'Observações gerais sobre funções cognitivas'},
   ]},
-  {id:'sme',tit:'18. Saúde Mental',fx:['d'],campos:[
-    {id:'1',lbl:'Diagnósticos psiquiátricos prévios?',t:'s'},
-    {id:'2',lbl:'Tratamento psicológico atual ou anterior?',t:'s'},
-    {id:'3',lbl:'Uso de psicotrópicos?',t:'s'},
-    {id:'4',lbl:'Episódios depressivos?',t:'s'},
-    {id:'5',lbl:'Ansiedade?',t:'s'},
-    {id:'6',lbl:'Burnout?',t:'s'},
-    {id:'7',lbl:'Detalhes sobre saúde mental'},
-  ]},
-  {id:'neu',tit:'19. Histórico Médico e Neurológico',fx:['d'],campos:[
-    {id:'1',lbl:'TCE?',t:'s'},
-    {id:'2',lbl:'AVC?',t:'s'},
-    {id:'3',lbl:'Epilepsia?',t:'s'},
-    {id:'4',lbl:'COVID com sequelas cognitivas?',t:'s'},
-    {id:'5',lbl:'Doenças autoimunes?',t:'s'},
-    {id:'6',lbl:'Distúrbios do sono diagnosticados?',t:'s'},
-    {id:'7',lbl:'Outros históricos médicos relevantes'},
-  ]},
-  {id:'aut',tit:'20. Funcionamento Social e Autonomia',fx:['d'],campos:[
+  {id:'aut',tit:'19. Funcionamento Social e Autonomia',fx:['d'],campos:[
     {id:'1',lbl:'Como é a administração financeira?'},
     {id:'2',lbl:'Como é a organização doméstica?'},
     {id:'3',lbl:'Como são os relacionamentos interpessoais?'},
     {id:'4',lbl:'Dirige veículos?',t:'s'},
     {id:'5',lbl:'Nível de autonomia geral'},
   ]},
-  {id:'lin',tit:'21. Linha do Tempo',fx:['c','a','d'],campos:[
-    {id:'1',lbl:'Quando começaram exatamente os sintomas?'},
-    {id:'2',lbl:'O que mudou antes disso?'},
-    {id:'3',lbl:'Houve algum gatilho identificável?'},
-  ]},
-  {id:'frq',tit:'22. Intensidade e Frequência',fx:['c','a','d'],campos:[
+  {id:'frq',tit:'20. Intensidade e Frequência',fx:['c','a','d'],campos:[
     {id:'1',lbl:'O problema acontece todos os dias?',t:'s'},
     {id:'2',lbl:'Em quais situações piora?'},
     {id:'3',lbl:'Existe alguma situação que melhora?'},
   ]},
-  {id:'imp',tit:'23. Impacto Funcional',fx:['c','a','d'],campos:[
+  {id:'imp',tit:'21. Impacto Funcional',fx:['c','a','d'],campos:[
     {id:'1',lbl:'O quanto isso interfere na vida diária?'},
     {id:'2',lbl:'Áreas mais afetadas (escola, trabalho, família, social)?'},
   ]},
-  {id:'for',tit:'24. Pontos Fortes e Habilidades Preservadas',fx:['c','a','d'],campos:[
+  {id:'for',tit:'22. Pontos Fortes e Habilidades Preservadas',fx:['c','a','d'],campos:[
     {id:'1',lbl:'Em que a pessoa vai bem?'},
     {id:'2',lbl:'Quais habilidades estão preservadas?'},
     {id:'3',lbl:'Recursos e apoios disponíveis'},
   ]},
-  {id:'std',tit:'25. Hipótese: TDAH',fx:['c','a','d'],campos:[
+  {id:'std',tit:'23. Hipótese: TDAH',fx:['c','a','d'],campos:[
     {id:'1',lbl:'Desatenção desde a infância?',t:'s'},
     {id:'2',lbl:'Esquecimentos frequentes?',t:'s'},
     {id:'3',lbl:'Impulsividade?',t:'s'},
     {id:'4',lbl:'Dificuldade em manter rotina?',t:'s'},
     {id:'5',lbl:'Observações sobre hipótese de TDAH'},
   ]},
-  {id:'tea',tit:'26. Hipótese: TEA',fx:['c','a','d'],campos:[
+  {id:'tea',tit:'24. Hipótese: TEA',fx:['c','a','d'],campos:[
     {id:'1',lbl:'Sensibilidade sensorial?',t:'s'},
     {id:'2',lbl:'Interesses restritos?',t:'s'},
     {id:'3',lbl:'Dificuldade social desde cedo?',t:'s'},
     {id:'4',lbl:'Rigidez cognitiva?',t:'s'},
     {id:'5',lbl:'Observações sobre hipótese de TEA'},
   ]},
-  {id:'apr',tit:'27. Hipótese: Transtorno de Aprendizagem',fx:['c','a'],campos:[
+  {id:'apr',tit:'25. Hipótese: Transtorno de Aprendizagem',fx:['c','a'],campos:[
     {id:'1',lbl:'Trocas de letras?',t:'s'},
     {id:'2',lbl:'Lentidão de leitura?',t:'s'},
     {id:'3',lbl:'Dificuldade matemática persistente?',t:'s'},
     {id:'4',lbl:'Observações sobre transtorno de aprendizagem'},
   ]},
-  {id:'dem',tit:'28. Hipótese: Demência / Comprometimento Cognitivo',fx:['d'],campos:[
+  {id:'dem',tit:'26. Hipótese: Demência / Comprometimento Cognitivo',fx:['d'],campos:[
     {id:'1',lbl:'Perda funcional progressiva?',t:'s'},
     {id:'2',lbl:'Esquecimentos recentes significativos?',t:'s'},
     {id:'3',lbl:'Mudança de personalidade?',t:'s'},
     {id:'4',lbl:'Observações sobre comprometimento cognitivo'},
   ]},
-  {id:'obs',tit:'29. Observações do Examinador',fx:['c','a','d'],campos:[
+  {id:'obs',tit:'27. Observações do Examinador',fx:['c','a','d'],campos:[
     {id:'1',lbl:'Linguagem espontânea durante a entrevista'},
     {id:'2',lbl:'Contato visual'},
     {id:'3',lbl:'Comportamento durante a entrevista'},
