@@ -467,10 +467,10 @@ function clientNeedsAttention(id){
 }
 function _addDaysStr(ds,n){var d=new Date(ds+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
 // Marcadores vermelhos na agenda: para cada paciente com pacote encerrado sem decisão,
-// projeta o nome na PRÓXIMA data prevista (última sessão + intervalo), rolando para frente
-// até cair em data atual/futura — assim fica visível até renovar ou dar alta.
+// projeta o nome na sessão seguinte à última do pacote (última sessão + 1 intervalo),
+// numa data fixa — fica ali até a usuária renovar ou dar alta.
 function attentionMarkers(){
-  var db=getDB();var out=[];var t=today();
+  var db=getDB();var out=[];
   db.clients.forEach(function(c){
     if(!clientNeedsAttention(c.id))return;
     var sess=db.sessions.filter(function(s){return s.clientId===c.id&&s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''));});
@@ -478,8 +478,7 @@ function attentionMarkers(){
     var last=sess[sess.length-1];
     var pkg=db.packages.find(function(p){return p.id===last.packageId;});
     var iv=last.intervalDays||(pkg&&pkg.intervalDays)||7;if(iv<1)iv=7;
-    var d=_addDaysStr(last.date,iv);var guard=0;
-    while(d<t&&guard<520){d=_addDaysStr(d,iv);guard++;}
+    var d=_addDaysStr(last.date,iv);
     var parts=clientName(c.id).split(' ');var short=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
     out.push({clientId:c.id,date:d,time:last.time||'',short:short,pkgName:pkg?pkg.name:''});
   });
