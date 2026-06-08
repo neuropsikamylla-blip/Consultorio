@@ -139,6 +139,8 @@ select option{background:var(--bg3);}
 .cal-chip.avaliacao{background:rgba(52,217,138,0.18);color:#6ee7b7;border-left:2px solid var(--green);}
 .cal-chip.falta{background:rgba(240,96,96,0.18);color:#fca5a5;border-left:2px solid var(--red);text-decoration:line-through;}
 .cal-chip.realizada{opacity:0.55;}
+.cal-chip.encerrado{background:rgba(240,96,96,0.30);color:#fff;border-left:3px solid var(--red);font-weight:800;opacity:1;text-decoration:none;box-shadow:0 0 0 1px rgba(240,96,96,0.45) inset;}
+.week-event.encerrado{background:rgba(240,96,96,0.34);color:#fff;border-left:3px solid var(--red);font-weight:800;}
 .cal-more{font-size:10px;color:var(--text3);padding:1px 6px;cursor:pointer;}
 .week-wrap{display:flex;overflow:hidden;}
 .week-time-col{width:52px;flex-shrink:0;border-right:1px solid var(--border);}
@@ -257,7 +259,7 @@ function getCreds(){
   return{email:'',password:'',name:'Profissional'};
 }
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
-function getDB(){return _cache||{clients:[],packages:[],sessions:[]};}
+function getDB(){return _cache||{clients:[],packages:[],sessions:[],clientStatus:{}};}
 
 function getAuthToken(){
   try{
@@ -315,15 +317,18 @@ function showLoadingOverlay(show){
 async function loadFromSupabase(){
   showLoadingOverlay(true);
   try{
-    const [clients,packages,sessions]=await Promise.all([
+    const [clients,packages,sessions,statusRows]=await Promise.all([
       supaFetch('GET','clients',null,'?order=name'),
       supaFetch('GET','packages',null,'?order=created_at'),
-      supaFetch('GET','sessions',null,'?order=date')
+      supaFetch('GET','sessions',null,'?order=date'),
+      supaFetch('GET','notes',null,'?id=eq.client_status')
     ]);
+    var _cstatus={};try{if(statusRows&&statusRows[0]&&statusRows[0].content)_cstatus=JSON.parse(statusRows[0].content)||{};}catch(e){_cstatus={};}
     _cache={
       clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
-      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending',sessionPrice:s.session_price||null});})
+      sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending',sessionPrice:s.session_price||null});}),
+      clientStatus:_cstatus
     };
   }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
   showLoadingOverlay(false);
@@ -451,6 +456,48 @@ function statusBadge(s){if(s==='realizada'||s==='completed')return['badge-realiz
 function pkgStats(pkg){var db=getDB();var used=db.sessions.filter(function(s){return s.packageId===pkg.id&&(s.status==='realizada'||s.status==='completed'||s.status==='falta'||s.status==='falta');}).length;var total=db.sessions.filter(function(s){return s.packageId===pkg.id;}).length;return{used:used,remaining:pkg.totalSessions-used,totalRegistered:total,isExhausted:(pkg.totalSessions-used)<=0,canAdd:total<pkg.totalSessions,pct:Math.round((used/pkg.totalSessions)*100)};}
 function clientName(id){var c=getDB().clients.find(function(c){return c.id===id;});return c?escHtml(c.name):'—';}
 function pkgName(id){var p=getDB().packages.find(function(p){return p.id===id;});return p?escHtml(p.name):'—';}
+// ── Encerramento de pacote / alta ──
+function isClientAlta(id){var db=getDB();return (db.clientStatus||{})[id]==='alta';}
+function clientNeedsAttention(id){
+  var db=getDB();
+  if(isClientAlta(id))return false;
+  var pkgs=db.packages.filter(function(p){return p.clientId===id;});
+  if(pkgs.length===0)return false;
+  return pkgs.every(function(p){return pkgStats(p).isExhausted;});
+}
+function _addDaysStr(ds,n){var d=new Date(ds+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
+// Marcadores vermelhos na agenda: para cada paciente com pacote encerrado sem decisão,
+// projeta o nome na PRÓXIMA data prevista (última sessão + intervalo), rolando para frente
+// até cair em data atual/futura — assim fica visível até renovar ou dar alta.
+function attentionMarkers(){
+  var db=getDB();var out=[];var t=today();
+  db.clients.forEach(function(c){
+    if(!clientNeedsAttention(c.id))return;
+    var sess=db.sessions.filter(function(s){return s.clientId===c.id&&s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''));});
+    if(!sess.length)return;
+    var last=sess[sess.length-1];
+    var pkg=db.packages.find(function(p){return p.id===last.packageId;});
+    var iv=last.intervalDays||(pkg&&pkg.intervalDays)||7;if(iv<1)iv=7;
+    var d=_addDaysStr(last.date,iv);var guard=0;
+    while(d<t&&guard<520){d=_addDaysStr(d,iv);guard++;}
+    var parts=clientName(c.id).split(' ');var short=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
+    out.push({clientId:c.id,date:d,time:last.time||'',short:short,pkgName:pkg?pkg.name:''});
+  });
+  return out;
+}
+async function setClientAlta(id,isAlta){
+  var db=getDB();var map=Object.assign({},db.clientStatus||{});
+  if(isAlta)map[id]='alta';else delete map[id];
+  var _nt=getAuthToken();
+  await fetch(SUPA_URL+'/rest/v1/notes',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_nt,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'client_status',user_id:'admin',content:JSON.stringify(map),updated_at:new Date().toISOString()})});
+  _cache=null;await loadFromSupabase();
+}
+window.setClientAlta=setClientAlta;
+function confirmAltaPaciente(id){
+  var nm=clientName(id);
+  showModal('Encerrar Atendimento','<div class="alert" style="background:var(--green-bg2);border:1px solid rgba(52,217,138,0.3);color:var(--text);margin-bottom:16px">Conceder <strong>alta</strong> para <strong>'+escHtml(nm)+'</strong>?<br><span style="font-size:12px;color:var(--text2)">O paciente sai dos alertas da agenda. As sessões já realizadas continuam no histórico.</span></div><div class="form-actions"><button class="btn btn-secondary" onclick="showClientDetail(\''+id+'\')">Cancelar</button><button class="btn btn-primary" onclick="(async function(){closeModal();showToast(\'⏳ Encerrando...\');await setClientAlta(\''+id+'\',true);showToast(\'🏁 Alta concedida!\');showClientDetail(\''+id+'\');})()">✅ Confirmar alta</button></div>');
+}
+window.confirmAltaPaciente=confirmAltaPaciente;
 function pkgMonth(p){
   var db=getDB();
   if(p.paymentDate)return p.paymentDate.slice(0,7);
@@ -678,7 +725,13 @@ function showClientDetail(id){
   sessHtml+='</tbody></table>';
   var ageStr='';if(c.birthDate){var _bd=new Date(c.birthDate+'T12:00:00');var _n2=new Date();ageStr=' ('+( _n2.getFullYear()-_bd.getFullYear()-(_n2<new Date(_n2.getFullYear(),_bd.getMonth(),_bd.getDate())?1:0))+' anos)';}
   var detailHeader='<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px"><div class="client-avatar">'+getInitials(c.name)+'</div><div>'+(c.phone?'<div style="font-size:13px;color:var(--text2)">📱 '+c.phone+'</div>':'')+(c.email?'<div style="font-size:13px;color:var(--text2)">✉️ '+c.email+'</div>':'')+(c.birthDate?'<div style="font-size:13px;color:var(--text2)">🎂 '+fmtDate(c.birthDate)+ageStr+'</div>':'')+(c.cpf?'<div style="font-size:13px;color:var(--text2)">🪪 '+c.cpf+'</div>':'')+(c.education?'<div style="font-size:13px;color:var(--text2)">🎓 '+c.education+'</div>':'')+(c.address?'<div style="font-size:13px;color:var(--text2)">📍 '+c.address+'</div>':'')+(c.notes?'<div style="font-size:12px;color:var(--text3);margin-top:4px">'+c.notes+'</div>':'')+'</div></div>';
-  showModal('Cliente: '+c.name,detailHeader+'<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\');">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\');">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\');">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
+  var attnHtml='';
+  if(isClientAlta(id)){
+    attnHtml='<div class="alert" style="background:var(--green-bg2);border:1px solid rgba(52,217,138,0.3);color:var(--text);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>🏁 <strong>Atendimento encerrado</strong> — alta concedida</span><button class="btn btn-ghost btn-sm" onclick="(async function(){showToast(\'⏳ Reativando...\');await setClientAlta(\''+id+'\',false);showToast(\'↩️ Paciente reativado\');showClientDetail(\''+id+'\');})()">↩️ Reativar</button></div>';
+  } else if(clientNeedsAttention(id)){
+    attnHtml='<div class="alert alert-red" style="margin-bottom:16px"><div style="font-weight:700;margin-bottom:6px">❗ Pacote encerrado — escolha uma ação</div><div style="font-size:12.5px;color:var(--text2);margin-bottom:12px">Enquanto não decidir, este paciente aparece em vermelho na agenda (na próxima data prevista).</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\')">🔄 Renovar pacote</button><button class="btn btn-secondary btn-sm" onclick="confirmAltaPaciente(\''+id+'\')">✅ Dar alta / Encerrar</button></div></div>';
+  }
+  showModal('Cliente: '+c.name,detailHeader+attnHtml+'<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\');">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\');">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\');">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
 }
 
 // ── PACKAGES ──
@@ -1097,10 +1150,10 @@ async function saveSessionEdit(id){
 function deleteSessionConfirm(id){showModal('Excluir Sessão','<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeleteSession(\''+id+'\');if(currentPage===\'sessions\')renderSessions();else if(currentPage===\'agenda\')renderCalendar();showToast(\'🗑️ Sessão excluída\');})()">Excluir</button></div>');}
 
 // ── AGENDA ──
-var calView='month',calDate=new Date();
+var calView='month',calDate=new Date(),_attnMarkers=[];
 function renderAgenda(){document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>';renderCalendar();}
 function renderCalendar(){
-  var db=getDB();var todayStr=today();
+  var db=getDB();var todayStr=today();_attnMarkers=attentionMarkers();
   var title='';
   if(calView==='month'){title=calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});title=title.charAt(0).toUpperCase()+title.slice(1);}
   else{var mon=weekStart(calDate);var sun=new Date(mon);sun.setDate(sun.getDate()+6);title=fmtDate(mon.toISOString().split('T')[0])+' – '+fmtDate(sun.toISOString().split('T')[0]);}
@@ -1138,6 +1191,7 @@ function buildMonthDay(dt,db,todayStr,other){
     chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
   });
   if(extra>0)chips+='<div class="cal-more">+'+extra+' mais</div>';
+  (_attnMarkers||[]).forEach(function(m){if(m.date===ds){chips='<span class="cal-chip encerrado" title="'+escHtml(clientName(m.clientId))+' — PACOTE ENCERRADO · renovar ou dar alta" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">❗ '+escHtml(m.short)+'</span>'+chips;}});
   return'<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">'+dt.getDate()+'</div>'+chips+'</div>';
 }
 function buildWeekGrid(db,todayStr){
@@ -1162,6 +1216,7 @@ function buildWeekGrid(db,todayStr){
         var lbl=pkg?fn+' '+n+'/'+t:fn;
         evts+='<span class="week-event '+(s.category||'psicoterapia')+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+lbl+'</span>';
       });
+      (_attnMarkers||[]).forEach(function(m){var mh=m.time?m.time.slice(0,2):'08';if(m.date===ds&&mh===hStr){evts='<span class="week-event encerrado" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">❗ '+escHtml(m.short)+'</span>'+evts;}});
       html+='<div class="week-cell" onclick="dayClick(\''+ds+'\')">'+evts+'</div>';
     });
     html+='</div>';
@@ -1176,7 +1231,9 @@ window.dayClick=function(dateStr){
   var sessHtml=sessions.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>':'<div>';
   sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+(s.time||'')+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
   if(sessions.length>0)sessHtml+='</div>';
-  showModal('📅 '+fmtDate(dateStr),sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
+  var _mk=attentionMarkers().filter(function(x){return x.date===dateStr;});
+  var markHtml='';_mk.forEach(function(x){markHtml+='<div class="ds-item" style="border:1px solid var(--red);background:var(--red-bg);margin-bottom:8px"><div class="ds-bar" style="background:var(--red)"></div><div style="flex:1"><div style="font-weight:700;font-size:13.5px;color:var(--red)">❗ '+escHtml(clientName(x.clientId))+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Pacote encerrado — renovar ou dar alta</div></div><button class="btn-icon" title="Abrir perfil" onclick="closeModal();showClientDetail(\''+x.clientId+'\')">→</button></div>';});
+  showModal('📅 '+fmtDate(dateStr),markHtml+sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
 };
 
 // ── FINANCIAL ──
