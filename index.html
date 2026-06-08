@@ -484,10 +484,10 @@ function clientNeedsAttention(id){
   return pkgs.every(function(p){return pkgStats(p).isExhausted;});
 }
 function _addDaysStr(ds,n){var d=new Date(ds+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
-// Marcadores vermelhos na agenda: para cada paciente com pacote encerrado sem decisão,
-// projeta o nome na sessão seguinte à última do pacote (última sessão + 1 intervalo),
-// numa data fixa — fica ali até a usuária renovar ou dar alta.
-function attentionMarkers(){
+// Horário RESERVADO na agenda: paciente com pacote encerrado e sem decisão mantém o
+// horário recorrente reservado (vermelho com "?") a cada intervalo, a partir da sessão
+// seguinte à última do pacote, até a usuária renovar ou dar alta. Ele NÃO sai da agenda.
+function attentionSlots(){
   var db=getDB();var out=[];
   db.clients.forEach(function(c){
     if(!clientNeedsAttention(c.id))return;
@@ -496,11 +496,20 @@ function attentionMarkers(){
     var last=sess[sess.length-1];
     var pkg=db.packages.find(function(p){return p.id===last.packageId;});
     var iv=last.intervalDays||(pkg&&pkg.intervalDays)||7;if(iv<1)iv=7;
-    var d=_addDaysStr(last.date,iv);
     var parts=clientName(c.id).split(' ');var short=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
-    out.push({clientId:c.id,date:d,time:last.time||'',short:short,pkgName:pkg?pkg.name:''});
+    out.push({clientId:c.id,start:_addDaysStr(last.date,iv),interval:iv,time:last.time||'',short:short});
   });
   return out;
+}
+function _daysBetween(a,b){return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000);}
+// Slots reservados que caem exatamente em ds (somente data atual/futura, alinhados ao intervalo)
+function reservedOnDate(slots,ds){
+  var t=today();
+  return (slots||[]).filter(function(sl){
+    if(ds<sl.start||ds<t)return false;
+    var diff=_daysBetween(sl.start,ds);
+    return diff>=0&&diff%sl.interval===0;
+  });
 }
 async function setClientAlta(id,isAlta){
   var db=getDB();var map=Object.assign({},db.clientStatus||{});
@@ -746,7 +755,7 @@ function showClientDetail(id){
   if(isClientAlta(id)){
     attnHtml='<div class="alert" style="background:var(--green-bg2);border:1px solid rgba(52,217,138,0.3);color:var(--text);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>🏁 <strong>Atendimento encerrado</strong> — alta concedida</span><button class="btn btn-ghost btn-sm" onclick="(async function(){showToast(\'⏳ Reativando...\');await setClientAlta(\''+id+'\',false);showToast(\'↩️ Paciente reativado\');showClientDetail(\''+id+'\');})()">↩️ Reativar</button></div>';
   } else if(clientNeedsAttention(id)){
-    attnHtml='<div class="alert alert-red" style="margin-bottom:16px"><div style="font-weight:700;margin-bottom:6px">❗ Pacote encerrado — escolha uma ação</div><div style="font-size:12.5px;color:var(--text2);margin-bottom:12px">Enquanto não decidir, este paciente aparece em vermelho na agenda (na próxima data prevista).</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\')">🔄 Renovar pacote</button><button class="btn btn-secondary btn-sm" onclick="confirmAltaPaciente(\''+id+'\')">✅ Dar alta / Encerrar</button></div></div>';
+    attnHtml='<div class="alert alert-red" style="margin-bottom:16px"><div style="font-weight:700;margin-bottom:6px">❗ Pacote encerrado — escolha uma ação</div><div style="font-size:12.5px;color:var(--text2);margin-bottom:12px">Enquanto não decidir, o horário dele fica reservado (vermelho com ?) na agenda toda semana — assim ninguém ocupa o lugar dele por engano.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\')">🔄 Renovar pacote</button><button class="btn btn-secondary btn-sm" onclick="confirmAltaPaciente(\''+id+'\')">✅ Dar alta / Encerrar</button></div></div>';
   }
   showModal('Cliente: '+c.name,detailHeader+attnHtml+'<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(\''+id+'\');">+ Registrar Sessão</button><button class="btn btn-secondary btn-sm" onclick="closeModal();showPackageForm(\''+id+'\');">+ Novo Pacote</button><button class="btn btn-ghost btn-sm" onclick="closeModal();showClientForm(\''+id+'\');">✏️ Editar</button></div><div class="section-header"><div class="section-title">📦 Pacotes</div></div>'+pkgsHtml+'<div class="section-header" style="margin-top:16px"><div class="section-title">📅 Histórico</div></div>'+sessHtml,true);
 }
@@ -1181,10 +1190,10 @@ async function saveSessionEdit(id){
 function deleteSessionConfirm(id){showModal('Excluir Sessão','<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeleteSession(\''+id+'\');if(currentPage===\'sessions\')renderSessions();else if(currentPage===\'agenda\')renderCalendar();showToast(\'🗑️ Sessão excluída\');})()">Excluir</button></div>');}
 
 // ── AGENDA ──
-var calView='month',calDate=new Date(),_attnMarkers=[];
+var calView='month',calDate=new Date(),_attnSlots=[];
 function renderAgenda(){document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>';renderCalendar();}
 function renderCalendar(){
-  var db=getDB();var todayStr=today();_attnMarkers=attentionMarkers();
+  var db=getDB();var todayStr=today();_attnSlots=attentionSlots();
   var title='';
   if(calView==='month'){title=calDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});title=title.charAt(0).toUpperCase()+title.slice(1);}
   else{var mon=weekStart(calDate);var sun=new Date(mon);sun.setDate(sun.getDate()+6);title=fmtDate(mon.toISOString().split('T')[0])+' – '+fmtDate(sun.toISOString().split('T')[0]);}
@@ -1222,7 +1231,7 @@ function buildMonthDay(dt,db,todayStr,other){
     chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
   });
   if(extra>0)chips+='<div class="cal-more">+'+extra+' mais</div>';
-  (_attnMarkers||[]).forEach(function(m){if(m.date===ds){chips='<span class="cal-chip encerrado" title="'+escHtml(clientName(m.clientId))+' — PACOTE ENCERRADO · renovar ou dar alta" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">❗ '+escHtml(m.short)+'</span>'+chips;}});
+  reservedOnDate(_attnSlots,ds).forEach(function(m){chips='<span class="cal-chip encerrado" title="'+escHtml(clientName(m.clientId))+' — pacote encerrado · horário reservado, renovar ou dar alta" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">'+(m.time?'<strong>'+m.time.slice(0,5)+'</strong> ':'')+'? '+escHtml(m.short)+'</span>'+chips;});
   return'<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">'+dt.getDate()+'</div>'+chips+'</div>';
 }
 function buildWeekGrid(db,todayStr){
@@ -1247,7 +1256,7 @@ function buildWeekGrid(db,todayStr){
         var lbl=pkg?fn+' '+n+'/'+t:fn;
         evts+='<span class="week-event '+(s.category||'psicoterapia')+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+lbl+'</span>';
       });
-      (_attnMarkers||[]).forEach(function(m){var mh=m.time?m.time.slice(0,2):'08';if(m.date===ds&&mh===hStr){evts='<span class="week-event encerrado" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">❗ '+escHtml(m.short)+'</span>'+evts;}});
+      reservedOnDate(_attnSlots,ds).forEach(function(m){var mh=m.time?m.time.slice(0,2):'08';if(mh===hStr){evts='<span class="week-event encerrado" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">? '+escHtml(m.short)+'</span>'+evts;}});
       html+='<div class="week-cell" onclick="dayClick(\''+ds+'\')">'+evts+'</div>';
     });
     html+='</div>';
@@ -1262,8 +1271,8 @@ window.dayClick=function(dateStr){
   var sessHtml=sessions.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>':'<div>';
   sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+(s.time||'')+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
   if(sessions.length>0)sessHtml+='</div>';
-  var _mk=attentionMarkers().filter(function(x){return x.date===dateStr;});
-  var markHtml='';_mk.forEach(function(x){markHtml+='<div class="ds-item" style="border:1px solid var(--red);background:var(--red-bg);margin-bottom:8px"><div class="ds-bar" style="background:var(--red)"></div><div style="flex:1"><div style="font-weight:700;font-size:13.5px;color:var(--red)">❗ '+escHtml(clientName(x.clientId))+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Pacote encerrado — renovar ou dar alta</div></div><button class="btn-icon" title="Abrir perfil" onclick="closeModal();showClientDetail(\''+x.clientId+'\')">→</button></div>';});
+  var _mk=reservedOnDate(attentionSlots(),dateStr);
+  var markHtml='';_mk.forEach(function(x){markHtml+='<div class="ds-item" style="border:1px solid var(--red);background:var(--red-bg);margin-bottom:8px"><div class="ds-bar" style="background:var(--red)"></div><div style="flex:1"><div style="font-weight:700;font-size:13.5px;color:var(--red)">'+(x.time?x.time.slice(0,5)+' · ':'')+'? '+escHtml(clientName(x.clientId))+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Horário reservado — pacote encerrado, renovar ou dar alta</div></div><button class="btn-icon" title="Abrir perfil" onclick="closeModal();showClientDetail(\''+x.clientId+'\')">→</button></div>';});
   showModal('📅 '+fmtDate(dateStr),markHtml+sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
 };
 
