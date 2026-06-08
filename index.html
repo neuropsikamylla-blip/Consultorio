@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <title>NeuroPsi</title>
 <style>
 :root{--bg:#0f1117;--bg2:#181c27;--bg3:#1e2333;--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.13);--text:#e8eaf0;--text2:#9099b0;--text3:#5a6278;--green:#34d98a;--green-bg:rgba(52,217,138,0.10);--green-bg2:rgba(52,217,138,0.18);--red:#f06060;--red-bg:rgba(240,96,96,0.12);--yellow:#f5c842;--yellow-bg:rgba(245,200,66,0.12);--blue:#60a5fa;--blue-bg:rgba(96,165,250,0.12);--purple:#a78bfa;--purple-bg:rgba(167,139,250,0.12);--radius:14px;--radius-sm:9px;--shadow:0 4px 32px rgba(0,0,0,0.4);}
@@ -235,8 +238,35 @@ const SUPA_URL='https://zrjrzorspfnohjzzykog.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyanJ6b3JzcGZub2hqenp5a29nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTA4NTIsImV4cCI6MjA5MTY2Njg1Mn0.Y8vDMSqzV9IosWMltnA8j5zTZYRXB_OjUsIhdSdq-HI';
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
+// Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
+const APP_VERSION='2026-06-08-08';
 let _cache=null;
 let _idCounter=0;
+
+// ── AUTO-ATUALIZAÇÃO ──
+// Detecta nova versão publicada e recarrega ignorando o cache (sem precisar de Cmd+Shift+R).
+(function(){
+  if(location.protocol.indexOf('http')!==0)return;
+  function _checkUpdate(){
+    fetch(location.pathname+'?_chk='+Date.now(),{cache:'no-store'})
+      .then(function(r){return r.ok?r.text():null;})
+      .then(function(html){
+        if(!html)return;
+        var m=html.match(/APP_VERSION='([^']+)'/);
+        if(m&&m[1]&&m[1]!==APP_VERSION){
+          var flag='neuropsi_upd_'+m[1];
+          if(!sessionStorage.getItem(flag)){
+            sessionStorage.setItem(flag,'1');
+            location.replace(location.pathname+'?v='+encodeURIComponent(m[1]));
+          }
+        }
+      }).catch(function(){});
+  }
+  setTimeout(_checkUpdate,1500);
+  setInterval(_checkUpdate,120000);
+  // Também checa quando a aba volta a ficar visível
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)_checkUpdate();});
+})();
 
 function genId(){_idCounter++;return Date.now().toString(36)+'_'+_idCounter.toString(36)+'_'+Math.random().toString(36).slice(2,8);}
 function today(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
