@@ -549,9 +549,9 @@ function loadBackupFile(e){
       var data=JSON.parse(ev.target.result);
       if(!data.clients||!data.packages||!data.sessions)throw new Error();
       showToast('⏳ Restaurando...');
-      for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,created_at:c.createdAt||new Date().toISOString()});}
-      for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',payment_type:p.paymentType||'pacote',payment_date:p.paymentDate||null,payment_date2:p.paymentDate2||null,created_at:p.createdAt||new Date().toISOString()});}
-      for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,created_at:s.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,cpf:c.cpf||null,birth_date:c.birthDate||c.birth_date||null,education:c.education||null,address:c.address||null,created_at:c.createdAt||c.created_at||new Date().toISOString()});}
+      for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',payment_type:p.paymentType||'pacote',payment_date:p.paymentDate||null,payment_date2:p.paymentDate2||null,notes:p.notes||null,created_at:p.createdAt||new Date().toISOString()});}
+      for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,session_pay_status:s.sessionPayStatus||s.session_pay_status||null,session_price:s.sessionPrice||s.session_price||null,session_paid:s.sessionPaid||s.session_paid||false,created_at:s.createdAt||new Date().toISOString()});}
       await loadFromSupabase();navigate(currentPage);showToast('✅ Backup restaurado!');
     }catch(err){console.error(err);showToast('❌ Arquivo inválido',true);}
   };
@@ -609,7 +609,7 @@ function renderDashboard(){
   html+='<div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val">'+totalClients+'</div><div class="stat-label">Clientes</div></div>';
   html+='<div class="stat-card blue"><div class="stat-icon">✅</div><div class="stat-val">'+totalDone+'</div><div class="stat-label">Sessões Realizadas</div></div>';
   html+='<div class="stat-card '+(hasNotes?'yellow':'')+'" style="cursor:pointer" onclick="navigate(\'notes\')"><div class="stat-icon">📝</div><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(hasNotes?notesPreview.slice(0,55)+(notesPreview.length>55?'...':''):'Clique para abrir notas')+'</div><div class="stat-label">Notas Importantes</div></div>';
-  html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Receita Confirmada (mês atual)</div></div>';
+  html+='<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev)+'</div><div class="stat-label">Recebido este mês</div></div>';
   html+='</div>';
 
   if(pendRev>0)html+='<div class="alert alert-yellow" style="margin-bottom:20px">⚠️ <strong>'+fmt(pendRev)+'</strong> em pagamentos pendentes</div>';
@@ -863,7 +863,15 @@ async function savePackage(id){
   showToast(successCount===totalSessions?'✅ Pacote criado com '+totalSessions+' sessões!':'⚠️ '+successCount+'/'+totalSessions+' sessões criadas.',successCount!==totalSessions);
 }
 
-async function cyclePayment(id){var db=getDB();var pkg=db.packages.find(function(p){return p.id===id;});var cycle={pending:'parcela1',parcela1:'paid',paid:'pending'};var newStatus=cycle[pkg.paymentStatus]||'parcela1';await dbUpdatePackage(id,{paymentStatus:newStatus});renderPackages();showToast('✅ '+paymentLabel(newStatus));}
+async function cyclePayment(id){
+  var db=getDB();var pkg=db.packages.find(function(p){return p.id===id;});
+  var cycle={pending:'parcela1',parcela1:'paid',paid:'pending'};var newStatus=cycle[pkg.paymentStatus]||'parcela1';
+  var data={paymentStatus:newStatus};
+  if(newStatus==='parcela1'){data.paymentDate=pkg.paymentDate||today();}
+  else if(newStatus==='paid'){if(pkg.paymentStatus==='parcela1'){data.paymentDate2=today();if(!pkg.paymentDate)data.paymentDate=today();}else{data.paymentDate=today();}}
+  else{data.paymentDate=null;data.paymentDate2=null;}
+  await dbUpdatePackage(id,data);renderPackages();showToast('✅ '+paymentLabel(newStatus));
+}
 function deletePackageConfirm(id,clientId){
   var p=getDB().packages.find(function(pkg){return pkg.id===id;});
   var sessCount=getDB().sessions.filter(function(s){return s.packageId===id;}).length;
@@ -974,7 +982,8 @@ function renderSessions(){closeSidebar();
   var html='<div class="page">';
   clientIds.forEach(function(clientId){
     var sessions=byClient[clientId];
-    var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta'||s.status==='falta';}).length;
+    var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
+    var realizadaCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
     var faltaCount=sessions.filter(function(s){return s.status==='falta';}).length;
     var rows='';var doneRows='';
     sessions.forEach(function(s){
@@ -1009,7 +1018,7 @@ function renderSessions(){closeSidebar();
     html+='<div style="display:flex;align-items:center;gap:12px">';
     html+='<div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(clientName(clientId))+'</div>';
     html+='<div><div style="font-weight:700;font-size:15px">'+clientName(clientId)+'</div>';
-    html+='<div style="font-size:12px;color:var(--text2);margin-top:2px">'+(sessions.length===1?' sessão:':' sessões:')+' <span style="color:var(--green)">'+completedCount+' realizada'+(completedCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div>';
+    html+='<div style="font-size:12px;color:var(--text2);margin-top:2px">'+(sessions.length===1?' sessão:':' sessões:')+' <span style="color:var(--green)">'+realizadaCount+' realizada'+(realizadaCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div>';
     html+='<div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+clientId+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+clientId+'\')">Ver perfil →</button></div></div>';
     // Table with all rows
     html+='<div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
@@ -1274,8 +1283,10 @@ function renderFinancial(){
   var paidRev=paidNow.reduce(function(a,p){return a+p.price;},0);
   // Sessão-a-sessão: soma apenas sessões efetivamente pagas/falta neste mês
   paidRev+=db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0);
+  // Avulsas: sessões sem pacote pagas/falta neste mês
+  paidRev+=db.sessions.filter(function(s){return !s.packageId&&(s.sessionPayStatus==='paid'||s.status==='falta')&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
   var parcela1Rev=parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
-  var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
+  var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
 
   // Revenue by month (all history)
   var revenueByMonth={};
@@ -1318,6 +1329,7 @@ function renderFinancial(){
   // Pending list: show ALL pending + parcela1 regardless of month
   var allPending=db.packages.filter(function(p){return p.paymentStatus==='pending';});
   var allParcela1=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
+  var standalonePending=db.sessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending';}).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
   var pendingRows='';
   allParcela1.forEach(function(p){
     pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
@@ -1337,6 +1349,14 @@ function renderFinancial(){
       '<td class="td-muted">—</td>'+
       '<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markPaid(\''+p.id+'\');})()">Marcar pago</button></td></tr>';
   });
+  standalonePending.forEach(function(s){
+    var isOld=s.date&&s.date.slice(0,7)<currentMonth;
+    pendingRows+='<tr><td><strong>'+clientName(s.clientId)+'</strong></td><td class="td-muted">Sessão avulsa</td>'+
+      '<td style="color:'+(isOld?'var(--text3)':'var(--yellow)')+';font-weight:600">'+fmt(s.sessionPrice||0)+(isOld?' <span style="font-size:11px;color:var(--text3)">(mês anterior)</span>':'')+'</td>'+
+      '<td><span class="badge '+(isOld?'badge-gray':'badge-yellow')+'">'+(isOld?'⚠️ Antigo':'⏳ Pendente')+'</span></td>'+
+      '<td class="td-muted">'+(s.date?fmtDate(s.date):'—')+'</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="(async function(){await markSessionPaid(\''+s.id+'\');})()">Marcar pago</button></td></tr>';
+  });
 
   var paidRows='';
   db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
@@ -1354,10 +1374,10 @@ function renderFinancial(){
   curMonthName=curMonthName.charAt(0).toUpperCase()+curMonthName.slice(1);
   html+='<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">📅 Resumo de '+curMonthName+'</div>';
   html+='<div class="grid-4" style="margin-bottom:24px">';
-  html+='<div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">'+fmt(paidRev)+'</div><div class="stat-label">Recebido este mês</div></div>';
-  html+='<div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">'+fmt(parcela1Rev)+'</div><div class="stat-label">1ª Parcela este mês</div></div>';
+  html+='<div class="stat-card green"><div class="stat-icon">💰</div><div class="stat-val">'+fmt(paidRev+parcela1Rev)+'</div><div class="stat-label">Recebido este mês</div></div>';
+  html+='<div class="stat-card" style="border-color:rgba(251,146,60,0.3)"><div class="stat-icon">🔶</div><div class="stat-val" style="font-size:22px">'+fmt(parcela1Rev)+'</div><div class="stat-label">1ª Parcela (incluída acima)</div></div>';
   html+='<div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-val" style="font-size:22px">'+fmt(pendRev)+'</div><div class="stat-label">A Receber este mês</div></div>';
-  html+='<div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev+parcela1Rev)+'</div><div class="stat-label">Total recebido este mês</div></div>';
+  html+='<div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-val" style="font-size:20px">'+fmt(paidRev+parcela1Rev+pendRev)+'</div><div class="stat-label">Previsto no mês (recebido + a receber)</div></div>';
   html+='</div>';
 
   // Monthly history table
@@ -1367,7 +1387,7 @@ function renderFinancial(){
   }
 
   // Pending payments
-  if(allPending.length>0||allParcela1.length>0){
+  if(allPending.length>0||allParcela1.length>0||standalonePending.length>0){
     html+='<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">⏳ Pagamentos Pendentes</div></div>'+
       '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>'+pendingRows+'</tbody></table></div></div>';
   }
@@ -1382,9 +1402,19 @@ function renderFinancial(){
   html+='</div>';
   document.getElementById('page-content').innerHTML=html;
 }
-window.markPaid=async function(id){await dbUpdatePackage(id,{paymentStatus:'paid'});renderFinancial();showToast('✅ Pagamento confirmado!');};
-window.markParcela1=async function(id){await dbUpdatePackage(id,{paymentStatus:'parcela1'});renderFinancial();showToast('🔶 1ª parcela registrada!');};
-window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending'});renderFinancial();showToast('↩️ Revertido para pendente');};
+window.markPaid=async function(id){
+  var pkg=getDB().packages.find(function(p){return p.id===id;});
+  var data={paymentStatus:'paid'};
+  if(pkg&&pkg.paymentStatus==='parcela1'){data.paymentDate2=today();if(!pkg.paymentDate)data.paymentDate=today();}
+  else{data.paymentDate=today();}
+  await dbUpdatePackage(id,data);renderFinancial();showToast('✅ Pagamento confirmado!');
+};
+window.markParcela1=async function(id){
+  var pkg=getDB().packages.find(function(p){return p.id===id;});
+  await dbUpdatePackage(id,{paymentStatus:'parcela1',paymentDate:(pkg&&pkg.paymentDate)||today()});renderFinancial();showToast('🔶 1ª parcela registrada!');
+};
+window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending',paymentDate:null,paymentDate2:null});renderFinancial();showToast('↩️ Revertido para pendente');};
+window.markSessionPaid=async function(id){await dbUpdateSession(id,{sessionPayStatus:'paid',sessionPaid:true});renderFinancial();showToast('✅ Sessão avulsa paga!');};
 
 // ── BILLS ──
 var _billsCache=null;
