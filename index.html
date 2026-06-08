@@ -201,8 +201,7 @@ select option{background:var(--bg3);}
       <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard"><span class="ico">📊</span> Dashboard</button>
       <button class="nav-item" onclick="navigate('clients')" data-page="clients"><span class="ico">👥</span> Clientes</button>
       <button class="nav-item" onclick="navigate('anexos')" data-page="anexos"><span class="ico">📁</span> Anexos</button>
-      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões</button>
-      <button class="nav-item" onclick="navigate('packages')" data-page="packages"><span class="ico">📦</span> Pacotes</button>
+      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões/Pacotes</button>
       <button class="nav-item" onclick="navigate('agenda')" data-page="agenda"><span class="ico">🗓️</span> Agenda</button>
       <button class="nav-item" onclick="navigate('financial')" data-page="financial"><span class="ico">💰</span> Financeiro</button>
       <button class="nav-item" onclick="navigate('bills')" data-page="bills"><span class="ico">📎</span> Boletos</button>
@@ -431,7 +430,7 @@ function navigate(page){
   var main=document.querySelector('.main');
   if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
   document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
-  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações',anamnese:'Anamnese Neuropsicológica'};
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões/Pacotes',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações',anamnese:'Anamnese Neuropsicológica'};
   document.getElementById('page-title').textContent=titles[page]||page;
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('page-content').innerHTML='';
