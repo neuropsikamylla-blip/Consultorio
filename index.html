@@ -239,7 +239,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-06-08-09';
+const APP_VERSION='2026-06-08-10';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -512,7 +512,9 @@ function clientNeedsAttention(id){
   if(isClientAlta(id))return false;
   var pkgs=db.packages.filter(function(p){return p.clientId===id;});
   if(pkgs.length===0)return false;
-  return pkgs.every(function(p){return pkgStats(p).isExhausted;});
+  // Encerrado = todos os pacotes totalmente agendados (sem vaga p/ nova sessão),
+  // ou seja, sem renovação. Não depende de marcar "realizada".
+  return pkgs.every(function(p){return !pkgStats(p).canAdd;});
 }
 function _addDaysStr(ds,n){var d=new Date(ds+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
 // Horário RESERVADO na agenda: paciente com pacote encerrado e sem decisão mantém o
@@ -533,11 +535,11 @@ function attentionSlots(){
   return out;
 }
 function _daysBetween(a,b){return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000);}
-// Slots reservados que caem exatamente em ds (somente data atual/futura, alinhados ao intervalo)
+// Slots reservados que caem exatamente em ds (data atual até ~3 meses à frente, alinhados ao intervalo)
 function reservedOnDate(slots,ds){
-  var t=today();
+  var t=today();var horizon=_addDaysStr(t,84);
   return (slots||[]).filter(function(sl){
-    if(ds<sl.start||ds<t)return false;
+    if(ds<sl.start||ds<t||ds>horizon)return false;
     var diff=_daysBetween(sl.start,ds);
     return diff>=0&&diff%sl.interval===0;
   });
