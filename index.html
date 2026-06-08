@@ -219,7 +219,7 @@ select option{background:var(--bg3);}
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;" onclick="importBackup()">⬆️ Restaurar</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;color:var(--red);" onclick="doLogout()">Sair</button>
       <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:6px;font-size:11px;opacity:0.6;" onclick="window.location.href=window.location.href.split('?')[0]+'?v='+Date.now()">🔄 Atualizar App</button>
-      <div style="text-align:center;font-size:10px;color:var(--text2);margin-top:6px;opacity:0.5">v20260509b</div>
+      <div id="app-version-label" style="text-align:center;font-size:10px;color:var(--text2);margin-top:6px;opacity:0.5">v—</div>
     </div>
   </nav>
   <main class="main">
@@ -239,7 +239,8 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-06-08-08';
+const APP_VERSION='2026-06-08-09';
+try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
 
