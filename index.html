@@ -201,7 +201,8 @@ select option{background:var(--bg3);}
       <button class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard"><span class="ico">📊</span> Dashboard</button>
       <button class="nav-item" onclick="navigate('clients')" data-page="clients"><span class="ico">👥</span> Clientes</button>
       <button class="nav-item" onclick="navigate('anexos')" data-page="anexos"><span class="ico">📁</span> Anexos</button>
-      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões/Pacotes</button>
+      <button class="nav-item" onclick="navigate('sessions')" data-page="sessions"><span class="ico">📋</span> Sessões</button>
+      <button class="nav-item" onclick="navigate('packages')" data-page="packages"><span class="ico">📦</span> Pacotes</button>
       <button class="nav-item" onclick="navigate('agenda')" data-page="agenda"><span class="ico">🗓️</span> Agenda</button>
       <button class="nav-item" onclick="navigate('financial')" data-page="financial"><span class="ico">💰</span> Financeiro</button>
       <button class="nav-item" onclick="navigate('bills')" data-page="bills"><span class="ico">📎</span> Boletos</button>
@@ -266,16 +267,40 @@ function getAuthToken(){
   }catch(e){}
   return SUPA_KEY;
 }
+var _isRefreshing=false;
+async function refreshAuthToken(){
+  if(_isRefreshing)return false;
+  _isRefreshing=true;
+  try{
+    var stored=localStorage.getItem(AUTH_KEY);
+    if(!stored)return false;
+    var auth=JSON.parse(stored);
+    if(!auth||!auth.refresh_token)return false;
+    var res=await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:auth.refresh_token})});
+    if(!res.ok)return false;
+    var data=await res.json();
+    if(!data.access_token)return false;
+    localStorage.setItem(AUTH_KEY,JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token||auth.refresh_token,email:auth.email}));
+    return true;
+  }catch(e){return false;}
+  finally{_isRefreshing=false;}
+}
 async function supaFetch(method,table,body,query){
   const url=SUPA_URL+'/rest/v1/'+table+(query||'');
-  const token=getAuthToken();
-  const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+  const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+getAuthToken(),'Content-Type':'application/json'};
   if(method==='POST'||method==='PATCH')headers['Prefer']='return=representation';
   if(method==='DELETE')headers['Prefer']='return=representation';
   const opts={method:method,headers:headers};
   if(body!=null)opts.body=JSON.stringify(body);
   try{
-    const res=await fetch(url,opts);
+    var res=await fetch(url,opts);
+    if(res.status===401||res.status===403){
+      var refreshed=await refreshAuthToken();
+      if(refreshed){
+        opts.headers['Authorization']='Bearer '+getAuthToken();
+        res=await fetch(url,opts);
+      }
+    }
     const text=await res.text();
     if(!res.ok){console.error('DB Error',res.status,text);return null;}
     return text?JSON.parse(text):[];
@@ -347,7 +372,9 @@ async function dbUpdateSession(id,data){
   if(data.category)row.category=data.category;
   if(data.sessionPaid!==undefined)row.session_paid=data.sessionPaid;
   if(data.sessionPayStatus!==undefined)row.session_pay_status=data.sessionPayStatus;
-  await supaFetch('PATCH','sessions',row,'?id=eq.'+id);await loadFromSupabase();
+  var result=await supaFetch('PATCH','sessions',row,'?id=eq.'+id);
+  if(result===null)throw new Error('Falha ao salvar. Verifique sua conexão ou faça login novamente.');
+  await loadFromSupabase();
 }
 async function dbDeleteSession(id){
   await supaFetch('DELETE','sessions',null,'?id=eq.'+id);
@@ -404,7 +431,7 @@ function navigate(page){
   var main=document.querySelector('.main');
   if(main)main.style.padding=page==='agenda'?'20px 16px':'28px 32px';
   document.querySelectorAll('.nav-item').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
-  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões/Pacotes',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações',anamnese:'Anamnese Neuropsicológica'};
+  var titles={dashboard:'Dashboard',clients:'Clientes',packages:'Pacotes',sessions:'Sessões',anexos:'Anexos',agenda:'Agenda',financial:'Financeiro',bills:'Boletos',notes:'Notas Importantes',settings:'Configurações',anamnese:'Anamnese Neuropsicológica'};
   document.getElementById('page-title').textContent=titles[page]||page;
   document.getElementById('topbar-actions').innerHTML='';
   document.getElementById('page-content').innerHTML='';
@@ -646,7 +673,7 @@ function showClientDetail(id){
   var pkgs=db.packages.filter(function(p){return p.clientId===id;});
   var sessions=db.sessions.filter(function(s){return s.clientId===id;}).sort(function(a,b){return b.date.localeCompare(a.date);});
   var pkgsHtml=pkgs.length===0?'<div class="empty" style="padding:20px"><p>Nenhum pacote</p></div>':'';
-  pkgs.forEach(function(p){var st=pkgStats(p);var bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';pkgsHtml+='<div class="package-card"><div class="package-header"><div><strong>'+p.name+'</strong>'+(st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':'')+'</div><span class="badge '+paymentBadgeClass(p.paymentStatus)+'">'+paymentLabel(p.paymentStatus,p.paymentType)+'</span></div><div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">'+p.totalSessions+'</strong></span><span style="font-size:12px;color:var(--text2)">Realizadas: <strong style="color:var(--text)">'+st.used+'</strong></span><span style="font-size:12px;color:var(--text2)">Restantes: <strong style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--green)')+'">'+st.remaining+'</strong></span><span style="font-size:12px;color:var(--text2)">Valor: <strong style="color:var(--text)">'+fmt(p.price)+'</strong></span></div><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></div>';});
+  pkgs.forEach(function(p){var st=pkgStats(p);var bc=st.pct>=100?'progress-red':st.pct>=70?'progress-yellow':'progress-green';pkgsHtml+='<div class="package-card"><div class="package-header"><div><strong>'+p.name+'</strong>'+(st.isExhausted?'<span class="badge badge-red" style="margin-left:8px">Encerrado</span>':'')+'</div><div style="display:flex;align-items:center;gap:8px"><span class="badge '+paymentBadgeClass(p.paymentStatus)+'">'+paymentLabel(p.paymentStatus,p.paymentType)+'</span><button class="btn-icon" title="Excluir pacote inteiro" onclick="deletePackageConfirm(\''+p.id+'\',\''+id+'\')">🗑️</button></div></div><div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--text2)">Total: <strong style="color:var(--text)">'+p.totalSessions+'</strong></span><span style="font-size:12px;color:var(--text2)">Realizadas: <strong style="color:var(--text)">'+st.used+'</strong></span><span style="font-size:12px;color:var(--text2)">Restantes: <strong style="color:'+(st.remaining<=0?'var(--red)':st.remaining<=2?'var(--yellow)':'var(--green)')+'">'+st.remaining+'</strong></span><span style="font-size:12px;color:var(--text2)">Valor: <strong style="color:var(--text)">'+fmt(p.price)+'</strong></span></div><div class="progress-bar"><div class="progress-fill '+bc+'" style="width:'+Math.min(st.pct,100)+'%"></div></div></div>';});
   var sessHtml='<table style="width:100%;border-collapse:collapse"><thead><tr><th>Data</th><th>Hora</th><th>Categoria</th><th>Status</th><th></th></tr></thead><tbody>';
   sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<tr><td>'+fmtDate(s.date)+'</td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td><span class="badge '+sb[0]+'">'+sb[1]+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="(async function(){await dbDeleteSession(\''+s.id+'\');showToast(\'🗑️ Removida\');showClientDetail(\''+id+'\');})()">🗑️</button></div></td></tr>';});
   sessHtml+='</tbody></table>';
@@ -763,15 +790,16 @@ async function savePackage(id){
 }
 
 async function cyclePayment(id){var db=getDB();var pkg=db.packages.find(function(p){return p.id===id;});var cycle={pending:'parcela1',parcela1:'paid',paid:'pending'};var newStatus=cycle[pkg.paymentStatus]||'parcela1';await dbUpdatePackage(id,{paymentStatus:newStatus});renderPackages();showToast('✅ '+paymentLabel(newStatus));}
-function deletePackageConfirm(id){
+function deletePackageConfirm(id,clientId){
   var p=getDB().packages.find(function(pkg){return pkg.id===id;});
   var sessCount=getDB().sessions.filter(function(s){return s.packageId===id;}).length;
+  var after=clientId?('showClientDetail(\''+clientId+'\');'):('navigate(currentPage);');
   showModal('Excluir Pacote',
     '<div class="alert alert-red" style="margin-bottom:14px">⚠️ Excluir pacote <strong>'+p.name+'</strong>?</div>'+
     '<p style="color:var(--text2);font-size:13px;margin-bottom:18px">'+sessCount+' sessão(ões) vinculada(s).</p>'+
     '<div style="display:flex;flex-direction:column;gap:8px">'+
-    '<button class="btn btn-danger" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');try{await dbDeletePackage(\''+id+'\');navigate(\'packages\');showToast(\'🗑️ Pacote e sessões excluídos!\');}catch(e){showToast(\'❌ \'+e.message,true);}})()">🗑️ Excluir pacote + '+sessCount+' sessão(ões)</button>'+
-    '<button class="btn btn-secondary" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');var r=await supaFetch(\'DELETE\',\'packages\',null,\'?id=eq.'+id+'\');if(!r||r.length===0){showToast(\'❌ Sem permissão para excluir.\',true);return;}_cache=null;await loadFromSupabase();navigate(\'packages\');showToast(\'🗑️ Pacote excluído (sessões mantidas)!\');})()">📋 Excluir só o pacote</button>'+
+    '<button class="btn btn-danger" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');try{await dbDeletePackage(\''+id+'\');'+after+'showToast(\'🗑️ Pacote e sessões excluídos!\');}catch(e){showToast(\'❌ \'+e.message,true);}})()">🗑️ Excluir pacote + '+sessCount+' sessão(ões)</button>'+
+    '<button class="btn btn-secondary" style="width:100%" onclick="(async function(){closeModal();showToast(\'⏳ Excluindo...\');var r=await supaFetch(\'DELETE\',\'packages\',null,\'?id=eq.'+id+'\');if(!r||r.length===0){showToast(\'❌ Sem permissão para excluir.\',true);return;}_cache=null;await loadFromSupabase();'+after+'showToast(\'🗑️ Pacote excluído (sessões mantidas)!\');})()">📋 Excluir só o pacote</button>'+
     '<button class="btn btn-ghost" style="width:100%" onclick="closeModal()">Cancelar</button>'+
     '</div>'
   );
@@ -1053,15 +1081,19 @@ async function saveSessionEdit(id){
   if(status==='falta'&&s&&s.status!=='falta'&&!window.confirm('Confirmar falta para esta sessão?'))return;
   var conflict=db.sessions.find(function(ss){return ss.date===date&&ss.time===time&&ss.clientId!==s.clientId&&ss.id!==id;});
   if(conflict&&!window.confirm('⚠️ Conflito com '+clientName(conflict.clientId)+' às '+time+' do dia '+fmtDate(date)+'. Reagendar mesmo assim?'))return;
-  closeModal();
-  await dbUpdateSession(id,{date:date,time:time,status:status,notes:notes,category:category});
-  if(propagate&&s&&date!==s.date){
-    var diff=(new Date(date+'T12:00:00')-new Date(s.date+'T12:00:00'))/(1000*60*60*24);
-    var futures=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date&&ss.id!==id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-    if(futures.length>0){await dbUpdateSessionsBatch(futures.map(function(ss){var nd=new Date(ss.date+'T12:00:00');nd.setDate(nd.getDate()+diff);return{id:ss.id,data:{date:nd.toISOString().split('T')[0],time:time}};}));}
+  try{
+    await dbUpdateSession(id,{date:date,time:time,status:status,notes:notes,category:category});
+    if(propagate&&s&&date!==s.date){
+      var diff=(new Date(date+'T12:00:00')-new Date(s.date+'T12:00:00'))/(1000*60*60*24);
+      var futures=db.sessions.filter(function(ss){return ss.packageId===s.packageId&&ss.date>s.date&&ss.id!==id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+      if(futures.length>0){await dbUpdateSessionsBatch(futures.map(function(ss){var nd=new Date(ss.date+'T12:00:00');nd.setDate(nd.getDate()+diff);return{id:ss.id,data:{date:nd.toISOString().split('T')[0],time:time}};}));}
+    }
+    closeModal();
+    if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
+    showToast(propagate?'✅ Sessão e futuras atualizadas!':'✅ Sessão atualizada!');
+  }catch(e){
+    err.textContent=e.message;err.style.display='flex';
   }
-  if(currentPage==='sessions')renderSessions();else if(currentPage==='agenda')renderCalendar();
-  showToast(propagate?'✅ Sessão e futuras atualizadas!':'✅ Sessão atualizada!');
 }
 function deleteSessionConfirm(id){showModal('Excluir Sessão','<p style="color:var(--text2);margin-bottom:20px">Tem certeza?</p><div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="(async function(){closeModal();await dbDeleteSession(\''+id+'\');if(currentPage===\'sessions\')renderSessions();else if(currentPage===\'agenda\')renderCalendar();showToast(\'🗑️ Sessão excluída\');})()">Excluir</button></div>');}
 
