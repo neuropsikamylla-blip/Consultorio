@@ -239,7 +239,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-06-08-10';
+const APP_VERSION='2026-08-17-01';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -292,6 +292,7 @@ function getCreds(){
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
 function getDB(){return _cache||{clients:[],packages:[],sessions:[],clientStatus:{}};}
 
+// ── AUTH-CORE-INICIO ──
 function getAuthToken(){
   try{
     var stored=localStorage.getItem(AUTH_KEY);
@@ -299,38 +300,59 @@ function getAuthToken(){
   }catch(e){}
   return SUPA_KEY;
 }
-var _isRefreshing=false;
+var _isRefreshing=null;
 async function refreshAuthToken(){
-  if(_isRefreshing)return false;
-  _isRefreshing=true;
+  if(_isRefreshing)return _isRefreshing;
+  _isRefreshing=(async function(){
+    try{
+      var stored=localStorage.getItem(AUTH_KEY);
+      if(!stored)return false;
+      var auth=JSON.parse(stored);
+      if(!auth||!auth.refresh_token)return false;
+      var res=await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:auth.refresh_token})});
+      if(!res.ok)return false;
+      var data=await res.json();
+      if(!data.access_token)return false;
+      localStorage.setItem(AUTH_KEY,JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token||auth.refresh_token,email:auth.email}));
+      return true;
+    }catch(e){return false;}
+  })();
+  try{
+    return await _isRefreshing;
+  }catch(e){return false;}
+  finally{_isRefreshing=null;}
+}
+async function ensureFreshToken(){
   try{
     var stored=localStorage.getItem(AUTH_KEY);
     if(!stored)return false;
     var auth=JSON.parse(stored);
-    if(!auth||!auth.refresh_token)return false;
-    var res=await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:auth.refresh_token})});
-    if(!res.ok)return false;
-    var data=await res.json();
-    if(!data.access_token)return false;
-    localStorage.setItem(AUTH_KEY,JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token||auth.refresh_token,email:auth.email}));
+    var exp=0;
+    try{
+      var part=auth.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+      while(part.length%4)part+='=';
+      exp=Number(JSON.parse(atob(part)).exp)||0;
+    }catch(e){exp=0;}
+    if(exp-(Date.now()/1000)<120)return await refreshAuthToken();
     return true;
   }catch(e){return false;}
-  finally{_isRefreshing=false;}
 }
-async function supaFetch(method,table,body,query){
+async function supaFetch(method,table,body,query,opts){
+  if(method==='POST'||method==='PATCH'||method==='DELETE')await ensureFreshToken();
   const url=SUPA_URL+'/rest/v1/'+table+(query||'');
   const headers={'apikey':SUPA_KEY,'Authorization':'Bearer '+getAuthToken(),'Content-Type':'application/json'};
-  if(method==='POST'||method==='PATCH')headers['Prefer']='return=representation';
-  if(method==='DELETE')headers['Prefer']='return=representation';
-  const opts={method:method,headers:headers};
-  if(body!=null)opts.body=JSON.stringify(body);
+  if(opts&&opts.prefer)headers['Prefer']=opts.prefer;
+  else if(method==='POST'||method==='PATCH')headers['Prefer']='return=representation';
+  else if(method==='DELETE')headers['Prefer']='return=representation';
+  const fetchOpts={method:method,headers:headers};
+  if(body!=null)fetchOpts.body=JSON.stringify(body);
   try{
-    var res=await fetch(url,opts);
+    var res=await fetch(url,fetchOpts);
     if(res.status===401||res.status===403){
       var refreshed=await refreshAuthToken();
       if(refreshed){
-        opts.headers['Authorization']='Bearer '+getAuthToken();
-        res=await fetch(url,opts);
+        fetchOpts.headers['Authorization']='Bearer '+getAuthToken();
+        res=await fetch(url,fetchOpts);
       }
     }
     const text=await res.text();
@@ -338,6 +360,7 @@ async function supaFetch(method,table,body,query){
     return text?JSON.parse(text):[];
   }catch(err){console.error('Network error:',err.message);return null;}
 }
+// ── AUTH-CORE-FIM ──
 
 function showLoadingOverlay(show){
   let el=document.getElementById('loading-overlay');
@@ -547,8 +570,8 @@ function reservedOnDate(slots,ds){
 async function setClientAlta(id,isAlta){
   var db=getDB();var map=Object.assign({},db.clientStatus||{});
   if(isAlta)map[id]='alta';else delete map[id];
-  var _nt=getAuthToken();
-  await fetch(SUPA_URL+'/rest/v1/notes',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_nt,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'client_status',user_id:'admin',content:JSON.stringify(map),updated_at:new Date().toISOString()})});
+  var res=await supaFetch('POST','notes',{id:'client_status',user_id:'admin',content:JSON.stringify(map),updated_at:new Date().toISOString()},null,{prefer:'resolution=merge-duplicates,return=minimal'});
+  if(res===null){showToast('❌ Não foi possível salvar. Tente novamente.',true);return;}
   _cache=null;await loadFromSupabase();
 }
 window.setClientAlta=setClientAlta;
@@ -891,18 +914,23 @@ async function savePackage(id){
   closeModal();
   showToast('⏳ Criando pacote e sessões...');
   var pkgId=genId();
-  var authTok=getAuthToken();
-  var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+authTok,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()})});
-  if(!pkgRes.ok){showToast('❌ Erro ao criar pacote.',true);return;}
-  var successCount=0;
+  var pkgRes=await supaFetch('POST','packages',{id:pkgId,client_id:clientId,name:name,total_sessions:totalSessions,price:price,payment_status:finalStatus,payment_type:paymentType,payment_date:paymentDate,payment_date2:paymentDate2,created_at:new Date().toISOString()},null,{prefer:'return=minimal'});
+  if(pkgRes===null){showToast('❌ Erro ao criar pacote. Tente novamente.',true);return;}
+  var sessions=[];
   for(var i=0;i<totalSessions;i++){
     var d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+(i*interval));
-    var sessRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+authTok,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()})});
-    if(sessRes.ok)successCount++;
+    sessions.push({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()});
+  }
+  var sessRes=await supaFetch('POST','sessions',sessions,null,{prefer:'return=minimal'});
+  if(sessRes===null){
+    await supaFetch('DELETE','packages',null,'?id=eq.'+pkgId);
+    showToast('❌ Erro ao criar as sessões. Nada foi salvo — tente novamente.',true);
+    await loadFromSupabase();
+    return;
   }
   await loadFromSupabase();
   navigate('sessions');
-  showToast(successCount===totalSessions?'✅ Pacote criado com '+totalSessions+' sessões!':'⚠️ '+successCount+'/'+totalSessions+' sessões criadas.',successCount!==totalSessions);
+  showToast('✅ Pacote criado com '+totalSessions+' sessões!');
 }
 
 async function cyclePayment(id){
@@ -1935,6 +1963,10 @@ function toggleTheme(){
     try{
       var auth=JSON.parse(stored);
       var res=await fetch(SUPA_URL+'/auth/v1/user',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+auth.access_token}});
+      if(!res.ok&&await refreshAuthToken()){
+        auth=JSON.parse(localStorage.getItem(AUTH_KEY));
+        res=await fetch(SUPA_URL+'/auth/v1/user',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+auth.access_token}});
+      }
       if(res.ok){
         document.getElementById('login-screen').style.display='none';
         document.getElementById('app').style.display='flex';
