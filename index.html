@@ -143,6 +143,8 @@ select option{background:var(--bg3);}
 .cal-chip.falta{background:rgba(240,96,96,0.18);color:#fca5a5;border-left:2px solid var(--red);text-decoration:line-through;}
 .cal-chip.realizada{opacity:0.55;}
 .cal-chip.encerrado{background:rgba(240,96,96,0.30);color:#fff;border-left:3px solid var(--red);font-weight:800;opacity:1;text-decoration:none;box-shadow:0 0 0 1px rgba(240,96,96,0.45) inset;}
+.cal-chip.compromisso{background:rgba(245,200,66,0.18);color:#f5c842;border-left:2px solid var(--yellow);}
+.week-event.compromisso{background:rgba(245,200,66,0.22);color:#f5c842;border-left:2px solid var(--yellow);}
 .week-event.encerrado{background:rgba(240,96,96,0.34);color:#fff;border-left:3px solid var(--red);font-weight:800;}
 .cal-more{font-size:10px;color:var(--text3);padding:1px 6px;cursor:pointer;}
 .week-wrap{display:flex;overflow:hidden;}
@@ -239,7 +241,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-17-02';
+const APP_VERSION='2026-08-17-03';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -290,7 +292,7 @@ function getCreds(){
   return{email:'',password:'',name:'Profissional'};
 }
 function saveCreds(c){localStorage.setItem(CREDS_KEY,JSON.stringify(c));}
-function getDB(){return _cache||{clients:[],packages:[],sessions:[],clientStatus:{}};}
+function getDB(){return _cache||{clients:[],packages:[],sessions:[],clientStatus:{},compromissos:[]};}
 
 // ── AUTH-CORE-INICIO ──
 function getAuthToken(){
@@ -371,20 +373,23 @@ function showLoadingOverlay(show){
 async function loadFromSupabase(){
   showLoadingOverlay(true);
   try{
-    const [clients,packages,sessions,statusRows]=await Promise.all([
+    const [clients,packages,sessions,statusRows,compromissoRows]=await Promise.all([
       supaFetch('GET','clients',null,'?order=name'),
       supaFetch('GET','packages',null,'?order=created_at'),
       supaFetch('GET','sessions',null,'?order=date'),
-      supaFetch('GET','notes',null,'?id=eq.client_status')
+      supaFetch('GET','notes',null,'?id=eq.client_status'),
+      supaFetch('GET','notes',null,'?id=eq.agenda_compromissos')
     ]);
     var _cstatus={};try{if(statusRows&&statusRows[0]&&statusRows[0].content)_cstatus=JSON.parse(statusRows[0].content)||{};}catch(e){_cstatus={};}
+    var _compromissos=[];try{if(compromissoRows&&compromissoRows[0]&&compromissoRows[0].content){var _compData=JSON.parse(compromissoRows[0].content);_compromissos=Array.isArray(_compData.items)?_compData.items:[];}}catch(e){_compromissos=[];}
     _cache={
       clients:(clients||[]).map(function(c){return Object.assign({},c,{cpf:c.cpf||'',birthDate:c.birth_date||null,education:c.education||'',address:c.address||''});}),
       packages:(packages||[]).map(function(p){return Object.assign({},p,{clientId:p.client_id,totalSessions:p.total_sessions,paymentStatus:p.payment_status,createdAt:p.created_at,notes:p.notes||'',paymentDate:p.payment_date||null,paymentDate2:p.payment_date2||null,paymentType:p.payment_type||'pacote'});}),
       sessions:(sessions||[]).map(function(s){return Object.assign({},s,{clientId:s.client_id,packageId:s.package_id,intervalDays:s.interval_days,createdAt:s.created_at,sessionPaid:s.session_paid||false,sessionPayStatus:s.session_pay_status||'pending',sessionPrice:s.session_price||null});}),
-      clientStatus:_cstatus
+      clientStatus:_cstatus,
+      compromissos:_compromissos
     };
-  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[]};showToast('⚠️ Erro ao carregar dados.',true);}
+  }catch(e){console.error('Load error:',e);_cache=_cache||{clients:[],packages:[],sessions:[],clientStatus:{},compromissos:[]};showToast('⚠️ Erro ao carregar dados.',true);}
   showLoadingOverlay(false);
   return _cache;
 }
@@ -590,6 +595,47 @@ function pkgMonth(p){
   return p.createdAt?p.createdAt.split('T')[0].slice(0,7):'';
 }
 
+// ── COMPROMISSOS-CORE-INICIO ──
+function compromissoKindMeta(kind){
+  if(kind==='laudo')return{lbl:'Entrega de Laudo',emoji:'📄'};
+  if(kind==='supervisao')return{lbl:'Supervisão',emoji:'👥'};
+  if(kind==='reuniao')return{lbl:'Reunião',emoji:'🤝'};
+  if(kind==='pessoal')return{lbl:'Pessoal',emoji:'🔒'};
+  return{lbl:'Compromisso',emoji:'📌'};
+}
+function compromissoOccurrences(base,repeatDays,count){
+  var total=Math.min(parseInt(count,10)||1,52);
+  if(repeatDays<=0||total<=1)return[Object.assign({},base)];
+  var items=[];
+  for(var i=0;i<total;i++){
+    var item=Object.assign({},base);
+    var date=new Date(base.date+'T12:00:00');
+    date.setDate(date.getDate()+i*repeatDays);
+    item.date=date.toISOString().split('T')[0];
+    item.id=i===0?base.id:base.id+'_r'+i;
+    items.push(item);
+  }
+  return items;
+}
+function compromissosOnDate(items,ds){
+  return(items||[]).filter(function(item){return item.date===ds;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
+}
+function compromissoValida(c){
+  if(!c.date)return'Informe a data';
+  if(!c.time)return'Informe o horário';
+  if(c.endTime&&c.endTime<=c.time)return'O horário final tem de ser depois do inicial';
+  if(!c.title&&!c.kind)return'Informe o que é o compromisso';
+  return'';
+}
+// ── COMPROMISSOS-CORE-FIM ──
+
+function getCompromissos(){return(getDB().compromissos)||[];}
+async function saveCompromissos(items){
+  var res=await supaFetch('POST','notes',{id:'agenda_compromissos',user_id:'admin',content:JSON.stringify({items:items}),updated_at:new Date().toISOString()},null,{prefer:'resolution=merge-duplicates,return=minimal'});
+  if(res===null){showToast('❌ Não foi possível salvar o compromisso. Tente novamente.',true);return false;}
+  _cache=null;await loadFromSupabase();return true;
+}
+
 // ── MODAL ──
 function showModal(title,bodyHTML,large){
   document.getElementById('modal-container').innerHTML='<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal '+(large?'modal-lg':'')+'"><div class="modal-header"><h3>'+title+'</h3><button class="modal-close" onclick="closeModal()">×</button></div><div class="modal-body">'+bodyHTML+'</div></div></div>';
@@ -617,6 +663,7 @@ function loadBackupFile(e){
       for(var i=0;i<data.clients.length;i++){var c=data.clients[i];await supaFetch('POST','clients',{id:c.id,name:c.name,phone:c.phone||null,email:c.email||null,notes:c.notes||null,cpf:c.cpf||null,birth_date:c.birthDate||c.birth_date||null,education:c.education||null,address:c.address||null,created_at:c.createdAt||c.created_at||new Date().toISOString()});}
       for(var i=0;i<data.packages.length;i++){var p=data.packages[i];await supaFetch('POST','packages',{id:p.id,client_id:p.clientId,name:p.name,total_sessions:p.totalSessions,price:p.price,payment_status:p.paymentStatus||'pending',payment_type:p.paymentType||'pacote',payment_date:p.paymentDate||null,payment_date2:p.paymentDate2||null,notes:p.notes||null,created_at:p.createdAt||new Date().toISOString()});}
       for(var i=0;i<data.sessions.length;i++){var s=data.sessions[i];var st=s.status==='completed'?'realizada':s.status==='pending'?'agendada':s.status||'agendada';await supaFetch('POST','sessions',{id:s.id,client_id:s.clientId,package_id:s.packageId,date:s.date,time:s.time||null,status:st,category:s.category||'psicoterapia',notes:s.notes||null,interval_days:s.intervalDays||null,session_pay_status:s.sessionPayStatus||s.session_pay_status||null,session_price:s.sessionPrice||s.session_price||null,session_paid:s.sessionPaid||s.session_paid||false,created_at:s.createdAt||new Date().toISOString()});}
+      if(Array.isArray(data.compromissos))await saveCompromissos(data.compromissos);
       await loadFromSupabase();navigate(currentPage);showToast('✅ Backup restaurado!');
     }catch(err){console.error(err);showToast('❌ Arquivo inválido',true);}
   };
@@ -628,9 +675,9 @@ var _dashGen=0;
 function renderDashboard(){
   var myGen=++_dashGen;
   var db=getDB();
-  if(!db.clients.length&&!db.packages.length){
+  if(!db.clients.length&&!db.packages.length&&!db.compromissos.length){
     document.getElementById('page-content').innerHTML='<div class="page"><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:16px">🔄</div><p style="color:var(--text2);margin-bottom:20px">Carregando dados...</p><button class="btn btn-primary" onclick="loadFromSupabase().then(function(){renderDashboard();})">Recarregar</button></div></div>';
-    loadFromSupabase().then(function(){var db2=getDB();if(db2.clients.length||db2.packages.length)renderDashboard();});
+    loadFromSupabase().then(function(){var db2=getDB();if(db2.clients.length||db2.packages.length||db2.compromissos.length)renderDashboard();});
     return;
   }
   var totalClients=db.clients.length;
@@ -644,12 +691,13 @@ function renderDashboard(){
   var in7s=in7.toISOString().split('T')[0];
 
   // Proximas 7 dias
-  var upcoming=db.sessions.filter(function(s){return s.status==='agendada'&&s.date>=now&&s.date<=in7s;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,6);
+  var upcoming=db.sessions.filter(function(s){return s.status==='agendada'&&s.date>=now&&s.date<=in7s;}).map(function(s){return{type:'session',item:s};});
+  upcoming=upcoming.concat(getCompromissos().filter(function(c){return c.date>=now&&c.date<=in7s;}).map(function(c){return{type:'compromisso',item:c};})).sort(function(a,b){return a.item.date.localeCompare(b.item.date)||(a.item.time||'').localeCompare(b.item.time||'');}).slice(0,6);
   var upcomingHtml='';
   if(upcoming.length===0){
     upcomingHtml='<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão nos próximos 7 dias</p></div>';
   } else {
-    upcoming.forEach(function(s){upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';});
+    upcoming.forEach(function(entry){var s=entry.item;if(entry.type==='compromisso'){var meta=compromissoKindMeta(s.kind);upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:var(--yellow);flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+meta.emoji+' '+escHtml(s.title)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · '+meta.lbl+'</div></div></div>';}else{upcomingHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:3px;height:36px;border-radius:99px;background:'+catColor(s.category)+';flex-shrink:0"></div><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(s.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+fmtDateTime(s.date,s.time)+' · <span style="color:'+catColor(s.category)+'">'+catLabelShort(s.category)+'</span></div></div></div>';}});
   }
 
   // Pacotes a encerrar (1 ou 2 sessoes restantes)
@@ -1289,7 +1337,77 @@ function deleteSessionConfirm(id){showModal('Excluir Sessão','<p style="color:v
 
 // ── AGENDA ──
 var calView='month',calDate=new Date(),_attnSlots=[];
-function renderAgenda(){document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button>';renderCalendar();}
+function showCompromissoForm(dateStr,id){
+  var item=id?getCompromissos().find(function(c){return c.id===id;}):null;
+  if(id&&!item){showToast('❌ Compromisso não encontrado.',true);return;}
+  var kind=item?item.kind||'outro':'laudo';
+  var kinds=['laudo','supervisao','reuniao','pessoal','outro'];var kindOpts='';
+  kinds.forEach(function(k){var meta=compromissoKindMeta(k);kindOpts+='<option value="'+k+'" '+(kind===k?'selected':'')+'>'+meta.emoji+' '+meta.lbl+'</option>';});
+  var body='<div class="form-group"><label>Tipo</label><select id="cf-kind">'+kindOpts+'</select></div>';
+  body+='<div class="form-group"><label>Título</label><input type="text" id="cf-title" value="'+escHtml(item?item.title||'':'')+'" placeholder="Ex: Entrega de Laudo — Joana"/></div>';
+  body+='<div class="form-row"><div class="form-group"><label>Data *</label><input type="date" id="cf-date" value="'+(item?item.date:dateStr||today())+'"/></div><div class="form-group"><label>Hora *</label><input type="time" id="cf-time" value="'+(item?item.time||'09:00':'09:00')+'"/></div></div>';
+  body+='<div class="form-group"><label>Termina (opcional)</label><input type="time" id="cf-end" value="'+(item?item.endTime||'':'')+'"/></div>';
+  body+='<div style="'+(id?'display:none':'')+'"><div class="form-row"><div class="form-group"><label>Repetir</label><select id="cf-repeat"><option value="0">Não repete</option><option value="7">Semanal</option><option value="14">Quinzenal</option><option value="30">Mensal</option></select></div><div class="form-group"><label>Quantas vezes</label><input type="number" id="cf-count" min="2" max="52" value="4"/></div></div></div>';
+  body+='<div class="form-group"><label>Observações</label><textarea id="cf-notes" rows="3">'+escHtml(item?item.notes||'':'')+'</textarea></div>';
+  body+='<div id="cf-error" class="alert alert-red" style="display:none"></div><div class="form-actions">'+(id?'<button class="btn btn-danger" style="margin-right:auto" onclick="confirmDeleteCompromisso(\''+id+'\')">🗑️ Excluir</button>':'')+'<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="window._saveCompromisso()">Salvar</button></div>';
+  showModal(id?'Editar Compromisso':'Novo Compromisso',body);
+  var _saving=false;
+  window._saveCompromisso=async function(){
+    if(_saving)return;
+    _saving=true;
+    try{await saveCompromisso(id||'');}finally{_saving=false;}
+  };
+}
+async function saveCompromisso(id){
+  var kind=document.getElementById('cf-kind').value;
+  var title=document.getElementById('cf-title').value.trim()||compromissoKindMeta(kind).lbl;
+  var current=id?getCompromissos().find(function(c){return c.id===id;}):null;
+  var newGroupId=current?current.groupId:genId();
+  var newId=id||genId();
+  var item={
+    id:newId,
+    groupId:newGroupId,
+    date:document.getElementById('cf-date').value,
+    time:document.getElementById('cf-time').value,
+    endTime:document.getElementById('cf-end').value||'',
+    title:title,
+    kind:kind,
+    notes:document.getElementById('cf-notes').value.trim()||'',
+    createdAt:current?current.createdAt:new Date().toISOString()
+  };
+  var error=compromissoValida(item);var err=document.getElementById('cf-error');
+  if(error){err.textContent=error;err.style.display='flex';return;}
+  var items=getCompromissos().slice();var novoArray;
+  if(id){novoArray=items.map(function(c){return c.id===id?item:c;});}
+  else{
+    var repeatDays=parseInt(document.getElementById('cf-repeat').value,10)||0;
+    var count=parseInt(document.getElementById('cf-count').value,10)||1;
+    novoArray=items.concat(compromissoOccurrences(item,repeatDays,count));
+  }
+  closeModal();
+  if(await saveCompromissos(novoArray)){
+    showToast('✅ Compromisso salvo!');
+    if(currentPage==='agenda')renderCalendar();else if(currentPage==='dashboard')renderDashboard();
+  }
+}
+function confirmDeleteCompromisso(id){
+  var items=getCompromissos();var item=items.find(function(c){return c.id===id;});
+  if(!item){showToast('❌ Compromisso não encontrado.',true);return;}
+  var series=items.filter(function(c){return c.groupId===item.groupId;});
+  var actions='<button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>';
+  if(series.length>1)actions+='<button class="btn btn-danger" onclick="window._deleteCompromisso(false)">Só este</button><button class="btn btn-danger" onclick="window._deleteCompromisso(true)">Toda a série ('+series.length+')</button>';
+  else actions+='<button class="btn btn-danger" onclick="window._deleteCompromisso(false)">Excluir</button>';
+  showModal('Excluir Compromisso','<p style="color:var(--text2);margin-bottom:8px">Excluir <strong style="color:var(--text)">'+escHtml(item.title)+'</strong>?</p><p style="color:var(--text2);font-size:13px;margin-bottom:20px">'+fmtDate(item.date)+'</p><div class="form-actions">'+actions+'</div>');
+  window._deleteCompromisso=async function(allSeries){
+    closeModal();
+    var novoArray=getCompromissos().filter(function(c){return allSeries?c.groupId!==item.groupId:c.id!==id;});
+    if(await saveCompromissos(novoArray)){
+      showToast('🗑️ Compromisso excluído.');
+      if(currentPage==='agenda')renderCalendar();else if(currentPage==='dashboard')renderDashboard();
+    }
+  };
+}
+function renderAgenda(){document.getElementById('topbar-actions').innerHTML='<div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showCompromissoForm()">+ Compromisso</button><button class="btn btn-primary" onclick="showSessionForm()">+ Nova Sessão</button></div>';renderCalendar();}
 function renderCalendar(){
   var db=getDB();var todayStr=today();_attnSlots=attentionSlots();
   var title='';
@@ -1329,6 +1447,7 @@ function buildMonthDay(dt,db,todayStr,other){
     chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
   });
   if(extra>0)chips+='<div class="cal-more">+'+extra+' mais</div>';
+  compromissosOnDate(db.compromissos,ds).forEach(function(c){var meta=compromissoKindMeta(c.kind);chips+='<span class="cal-chip compromisso" title="'+escHtml(meta.lbl+' — '+c.title)+'" onclick="event.stopPropagation();showCompromissoForm(null,\''+c.id+'\')">'+(c.time?'<strong>'+c.time.slice(0,5)+'</strong> ':'')+meta.emoji+' '+escHtml(c.title)+'</span>';});
   reservedOnDate(_attnSlots,ds).forEach(function(m){chips='<span class="cal-chip encerrado" title="'+escHtml(clientName(m.clientId))+' — pacote encerrado · horário reservado, renovar ou dar alta" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">'+(m.time?'<strong>'+m.time.slice(0,5)+'</strong> ':'')+'? '+escHtml(m.short)+'</span>'+chips;});
   return'<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">'+dt.getDate()+'</div>'+chips+'</div>';
 }
@@ -1354,6 +1473,7 @@ function buildWeekGrid(db,todayStr){
         var lbl=pkg?fn+' '+n+'/'+t:fn;
         evts+='<span class="week-event '+(s.category||'psicoterapia')+(s.status==='falta'?' falta':'')+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+lbl+'</span>';
       });
+      compromissosOnDate(db.compromissos,ds).forEach(function(c){if((c.time||'').slice(0,2)===hStr){var meta=compromissoKindMeta(c.kind);evts+='<span class="week-event compromisso" onclick="event.stopPropagation();showCompromissoForm(null,\''+c.id+'\')">'+meta.emoji+' '+escHtml(c.title)+'</span>';}});
       reservedOnDate(_attnSlots,ds).forEach(function(m){var mh=m.time?m.time.slice(0,2):'08';if(mh===hStr){evts='<span class="week-event encerrado" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">? '+escHtml(m.short)+'</span>'+evts;}});
       html+='<div class="week-cell" onclick="dayClick(\''+ds+'\')">'+evts+'</div>';
     });
@@ -1366,12 +1486,13 @@ window.calNav=function(dir){if(calView==='month'){calDate=new Date(calDate.getFu
 window.calGoToday=function(){calDate=new Date();renderCalendar();};
 window.dayClick=function(dateStr){
   var db=getDB();var sessions=db.sessions.filter(function(s){return s.date===dateStr;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
+  var compromissoHtml='';compromissosOnDate(db.compromissos,dateStr).forEach(function(c){var meta=compromissoKindMeta(c.kind);compromissoHtml+='<div class="ds-item"><div class="ds-bar" style="background:var(--yellow)"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+(c.time?c.time.slice(0,5)+(c.endTime?'–'+c.endTime.slice(0,5):'')+' · ':'')+meta.emoji+' '+escHtml(c.title)+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">'+meta.lbl+(c.notes?' · '+escHtml(c.notes):'')+'</div></div><button class="btn-icon" onclick="closeModal();showCompromissoForm(null,\''+c.id+'\')">✏️</button></div>';});
   var sessHtml=sessions.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>':'<div>';
   sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+(s.time||'')+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
   if(sessions.length>0)sessHtml+='</div>';
   var _mk=reservedOnDate(attentionSlots(),dateStr);
   var markHtml='';_mk.forEach(function(x){markHtml+='<div class="ds-item" style="border:1px solid var(--red);background:var(--red-bg);margin-bottom:8px"><div class="ds-bar" style="background:var(--red)"></div><div style="flex:1"><div style="font-weight:700;font-size:13.5px;color:var(--red)">'+(x.time?x.time.slice(0,5)+' · ':'')+'? '+escHtml(clientName(x.clientId))+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Horário reservado — pacote encerrado, renovar ou dar alta</div></div><button class="btn-icon" title="Abrir perfil" onclick="closeModal();showClientDetail(\''+x.clientId+'\')">→</button></div>';});
-  showModal('📅 '+fmtDate(dateStr),markHtml+sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);text-align:right"><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
+  showModal('📅 '+fmtDate(dateStr),markHtml+compromissoHtml+sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-secondary btn-sm" onclick="closeModal();showCompromissoForm(\''+dateStr+'\')">+ Compromisso</button><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
 };
 
 // ── FINANCIAL ──
