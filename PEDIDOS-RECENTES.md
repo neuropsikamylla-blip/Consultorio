@@ -8,3 +8,6 @@ o meu App NeuroPsi está dando erro quando tento renovar pacote. Agora que feche
 No server is currently available to service your request.
 
 Sorry about that. Please try refreshing and contact us if the problem persists.
+
+## 17/08/2026 11:13
+nao nao.. estou tentnado entrar no github e esta dando isso
