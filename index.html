@@ -239,7 +239,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-17-01';
+const APP_VERSION='2026-08-17-02';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -881,6 +881,24 @@ function showPackageForm(clientId,pkgId){
   };
 }
 
+// ── SESS-BATCH-INICIO ──
+async function insertSessionRows(rows){
+  var count=0;
+  try{
+    if(rows.length===0)return{ok:true,count:0};
+    var batchRes=null;
+    try{batchRes=await supaFetch('POST','sessions',rows,null,{prefer:'return=minimal'});}catch(e){batchRes=null;}
+    if(batchRes!==null)return{ok:true,count:rows.length};
+    for(var i=0;i<rows.length;i++){
+      var rowRes=null;
+      try{rowRes=await supaFetch('POST','sessions',rows[i],null,{prefer:'return=minimal'});}catch(e){rowRes=null;}
+      if(rowRes!==null)count++;
+    }
+    return{ok:count===rows.length,count:count};
+  }catch(e){return{ok:false,count:count};}
+}
+// ── SESS-BATCH-FIM ──
+
 async function savePackage(id){
   var clientId=document.getElementById('pf-client').value;
   var name=document.getElementById('pf-name').value.trim();
@@ -921,11 +939,18 @@ async function savePackage(id){
     var d=new Date(firstDate+'T12:00:00');d.setDate(d.getDate()+(i*interval));
     sessions.push({id:pkgId+'_s'+(i+1),client_id:clientId,package_id:pkgId,date:d.toISOString().split('T')[0],time:time,status:'agendada',category:category,notes:'',interval_days:interval,created_at:new Date(Date.now()+i*10).toISOString()});
   }
-  var sessRes=await supaFetch('POST','sessions',sessions,null,{prefer:'return=minimal'});
-  if(sessRes===null){
-    await supaFetch('DELETE','packages',null,'?id=eq.'+pkgId);
-    showToast('❌ Erro ao criar as sessões. Nada foi salvo — tente novamente.',true);
+  var sessRes=await insertSessionRows(sessions);
+  if(sessRes.count===0){
+    var del=await supaFetch('DELETE','packages',null,'?id=eq.'+pkgId);
+    if(del!==null)showToast('❌ Erro ao criar as sessões. Nada foi salvo — tente novamente.',true);
+    else showToast('❌ Erro ao criar as sessões. O pacote ficou sem sessões — abra e edite ou exclua.',true);
     await loadFromSupabase();
+    return;
+  }
+  if(!sessRes.ok){
+    await loadFromSupabase();
+    navigate('sessions');
+    showToast('⚠️ '+sessRes.count+'/'+totalSessions+' sessões criadas.',true);
     return;
   }
   await loadFromSupabase();
@@ -1188,22 +1213,34 @@ async function saveSession(){
   // Se for novo pacote, criar primeiro e gerar as sessões restantes
   if(isNewPkg){
     showToast('⏳ Criando pacote e sessões...');
-    var authTok=getAuthToken();
     var newPkgId=genId();
     var finalStatus=pkgType==='sessao'?'paid':pkgPay;
-    var pkgRes=await fetch(SUPA_URL+'/rest/v1/packages',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+authTok,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:newPkgId,client_id:clientId,name:pkgName2,total_sessions:pkgSess,price:pkgPrice,payment_status:finalStatus,payment_type:pkgType,created_at:new Date().toISOString()})});
-    if(!pkgRes.ok){showToast('❌ Erro ao criar pacote.',true);return;}
+    var pkgRes=await supaFetch('POST','packages',{id:newPkgId,client_id:clientId,name:pkgName2,total_sessions:pkgSess,price:pkgPrice,payment_status:finalStatus,payment_type:pkgType,created_at:new Date().toISOString()},null,{prefer:'return=minimal'});
+    if(pkgRes===null){showToast('❌ Erro ao criar pacote. Tente novamente.',true);return;}
     // Primeira sessão = a que o usuário preencheu; demais são geradas automaticamente
-    var sIds=[];
+    var sessionRows=[];
     for(var i=0;i<pkgSess;i++){
       var d2=new Date(date+'T12:00:00');d2.setDate(d2.getDate()+(i*pkgInt));
       var ds2=d2.toISOString().split('T')[0];
-      var sRes=await fetch(SUPA_URL+'/rest/v1/sessions',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+authTok,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({id:newPkgId+'_s'+(i+1),client_id:clientId,package_id:newPkgId,date:ds2,time:time,status:i===0?status:'agendada',category:category,notes:i===0?notes:'',interval_days:pkgInt,created_at:new Date(Date.now()+i*10).toISOString()})});
-      if(sRes.ok)sIds.push(i);
+      sessionRows.push({id:newPkgId+'_s'+(i+1),client_id:clientId,package_id:newPkgId,date:ds2,time:time,status:i===0?status:'agendada',category:category,notes:i===0?notes:'',interval_days:pkgInt,created_at:new Date(Date.now()+i*10).toISOString()});
+    }
+    var sessRes=await insertSessionRows(sessionRows);
+    if(sessRes.count===0){
+      var del=await supaFetch('DELETE','packages',null,'?id=eq.'+newPkgId);
+      if(del!==null)showToast('❌ Erro ao criar as sessões. Nada foi salvo — tente novamente.',true);
+      else showToast('❌ Erro ao criar as sessões. O pacote ficou sem sessões — abra e edite ou exclua.',true);
+      await loadFromSupabase();
+      return;
+    }
+    if(!sessRes.ok){
+      await loadFromSupabase();
+      navigate('sessions');
+      showToast('⚠️ '+sessRes.count+'/'+pkgSess+' sessões criadas.',true);
+      return;
     }
     await loadFromSupabase();
     navigate('sessions');
-    showToast('✅ Pacote "'+pkgName2+'" criado com '+sIds.length+'/'+pkgSess+' sessões!',sIds.length!==pkgSess);
+    showToast('✅ Pacote "'+pkgName2+'" criado com '+pkgSess+' sessões!');
     return;
   }
   var sessData={clientId:clientId,packageId:packageId,date:date,time:time,status:status,notes:notes,category:category};
@@ -1673,26 +1710,17 @@ function renderNotes(){
     if(status)status.textContent='Salvando...';
     try{
       var res;
-      var _nt=getAuthToken();
       if(_noteId){
-        res=await fetch(SUPA_URL+'/rest/v1/notes?id=eq.'+_noteId,{
-          method:'PATCH',
-          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_nt,'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify({content:content,updated_at:new Date().toISOString()})
-        });
+        res=await supaFetch('PATCH','notes',{content:content,updated_at:new Date().toISOString()},'?id=eq.'+_noteId,{prefer:'return=minimal'});
       } else {
         _noteId='note_admin';
-        res=await fetch(SUPA_URL+'/rest/v1/notes',{
-          method:'POST',
-          headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_nt,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-          body:JSON.stringify({id:'note_admin',user_id:'admin',content:content,updated_at:new Date().toISOString()})
-        });
+        res=await supaFetch('POST','notes',{id:'note_admin',user_id:'admin',content:content,updated_at:new Date().toISOString()},null,{prefer:'resolution=merge-duplicates,return=minimal'});
       }
       localStorage.setItem('dashboard_notes',content);
-      if(status)status.textContent=res.ok?'✅ Salvo!':'⚠️ Erro: '+res.status;
+      if(status)status.textContent=res===null?'⚠️ Não salvou no servidor':'✅ Salvo!';
     }catch(e){
       localStorage.setItem('dashboard_notes',content);
-      if(status)status.textContent='✅ Salvo localmente';
+      if(status)status.textContent='⚠️ Não salvou no servidor';
     }
     setTimeout(function(){var s=document.getElementById('notes-status');if(s)s.textContent='';},3000);
   }
@@ -1714,9 +1742,7 @@ function renderNotes(){
   buildUI(localContent);
 
   // Depois tenta sincronizar com Supabase
-  fetch(SUPA_URL+'/rest/v1/notes?id=eq.note_admin',{
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+getAuthToken()}
-  }).then(function(r){return r.json();}).then(function(rows){
+  supaFetch('GET','notes',null,'?id=eq.note_admin').then(function(rows){
     if(rows&&rows.length>0){
       _noteId='note_admin';
       var ta=document.querySelector('#notes-container textarea');
