@@ -58,31 +58,51 @@ Raiz provável identificada por leitura de código (`index.html`):
       Contrafactual: versão antiga `15f0f22` = **0/5 PASS**; versão corrigida = **5/5 PASS**.
 - [ ] Passo 4 — PUBLICAR. **BLOQUEADO: credencial do GitHub.** Ver abaixo.
 
-### BLOQUEIO ABERTO — o push não sai (17/08/2026)
+### BLOQUEIO ABERTO — o push não sai (aberto em 17/08/2026)
 
 `git push` falha com `Invalid username or token. Password authentication is not supported`.
 O remote tem um token `ghp_...` embutido na própria URL (dentro de `.git/config`) e esse
-token não é mais aceito pelo GitHub. Enquanto isso não for resolvido, **as correções e a
-feature existem só no repositório local — o app publicado continua com o bug.**
+token não é mais aceito pelo GitHub. **Consequência que importa: as correções e a feature
+existem só no repositório local — o app que ela usa continua com o bug de renovar pacote.**
 
-Duas coisas a fazer, nesta ordem:
-1. **Revogar o token antigo** em https://github.com/settings/tokens — ele está gravado em
-   texto puro no `.git/config` (viola a regra 2 da casa) e apareceu no terminal.
-2. Autenticar de novo sem gravar segredo na URL. O jeito limpo:
-   `git remote set-url origin https://github.com/neuropsikamylla-blip/Consultorio.git`
-   e então instalar o GitHub CLI (`brew install gh` e `gh auth login`), que guarda a
-   credencial no chaveiro do macOS em vez de num arquivo de texto.
-   O `credential.helper` do repositório já é `osxkeychain`.
+Andamento em 17/08/2026, fim da sessão:
 
-Depois disso, `git push origin main` publica os 6 commits e a auto-atualização do app leva
-a versão nova (`2026-08-17-03`) para ela sem precisar de Cmd+Shift+R.
+- ✅ GitHub CLI instalado (`gh` 2.97.0, via Homebrew) — feito por mim.
+- ⬜ `gh auth login` — **falta**. É a única parte que depende dela: login é dela, não meu.
+- ⬜ trocar o remote para a URL limpa (sem token) — meu, assim que ela autenticar:
+  `git remote set-url origin https://github.com/neuropsikamylla-blip/Consultorio.git`
+- ⬜ `git push origin main` — meu.
+- ⬜ revogar o token velho em github.com/settings/tokens — dela, sem pressa
+  (ele já está inválido), mas é higiene: segredo em texto puro viola a regra 2 da casa.
+
+Contexto do dia: o GitHub estava em *Partially Degraded Service* (API, Issues, PRs, Actions
+degradados; Git Operations, Pages e Packages de pé). Por isso a tela do site dava erro para
+ela. Isso NÃO bloqueia o push em si — o bloqueio é a credencial.
+
+### Respostas do `gh auth login` (para não ter de descobrir de novo)
+
+| Pergunta | Resposta |
+|---|---|
+| What account do you want to log into? | GitHub.com |
+| What is your preferred protocol? | HTTPS |
+| Authenticate Git with your GitHub credentials? | Yes |
+| How would you like to authenticate? | Login with a web browser |
+
+Ele mostra um código de 8 caracteres e abre o navegador; ela cola o código e confirma.
 
 ### Decisões de desenho registradas
 
 1. **Persistência do compromisso**: tabela `notes`, registro único `id='agenda_compromissos'`,
-   `content` = JSON. Motivo: não exige DDL no Supabase (não temos acesso ao painel nesta
-   sessão) e segue precedente já em uso no projeto (`id='client_status'`).
+   `content` = JSON. Motivo: não exige DDL no Supabase (não temos acesso ao painel) e segue
+   precedente já em uso no projeto (`id='client_status'`).
 2. **Recorrência**: ocorrências geradas explicitamente na criação (como as sessões de pacote),
    ligadas por `groupId`, para permitir excluir a série inteira.
 3. **Compromisso NÃO é sessão**: não tem cliente, não tem preço, não entra no financeiro nem
    nas contagens de pacote. Vive num vetor separado do `_cache`.
+4. **Insert de sessões**: um POST em lote com fallback para um-a-um (`insertSessionRows`).
+   Motivo: não havia evidência de como o PostgREST/RLS deste projeto responde a array insert,
+   e essa é a função que ela mais usa — o fallback tira o risco de regressão.
+5. **Anexos ficam com a anon key**: `/rest/v1/documents` usa `Bearer SUPA_KEY` de propósito
+   (documentado no `CLAUDE.md`); anon key não expira, então não sofre do bug do token.
+6. **`.DS_Store` saiu do versionamento** (18/08/2026): criado `.gitignore`; o arquivo continua
+   no disco, só deixou de sujar os commits.
