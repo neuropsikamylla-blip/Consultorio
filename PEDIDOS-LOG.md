@@ -16,3 +16,6 @@ nao nao.. estou tentnado entrar no github e esta dando isso
 
 ## 17/08/2026 11:20
 ok
+
+## 18/08/2026 08:04
+quero sair mesmo depois voltamos
