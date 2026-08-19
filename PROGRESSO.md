@@ -126,9 +126,18 @@ Tentei guardar a credencial no keychain (`git credential approve`) para os próx
 saírem sozinhos: **bloqueado pelo classificador de segurança do Claude Code**, que barra
 gravação de segredo. Não contornei.
 
-**Consequência prática para a próxima sessão:** o push voltará a pedir credencial. Ou ela
-autoriza a regra de Bash para gravar no keychain, ou o token é passado de novo para uso
-efêmero, ou ela roda `gh auth login` uma única vez (aí o keychain fica populado para sempre).
+**DECISÃO DELA (19/08/2026): não guardar credencial nenhuma na máquina.** Ela optou por
+revogar o token assim que a sessão fechasse. Registrado a pedido dela, não é esquecimento meu.
+
+**Consequência prática, aceita:** o push voltará a pedir credencial na próxima sessão. Quando
+houver algo a publicar, o caminho é ela gerar um token novo e passar para uso efêmero (o
+método acima), ou rodar `gh auth login` uma vez. Nada quebra por não haver credencial: o
+`.git/config` está com a URL limpa, o repositório local está íntegro e o app publicado
+continua no ar de qualquer forma.
+
+**Aviso para a próxima sessão:** ao receber token dela pelo chat, mascarar no `PEDIDOS-LOG.md`
+ANTES de qualquer outra coisa — o gancho grava a mensagem dela literalmente num arquivo
+versionado de repositório público.
 
 ### Decisões de desenho registradas
 
