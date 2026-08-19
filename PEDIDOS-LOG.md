@@ -22,3 +22,6 @@ quero sair mesmo depois voltamos
 
 ## 19/08/2026 16:17
 continue da onde parou
+
+## 19/08/2026 16:22
+token: [TOKEN REMOVIDO PELO CLAUDE — segredo nao entra em arquivo versionado, regra 2]
