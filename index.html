@@ -252,7 +252,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-19-03';
+const APP_VERSION='2026-08-19-04';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -628,6 +628,23 @@ function pkgMonth(p){
   return p.createdAt?p.createdAt.split('T')[0].slice(0,7):'';
 }
 
+// ── FINMARCO-CORE-INICIO ──
+function financeStartMonth(){
+  var value=(getDB().appSettings||{}).financeStart;
+  return typeof value==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(value)?value:'';
+}
+function withinFinance(month){
+  var start=financeStartMonth();
+  return !start||!month||month>=start;
+}
+function financePackages(db){
+  return db.packages.filter(function(p){return withinFinance(pkgMonth(p));});
+}
+function financeSessions(db){
+  return db.sessions.filter(function(s){return withinFinance((s.date||'').slice(0,7));});
+}
+// ── FINMARCO-CORE-FIM ──
+
 // ── COMPROMISSOS-CORE-INICIO ──
 function compromissoKindMeta(kind){
   if(kind==='laudo')return{lbl:'Entrega de Laudo',emoji:'📄'};
@@ -762,9 +779,10 @@ function renderDashboard(){
   var totalClients=db.clients.length;
   var totalDone=db.sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
   var curMon=today().slice(0,7);
+  var finPackages=financePackages(db);var finSessions=financeSessions(db);
   var hasSess=function(p){return db.sessions.some(function(s){return s.packageId===p.id;});};
-  var paidRev=db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0)+db.sessions.filter(function(s){return !s.packageId&&(s.sessionPayStatus==='paid'||s.status==='falta')&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
-  var pendRev=db.packages.filter(function(p){return p.paymentStatus==='pending'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
+  var paidRev=finPackages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+finPackages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+finSessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0)+finSessions.filter(function(s){return !s.packageId&&(s.sessionPayStatus==='paid'||s.status==='falta')&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
+  var pendRev=finPackages.filter(function(p){return p.paymentStatus==='pending'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price;},0)+finPackages.filter(function(p){return p.paymentStatus==='parcela1'&&hasSess(p)&&pkgMonth(p)===curMon;}).reduce(function(a,p){return a+p.price/2;},0)+finSessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending'&&s.date&&s.date.slice(0,7)===curMon;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
   var now=today();
   var in7=new Date();in7.setDate(in7.getDate()+7);
   var in7s=in7.toISOString().split('T')[0];
@@ -1585,37 +1603,38 @@ window.dayClick=function(dateStr){
 // ── FINANCIAL ──
 function renderFinancial(){
   var db=getDB();
+  var finPackages=financePackages(db);var finSessions=financeSessions(db);
   var nowDate=today();
   var currentMonth=nowDate.slice(0,7); // 'YYYY-MM'
 
   // Pacotes sem nenhuma sessão vinculada não entram nos cálculos financeiros
   var hasSessF=function(p){return db.sessions.some(function(s){return s.packageId===p.id;});};
   // Current month packages only - for top cards (sessao-type excluded from paidNow — counted per session below)
-  var paidNow=db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&pkgMonth(p)===currentMonth&&hasSessF(p);});
-  var parcela1Now=db.packages.filter(function(p){return p.paymentStatus==='parcela1'&&pkgMonth(p)===currentMonth&&hasSessF(p);});
-  var pendingNow=db.packages.filter(function(p){return p.paymentStatus==='pending'&&pkgMonth(p)===currentMonth&&hasSessF(p);});
+  var paidNow=finPackages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao'&&pkgMonth(p)===currentMonth&&hasSessF(p);});
+  var parcela1Now=finPackages.filter(function(p){return p.paymentStatus==='parcela1'&&pkgMonth(p)===currentMonth&&hasSessF(p);});
+  var pendingNow=finPackages.filter(function(p){return p.paymentStatus==='pending'&&pkgMonth(p)===currentMonth&&hasSessF(p);});
 
   var paidRev=paidNow.reduce(function(a,p){return a+p.price;},0);
   // Sessão-a-sessão: soma apenas sessões efetivamente pagas/falta neste mês
-  paidRev+=db.sessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0);
+  paidRev+=finSessions.filter(function(s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return(s.sessionPayStatus==='paid'||s.status==='falta')&&pkg&&pkg.paymentType==='sessao'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){var pkg=db.packages.find(function(p){return p.id===s.packageId;});return a+(pkg?pkg.price/pkg.totalSessions:0);},0);
   // Avulsas: sessões sem pacote pagas/falta neste mês
-  paidRev+=db.sessions.filter(function(s){return !s.packageId&&(s.sessionPayStatus==='paid'||s.status==='falta')&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
+  paidRev+=finSessions.filter(function(s){return !s.packageId&&(s.sessionPayStatus==='paid'||s.status==='falta')&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
   var parcela1Rev=parcela1Now.reduce(function(a,p){return a+p.price/2;},0);
-  var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0)+db.sessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
+  var pendRev=pendingNow.reduce(function(a,p){return a+p.price;},0)+parcela1Now.reduce(function(a,p){return a+p.price/2;},0)+finSessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending'&&s.date&&s.date.slice(0,7)===currentMonth;}).reduce(function(a,s){return a+(s.sessionPrice||0);},0);
 
   // Revenue by month (all history)
   var revenueByMonth={};
   // Pacotes pagos — usa pkgMonth para consistência com os cards do topo
-  db.packages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao';}).forEach(function(p){
+  finPackages.filter(function(p){return p.paymentStatus==='paid'&&p.paymentType!=='sessao';}).forEach(function(p){
     var mon=pkgMonth(p);
     if(mon){if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price;}
   });
   // Parcelados — 1ª parcela no paymentDate, 2ª em paymentDate2
-  db.packages.filter(function(p){return p.paymentStatus==='parcela1';}).forEach(function(p){
+  finPackages.filter(function(p){return p.paymentStatus==='parcela1';}).forEach(function(p){
     if(p.paymentDate){var mon=p.paymentDate.slice(0,7);if(!revenueByMonth[mon])revenueByMonth[mon]=0;revenueByMonth[mon]+=p.price/2;}
   });
   // Por sessão e avulsas — conta cada sessão paga (ou falta) no mês da sessão
-  db.sessions.filter(function(s){return s.sessionPayStatus==='paid'||(s.status==='falta');}).forEach(function(s){
+  finSessions.filter(function(s){return s.sessionPayStatus==='paid'||(s.status==='falta');}).forEach(function(s){
     var d=s.date;
     if(d){
       var pkg=db.packages.find(function(p){return p.id===s.packageId;});
@@ -1630,7 +1649,7 @@ function renderFinancial(){
       }
     }
   });
-  var sortedMonths=Object.keys(revenueByMonth).sort().reverse();
+  var sortedMonths=Object.keys(revenueByMonth).filter(withinFinance).sort().reverse();
   var monthRows='';
   sortedMonths.forEach(function(mon){
     var parts=mon.split('-');
@@ -1642,9 +1661,9 @@ function renderFinancial(){
   });
 
   // Pending list: show ALL pending + parcela1 regardless of month
-  var allPending=db.packages.filter(function(p){return p.paymentStatus==='pending';});
-  var allParcela1=db.packages.filter(function(p){return p.paymentStatus==='parcela1';});
-  var standalonePending=db.sessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending';}).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  var allPending=finPackages.filter(function(p){return p.paymentStatus==='pending';});
+  var allParcela1=finPackages.filter(function(p){return p.paymentStatus==='parcela1';});
+  var standalonePending=finSessions.filter(function(s){return !s.packageId&&s.sessionPayStatus==='pending';}).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
   var pendingRows='';
   allParcela1.forEach(function(p){
     pendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
@@ -1674,7 +1693,7 @@ function renderFinancial(){
   });
 
   var paidRows='';
-  db.packages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
+  finPackages.filter(function(p){return p.paymentStatus==='paid';}).forEach(function(p){
     var st=pkgStats(p);
     paidRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td>'+
       '<td class="td-muted">'+(p.paymentDate?fmtDate(p.paymentDate):'—')+'</td>'+
@@ -1709,7 +1728,7 @@ function renderFinancial(){
 
   // Confirmed payments
   html+='<div class="card"><div class="section-header"><div class="section-title">✅ Pagamentos Confirmados</div></div>'+
-    (db.packages.filter(function(p){return p.paymentStatus==='paid';}).length===0?
+    (finPackages.filter(function(p){return p.paymentStatus==='paid';}).length===0?
       '<div class="empty" style="padding:20px"><p>Nenhum pagamento confirmado</p></div>':
       '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Data Pgto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>')+
     '</div>';
@@ -2135,6 +2154,7 @@ function renderSettings(){
   html+='<div class="form-group"><label>Nova Senha</label><input type="password" id="st-new" placeholder="Deixe em branco para manter"/></div>';
   html+='<div class="form-group"><label>Confirmar Nova Senha</label><input type="password" id="st-confirm" placeholder="Repita a nova senha"/></div>';
   html+='<div class="form-group"><label>Duração padrão da sessão (minutos)</label><input type="number" id="st-session-duration" value="'+getSessionDuration()+'" min="5" max="240"/></div>';
+  html+='<div class="form-group"><label>Financeiro computa a partir de</label><input type="month" id="st-finance-start" value="'+financeStartMonth()+'"/><div style="font-size:11px;color:var(--text2);margin-top:6px">Os lançamentos anteriores continuam guardados — apenas deixam de ser somados.</div></div>';
   html+='<div id="st-error" class="alert alert-red" style="display:none"></div><div id="st-ok" class="alert alert-green" style="display:none"></div>';
   html+='<button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>';
   html+='<div><div class="card" style="margin-bottom:16px"><div class="section-header"><div class="section-title">💾 Backup</div></div><p style="color:var(--text2);font-size:13px;margin-bottom:16px">Faça backup regularmente.</p><button class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportBackup()">⬇️ Exportar Backup</button><button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="importBackup()">⬆️ Restaurar Backup</button></div>';
@@ -2153,6 +2173,7 @@ async function saveSettings(){
   var np=document.getElementById('st-new').value;
   var nc=document.getElementById('st-confirm').value;
   var duration=Number(document.getElementById('st-session-duration').value);
+  var financeStart=document.getElementById('st-finance-start').value.trim();
   var err=document.getElementById('st-error');var ok=document.getElementById('st-ok');
   err.style.display='none';ok.style.display='none';
   if(!name||!email){err.textContent='Nome e email obrigatórios';err.style.display='flex';return;}
@@ -2161,8 +2182,9 @@ async function saveSettings(){
   if(np&&np!==nc){err.textContent='Senhas não coincidem';err.style.display='flex';return;}
   if(np&&np.length<4){err.textContent='Mínimo 4 caracteres';err.style.display='flex';return;}
   if(!Number.isInteger(duration)||duration<5||duration>240){err.textContent='A duração deve ser um número inteiro entre 5 e 240 minutos';err.style.display='flex';return;}
-  var settings=Object.assign({},getDB().appSettings||{},{sessionDurationMin:duration});
-  if(!await saveAppSettings(settings)){err.textContent='Não foi possível salvar a duração da sessão. Tente novamente.';err.style.display='flex';return;}
+  if(financeStart&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(financeStart)){err.textContent='Informe um mês válido para o início do financeiro';err.style.display='flex';return;}
+  var settings=Object.assign({},getDB().appSettings||{},{sessionDurationMin:duration,financeStart:financeStart});
+  if(!await saveAppSettings(settings)){err.textContent='Não foi possível salvar as configurações. Tente novamente.';err.style.display='flex';return;}
   creds.name=name;creds.email=email;if(np)creds.password=np;
   saveCreds(creds);document.getElementById('sidebar-user-name').textContent=name;
   ok.textContent='✅ Salvo!';ok.style.display='flex';

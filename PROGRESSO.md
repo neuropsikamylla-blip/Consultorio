@@ -18,6 +18,45 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## ENTREGUE — barra lateral retrátil e marco do financeiro (19/08/2026)
+
+> "coloque uma setinha para recuar essa parte do dashboard (para ampliar a agenda) mensal e
+> semanal) e resete o financeiro(até o mes de agosto) para voltarmos a computar a partir de
+> setembro!"
+
+### Barra lateral retrátil — `6fa2f63`
+
+Botão fixo que recolhe a barra de 230px no desktop (`body.sidebar-collapsed`), preferência em
+`localStorage['neuropsi_sidebar']` aplicada antes da primeira pintura. Celular intocado.
+Codex `gpt-5.6-terra` high, lab `neuropsi-sidebar`. Conserto pós-colheita: `setItem` estava sem
+`try/catch` (o `getItem` tinha) — quebraria em janela privada.
+
+### Marco do financeiro — SEM APAGAR NADA
+
+**Decisão dela**, escolhida entre três opções apresentadas: marco de corte, não apagar. Os
+lançamentos antigos continuam no Supabase; o Financeiro e o Dashboard passam a ignorá-los.
+Reversível: basta limpar o campo.
+
+`financeStart` (`'YYYY-MM'`) vive em `notes/app_settings`, ao lado de `sessionDurationMin`.
+Aplicado em 15 pontos de cálculo entre `renderDashboard` e `renderFinancial`, via
+`financePackages(db)` / `financeSessions(db)`.
+
+**O corte é só do dinheiro.** A agenda, o calendário e a contagem de sessões dos pacotes
+continuam mostrando tudo — há prova específica para isso (teste 10: com marco em `2026-09`,
+`buildMonthDay` de 15/08 ainda mostra a sessão).
+
+Codex `gpt-5.6-sol` high (código acoplado mexendo em receita), lab `neuropsi-marco`. Diff
+revisado linha a linha e aplicado sem conserto.
+
+Provas: **88/88 PASS** nas 10 baterias. `APP_VERSION` → 2026-08-19-04.
+
+### PENDENTE — um gesto dela, de 10 segundos
+
+O marco NÃO foi ativado por mim: ele é um dado que vive na conta Supabase dela, e eu não tenho
+credencial de escrita no banco dela. Para ativar:
+**Configurações → "Financeiro computa a partir de" → setembro/2026 → Salvar.**
+Enquanto não fizer isso, o financeiro segue somando tudo, como antes.
+
 ## ENTREGUE — ordem cronológica na agenda (19/08/2026)
 
 > "esta ficando embaixo deveria ficar certinho na agenda ou seja 14h ficar antes das 15h ou
