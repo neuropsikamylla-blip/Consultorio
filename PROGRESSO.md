@@ -18,6 +18,26 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## EM ANDAMENTO — ordem cronológica na agenda (aberto 19/08/2026)
+
+Pedido dela, nas palavras dela, com print do mês:
+> "esta ficando embaixo deveria ficar certinho na agenda ou seja 14h ficar antes das 15h ou
+> das 16h (quando for esses dois casos) que são sessoes mais longas"
+
+**Defeito confirmado** em `buildMonthDay` e em `window.dayClick`: a lista é montada POR TIPO,
+não por horário. As sessões entram ordenadas, depois os compromissos são anexados no fim
+(`chips+=`) e os alertas de pacote encerrado são jogados no topo (`chips=...+chips`). No print
+dela, dia 20: a Supervisão das 14:00 aparece depois da sessão das 17:00.
+
+Defeito ANTERIOR à entrega de hoje — nasceu no passo 2 (`b485018`), quando o compromisso foi
+criado. Não é regressão da mudança de período.
+
+- [ ] Passo 1 — Spec. PRONTO quando commitada.
+- [ ] Passo 2 — Lista única ordenada por horário no mês e no detalhe do dia, sem cortar
+      compromisso nem alerta pelo limite de 8. PRONTO quando a prova nova passar.
+- [ ] Passo 3 — Prova de ordem + contrafactual na versão atual.
+- [ ] Passo 4 — Bump, commit, publicar.
+
 ## ENTREGUE — período visível na agenda (19/08/2026)
 
 Pedido dela, nas palavras dela:
