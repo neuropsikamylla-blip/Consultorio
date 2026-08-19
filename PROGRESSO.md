@@ -18,6 +18,38 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## EM ANDAMENTO — período visível na agenda (aberto 19/08/2026)
+
+Pedido dela, nas palavras dela:
+> "seria interessante colocar o periodo ... para saber qts min tem cada sessão?"
+> "digo mas sem ocupar mais espaço (é que a supervisão era 14h até 15:30) ai fica parecendo
+> que 15h esta livre"
+
+**Defeito confirmado no código** (`index.html` linha ~1476, visão de semana):
+`if((c.time||'').slice(0,2)===hStr)` — o compromisso é desenhado APENAS na faixa da hora em
+que começa. Uma supervisão 14:00–15:30 some da célula das 15h, que fica visualmente livre.
+Risco real de marcar atendimento em cima de compromisso existente. O `endTime` já é gravado
+desde o passo 2; é só a renderização que o ignora.
+
+Sessões têm o problema pela raiz oposta: a tabela `sessions` não guarda duração nenhuma,
+só `time`. Não há o que exibir sem antes definir de onde vem a duração.
+
+### Plano em passos
+
+- [ ] Passo 1 — Spec da mudança em `docs/`. PRONTO quando a spec estiver commitada.
+- [ ] Passo 2 — Compromisso: exibir `HH:MM–HH:MM` no chip (mês e semana) e tingir as faixas
+      de hora atravessadas, sem aumentar a altura do bloco.
+      PRONTO quando a prova nova passar e `node --check` estiver OK.
+- [ ] Passo 3 — Sessão: duração padrão de 50 min, configurável em Configurações, persistida
+      no padrão `notes` já usado. Agenda passa a mostrar o período das sessões.
+      PRONTO quando a prova cobrir padrão, valor alterado e sessão sem horário.
+- [ ] Passo 4 — Prova de renderização cobrindo o caso dela (14:00–15:30 marca as 14h e as 15h).
+      PRONTO quando rodar verde e o contrafactual falhar na versão atual.
+- [ ] Passo 5 — Bump de `APP_VERSION`, commit e publicar.
+
+**SUPOSIÇÃO DECLARADA:** duração de sessão = 50 min. Escolhida para não travar o trabalho numa
+pergunta; fica configurável justamente porque pode estar errada.
+
 ## ENTREGUE — pedido de 17/08/2026 10:28
 
 Pedido dela, nas palavras dela:

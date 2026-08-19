@@ -31,3 +31,6 @@ nao quero gravar eu vou revogar o token apos vc fianalizar
 
 ## 19/08/2026 17:17
 o que foi implantado?
+
+## 19/08/2026 17:23
+seria interessante colocar o periodo por exemplo:[Image #1] para saber qts min tem cada sessão?
