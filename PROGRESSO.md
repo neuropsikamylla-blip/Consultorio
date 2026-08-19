@@ -87,6 +87,49 @@ Pendência dela, sem pressa e sem bloquear nada: revogar o token velho em
 github.com/settings/tokens. Ele já está inválido e já saiu do `.git/config`, mas o histórico
 do repositório ainda o contém — higiene, não emergência.
 
+### INCIDENTE DE SEGREDO — token colado no chat (19/08/2026)
+
+Ela colou um Personal Access Token válido no chat para destravar o push. **O gancho que
+registra os pedidos gravou esse token no `PEDIDOS-LOG.md`, que é versionado num repositório
+público.** Pego antes de qualquer commit.
+
+Contenção feita:
+
+1. Token mascarado no `PEDIDOS-LOG.md` (o texto do pedido dela ficou preservado; só o segredo saiu).
+2. Backup temporário que o continha, apagado — diff conferido antes, nada de conteúdo se perdeu.
+3. `*.bak` e `*.bak-*` entraram no `.gitignore`: backups datados da regra 11 nunca mais
+   poderão ser commitados carregando segredo.
+4. `git log --all -S<token>` = vazio. **O token nunca entrou no histórico do Git**, então
+   nunca ficou público. Commits `19b2cdd` e este.
+
+**Risco que sobra:** o token é válido, escopo `repo` (escrita em todos os repositórios dela),
+e trafegou pelo chat. Revogar em github.com/settings/tokens é gesto dela e é o único item
+aberto — mas **não bloqueia nada**: o app está publicado e funcionando.
+
+### Estado da credencial de push (19/08/2026)
+
+Sequência real observada, que contradiz o diagnóstico da manhã:
+
+- Após limpar a URL do remote, dois pushes passaram usando o `osxkeychain`.
+- O terceiro push falhou com `Invalid username or token`. `git credential fill` passou a
+  devolver **string vazia** — o keychain está sem credencial para `github.com`. A leitura mais
+  provável é que a credencial guardada era o token velho: o Git a usou, o GitHub recusou, e o
+  Git a apagou do helper (`credential reject` automático).
+- Portanto: limpar a URL foi necessário, mas **não era suficiente** — não havia credencial boa
+  no keychain, ao contrário do que a nota da manhã afirmou.
+
+Como os pushes saíram: token dela usado de forma **efêmera**, via `GIT_ASKPASS` apontando para
+um arquivo fora do repositório, com `-c credential.helper=` para não persistir, e o arquivo
+apagado em seguida. O `.git/config` continua com a URL limpa.
+
+Tentei guardar a credencial no keychain (`git credential approve`) para os próximos pushes
+saírem sozinhos: **bloqueado pelo classificador de segurança do Claude Code**, que barra
+gravação de segredo. Não contornei.
+
+**Consequência prática para a próxima sessão:** o push voltará a pedir credencial. Ou ela
+autoriza a regra de Bash para gravar no keychain, ou o token é passado de novo para uso
+efêmero, ou ela roda `gh auth login` uma única vez (aí o keychain fica populado para sempre).
+
 ### Decisões de desenho registradas
 
 1. **Persistência do compromisso**: tabela `notes`, registro único `id='agenda_compromissos'`,
