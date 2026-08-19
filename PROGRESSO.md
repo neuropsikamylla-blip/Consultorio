@@ -18,25 +18,26 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
-## EM ANDAMENTO — ordem cronológica na agenda (aberto 19/08/2026)
+## ENTREGUE — ordem cronológica na agenda (19/08/2026)
 
-Pedido dela, nas palavras dela, com print do mês:
 > "esta ficando embaixo deveria ficar certinho na agenda ou seja 14h ficar antes das 15h ou
 > das 16h (quando for esses dois casos) que são sessoes mais longas"
 
-**Defeito confirmado** em `buildMonthDay` e em `window.dayClick`: a lista é montada POR TIPO,
-não por horário. As sessões entram ordenadas, depois os compromissos são anexados no fim
-(`chips+=`) e os alertas de pacote encerrado são jogados no topo (`chips=...+chips`). No print
-dela, dia 20: a Supervisão das 14:00 aparece depois da sessão das 17:00.
+Defeito ANTERIOR à entrega do período (nasceu no passo 2, `b485018`): mês e detalhe do dia
+montavam a lista POR TIPO — sessões ordenadas, compromissos anexados no fim, alertas jogados
+no topo. No print dela, a Supervisão das 14:00 vinha depois da sessão das 17:00.
 
-Defeito ANTERIOR à entrega de hoje — nasceu no passo 2 (`b485018`), quando o compromisso foi
-criado. Não é regressão da mudança de período.
+Agora os três tipos entram numa lista única ordenada por horário. Empate de horário resolve
+por `reservado → compromisso → sessão`, para o alerta vermelho não ficar escondido.
 
-- [ ] Passo 1 — Spec. PRONTO quando commitada.
-- [ ] Passo 2 — Lista única ordenada por horário no mês e no detalhe do dia, sem cortar
-      compromisso nem alerta pelo limite de 8. PRONTO quando a prova nova passar.
-- [ ] Passo 3 — Prova de ordem + contrafactual na versão atual.
-- [ ] Passo 4 — Bump, commit, publicar.
+O limite de 8 do mês foi preservado como era: corta SOMENTE sessões; compromisso e alerta
+nunca somem, e o `+N mais` conta só as sessões omitidas.
+
+Codex `gpt-5.6-terra` high, lab `neuropsi-ordem`. Diff revisado linha a linha — aplicado sem
+conserto, o Codex acertou de primeira desta vez.
+Provas: **70/70 PASS** nas 8 baterias. Contrafactual da prova de ordem na versão anterior:
+**4/9** — os quatro testes de ordenação falham lá.
+`APP_VERSION` 2026-08-19-01 → 2026-08-19-02.
 
 ## ENTREGUE — período visível na agenda (19/08/2026)
 

@@ -243,7 +243,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-19-01';
+const APP_VERSION='2026-08-19-02';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -1485,7 +1485,7 @@ function buildMonthDay(dt,db,todayStr,other){
   var ds=dt.toISOString().split('T')[0];var isToday=ds===todayStr;
   var sessions=db.sessions.filter(function(s){return s.date===ds;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
   var show=sessions.slice(0,8);var extra=sessions.length-8;
-  var chips='';
+  var items=[];var kindOrder={reservado:0,compromisso:1,sessao:2};
   show.forEach(function(s){
     var pkg=db.packages.find(function(p){return p.id===s.packageId;});
     var pkgSessions=pkg?db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'');}):[];
@@ -1495,11 +1495,13 @@ function buildMonthDay(dt,db,todayStr,other){
     var shortName=parts.length>=2?parts[0]+' '+parts[1]:parts[0];
     var label=pkg?shortName+' '+sessNum+'/'+total:shortName;
     var chipClass=(s.category||'psicoterapia')+(s.status==='falta'?' falta':s.status==='realizada'?' realizada':'');
-    chips+='<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>';
+    items.push({time:s.time||'',kind:'sessao',html:'<span class="cal-chip '+chipClass+'" title="'+clientName(s.clientId)+' — Sessão '+sessNum+'/'+total+'" onclick="event.stopPropagation();showSessionEditForm(\''+s.id+'\')">'+(s.time?'<strong>'+s.time.slice(0,5)+'</strong> ':'')+label+'</span>'});
   });
+  compromissosOnDate(db.compromissos,ds).forEach(function(c){var meta=compromissoKindMeta(c.kind);items.push({time:c.time||'',kind:'compromisso',html:'<span class="cal-chip compromisso" title="'+escHtml(meta.lbl+' — '+c.title)+'" onclick="event.stopPropagation();showCompromissoForm(null,\''+c.id+'\')">'+(c.time?'<strong>'+periodLabel(c.time,c.endTime)+'</strong> ':'')+meta.emoji+' '+escHtml(c.title)+'</span>'});});
+  reservedOnDate(_attnSlots,ds).forEach(function(m){items.push({time:m.time||'',kind:'reservado',html:'<span class="cal-chip encerrado" title="'+escHtml(clientName(m.clientId))+' — pacote encerrado · horário reservado, renovar ou dar alta" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">'+(m.time?'<strong>'+m.time.slice(0,5)+'</strong> ':'')+'? '+escHtml(m.short)+'</span>'});});
+  items.sort(function(a,b){return a.time.localeCompare(b.time)||kindOrder[a.kind]-kindOrder[b.kind];});
+  var chips=items.map(function(item){return item.html;}).join('');
   if(extra>0)chips+='<div class="cal-more">+'+extra+' mais</div>';
-  compromissosOnDate(db.compromissos,ds).forEach(function(c){var meta=compromissoKindMeta(c.kind);chips+='<span class="cal-chip compromisso" title="'+escHtml(meta.lbl+' — '+c.title)+'" onclick="event.stopPropagation();showCompromissoForm(null,\''+c.id+'\')">'+(c.time?'<strong>'+periodLabel(c.time,c.endTime)+'</strong> ':'')+meta.emoji+' '+escHtml(c.title)+'</span>';});
-  reservedOnDate(_attnSlots,ds).forEach(function(m){chips='<span class="cal-chip encerrado" title="'+escHtml(clientName(m.clientId))+' — pacote encerrado · horário reservado, renovar ou dar alta" onclick="event.stopPropagation();showClientDetail(\''+m.clientId+'\')">'+(m.time?'<strong>'+m.time.slice(0,5)+'</strong> ':'')+'? '+escHtml(m.short)+'</span>'+chips;});
   return'<div class="month-day '+(other?'other':'')+' '+(isToday?'today':'')+'" onclick="dayClick(\''+ds+'\')"><div class="month-day-num">'+dt.getDate()+'</div>'+chips+'</div>';
 }
 function buildWeekGrid(db,todayStr){
@@ -1541,13 +1543,15 @@ window.calNav=function(dir){if(calView==='month'){calDate=new Date(calDate.getFu
 window.calGoToday=function(){calDate=new Date();renderCalendar();};
 window.dayClick=function(dateStr){
   var db=getDB();var sessions=db.sessions.filter(function(s){return s.date===dateStr;}).sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
-  var compromissoHtml='';compromissosOnDate(db.compromissos,dateStr).forEach(function(c){var meta=compromissoKindMeta(c.kind);compromissoHtml+='<div class="ds-item"><div class="ds-bar" style="background:var(--yellow)"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+(c.time?periodLabel(c.time,c.endTime)+' · ':'')+meta.emoji+' '+escHtml(c.title)+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">'+meta.lbl+(c.notes?' · '+escHtml(c.notes):'')+'</div></div><button class="btn-icon" onclick="closeModal();showCompromissoForm(null,\''+c.id+'\')">✏️</button></div>';});
-  var sessHtml=sessions.length===0?'<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>':'<div>';
-  sessions.forEach(function(s){var sb=statusBadge(s.status);sessHtml+='<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+periodLabel(s.time,sessionEnd(s.time,getSessionDuration()))+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>';});
-  if(sessions.length>0)sessHtml+='</div>';
+  var items=[];var kindOrder={reservado:0,compromisso:1,sessao:2};
+  compromissosOnDate(db.compromissos,dateStr).forEach(function(c){var meta=compromissoKindMeta(c.kind);items.push({time:c.time||'',kind:'compromisso',html:'<div class="ds-item"><div class="ds-bar" style="background:var(--yellow)"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+(c.time?periodLabel(c.time,c.endTime)+' · ':'')+meta.emoji+' '+escHtml(c.title)+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">'+meta.lbl+(c.notes?' · '+escHtml(c.notes):'')+'</div></div><button class="btn-icon" onclick="closeModal();showCompromissoForm(null,\''+c.id+'\')">✏️</button></div>'});});
+  sessions.forEach(function(s){var sb=statusBadge(s.status);items.push({time:s.time||'',kind:'sessao',html:'<div class="ds-item"><div class="ds-bar" style="background:'+catColor(s.category)+'"></div><div style="flex:1"><div style="font-weight:600;font-size:13.5px">'+clientName(s.clientId)+'</div><div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;align-items:center"><span class="badge '+catBadgeClass(s.category)+'" style="font-size:10px">'+catLabelShort(s.category)+'</span><span style="font-size:12px;color:var(--text2)">'+periodLabel(s.time,sessionEnd(s.time,getSessionDuration()))+' · '+pkgName(s.packageId)+'</span></div></div><span class="badge '+sb[0]+'" style="flex-shrink:0">'+sb[1]+'</span><button class="btn-icon" onclick="closeModal();showSessionEditForm(\''+s.id+'\')">✏️</button></div>'});});
   var _mk=reservedOnDate(attentionSlots(),dateStr);
-  var markHtml='';_mk.forEach(function(x){markHtml+='<div class="ds-item" style="border:1px solid var(--red);background:var(--red-bg);margin-bottom:8px"><div class="ds-bar" style="background:var(--red)"></div><div style="flex:1"><div style="font-weight:700;font-size:13.5px;color:var(--red)">'+(x.time?x.time.slice(0,5)+' · ':'')+'? '+escHtml(clientName(x.clientId))+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Horário reservado — pacote encerrado, renovar ou dar alta</div></div><button class="btn-icon" title="Abrir perfil" onclick="closeModal();showClientDetail(\''+x.clientId+'\')">→</button></div>';});
-  showModal('📅 '+fmtDate(dateStr),markHtml+compromissoHtml+sessHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-secondary btn-sm" onclick="closeModal();showCompromissoForm(\''+dateStr+'\')">+ Compromisso</button><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
+  _mk.forEach(function(x){items.push({time:x.time||'',kind:'reservado',html:'<div class="ds-item" style="border:1px solid var(--red);background:var(--red-bg);margin-bottom:8px"><div class="ds-bar" style="background:var(--red)"></div><div style="flex:1"><div style="font-weight:700;font-size:13.5px;color:var(--red)">'+(x.time?x.time.slice(0,5)+' · ':'')+'? '+escHtml(clientName(x.clientId))+'</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Horário reservado — pacote encerrado, renovar ou dar alta</div></div><button class="btn-icon" title="Abrir perfil" onclick="closeModal();showClientDetail(\''+x.clientId+'\')">→</button></div>'});});
+  items.sort(function(a,b){return a.time.localeCompare(b.time)||kindOrder[a.kind]-kindOrder[b.kind];});
+  var dayItemsHtml=items.map(function(item){return item.html;}).join('');
+  if(sessions.length===0)dayItemsHtml+='<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><p>Nenhuma sessão neste dia</p></div>';
+  showModal('📅 '+fmtDate(dateStr),dayItemsHtml+'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-secondary btn-sm" onclick="closeModal();showCompromissoForm(\''+dateStr+'\')">+ Compromisso</button><button class="btn btn-primary btn-sm" onclick="closeModal();showSessionForm(null,\''+dateStr+'\')">+ Agendar neste dia</button></div>');
 };
 
 // ── FINANCIAL ──
