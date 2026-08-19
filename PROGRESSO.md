@@ -2,7 +2,7 @@
 
 Arquivo de continuidade entre sessões. O que não está aqui não existe para a próxima sessão.
 
-## Estado do projeto (17/08/2026)
+## Estado do projeto (19/08/2026)
 
 - App é um único `index.html` (~668 KB) publicado por GitHub Pages a partir do `main`.
 - Backend Supabase (REST direto). Auth por JWT em `localStorage`.
@@ -56,39 +56,36 @@ Raiz provável identificada por leitura de código (`index.html`):
 - [x] Passo 3 — Prova de ponta a ponta do bug relatado. ✅ commit `4a3c410`.
       `prova-renovar-pacote.mjs` reproduz "app aberto há mais de 1h, token vencido".
       Contrafactual: versão antiga `15f0f22` = **0/5 PASS**; versão corrigida = **5/5 PASS**.
-- [ ] Passo 4 — PUBLICAR. **BLOQUEADO: credencial do GitHub.** Ver abaixo.
+- [x] Passo 4 — PUBLICAR. ✅ 19/08/2026. `git push origin main` levou os 14 commits locais
+      (`15f0f22` → `aead9a7`). Bloqueio resolvido — causa real abaixo.
 
-### BLOQUEIO ABERTO — o push não sai (aberto em 17/08/2026)
+### BLOQUEIO RESOLVIDO — o push saiu (19/08/2026)
 
-`git push` falha com `Invalid username or token. Password authentication is not supported`.
-O remote tem um token `ghp_...` embutido na própria URL (dentro de `.git/config`) e esse
-token não é mais aceito pelo GitHub. **Consequência que importa: as correções e a feature
-existem só no repositório local — o app que ela usa continua com o bug de renovar pacote.**
+**Causa real, diferente da hipótese anterior:** não faltava credencial. O macOS já tinha uma
+credencial válida no `osxkeychain` (`credential.helper=osxkeychain`). O que quebrava era o
+token `ghp_...` embutido na URL do remote dentro do `.git/config`: uma credencial escrita na
+URL tem precedência sobre o keychain, então o Git mandava o token podre e nem consultava o
+keychain. `gh auth login` nunca foi necessário.
 
-Andamento em 17/08/2026, fim da sessão:
+Feito, nesta ordem:
 
-- ✅ GitHub CLI instalado (`gh` 2.97.0, via Homebrew) — feito por mim.
-- ⬜ `gh auth login` — **falta**. É a única parte que depende dela: login é dela, não meu.
-- ⬜ trocar o remote para a URL limpa (sem token) — meu, assim que ela autenticar:
-  `git remote set-url origin https://github.com/neuropsikamylla-blip/Consultorio.git`
-- ⬜ `git push origin main` — meu.
-- ⬜ revogar o token velho em github.com/settings/tokens — dela, sem pressa
-  (ele já está inválido), mas é higiene: segredo em texto puro viola a regra 2 da casa.
+1. `cp .git/config .git/config.bak-20260819` (backup datado, regra 11).
+2. `git remote set-url origin https://github.com/neuropsikamylla-blip/Consultorio.git`
+   — URL limpa, sem segredo em texto puro (regra 2).
+3. `git push origin main` → `15f0f22..aead9a7`. `git log origin/main..main` = **0 pendentes**.
 
-Contexto do dia: o GitHub estava em *Partially Degraded Service* (API, Issues, PRs, Actions
-degradados; Git Operations, Pages e Packages de pé). Por isso a tela do site dava erro para
-ela. Isso NÃO bloqueia o push em si — o bloqueio é a credencial.
+Antes de publicar, as 5 provas rodaram no repositório real: **40/40 PASS**
+(6/6, 5/5, 12/12, 12/12, 5/5).
 
-### Respostas do `gh auth login` (para não ter de descobrir de novo)
+`APP_VERSION` publicada saltou de `2026-06-08-10` para `2026-08-17-03`, então a
+auto-atualização dispara sozinha no app dela — não precisa limpar cache na mão.
 
-| Pergunta | Resposta |
-|---|---|
-| What account do you want to log into? | GitHub.com |
-| What is your preferred protocol? | HTTPS |
-| Authenticate Git with your GitHub credentials? | Yes |
-| How would you like to authenticate? | Login with a web browser |
+**Consequência que importa: o app que ela usa agora tem a correção do erro de renovar pacote
+e os compromissos de agenda sem paciente.**
 
-Ele mostra um código de 8 caracteres e abre o navegador; ela cola o código e confirma.
+Pendência dela, sem pressa e sem bloquear nada: revogar o token velho em
+github.com/settings/tokens. Ele já está inválido e já saiu do `.git/config`, mas o histórico
+do repositório ainda o contém — higiene, não emergência.
 
 ### Decisões de desenho registradas
 
