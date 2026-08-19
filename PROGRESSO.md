@@ -18,37 +18,55 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
-## EM ANDAMENTO — período visível na agenda (aberto 19/08/2026)
+## ENTREGUE — período visível na agenda (19/08/2026)
 
 Pedido dela, nas palavras dela:
 > "seria interessante colocar o periodo ... para saber qts min tem cada sessão?"
 > "digo mas sem ocupar mais espaço (é que a supervisão era 14h até 15:30) ai fica parecendo
 > que 15h esta livre"
+> "mas tem sessão de laudo e supervisao que dura 1:30 a 2h como faz?"
 
-**Defeito confirmado no código** (`index.html` linha ~1476, visão de semana):
-`if((c.time||'').slice(0,2)===hStr)` — o compromisso é desenhado APENAS na faixa da hora em
-que começa. Uma supervisão 14:00–15:30 some da célula das 15h, que fica visualmente livre.
-Risco real de marcar atendimento em cima de compromisso existente. O `endTime` já é gravado
-desde o passo 2; é só a renderização que o ignora.
+**Defeito**: na visão de semana, o compromisso era desenhado só na faixa da hora de início.
+Supervisão 14:00–15:30 sumia da célula das 15h, que ficava visualmente livre — risco de
+marcar atendimento em cima. O `endTime` já era gravado; a renderização é que o ignorava.
 
-Sessões têm o problema pela raiz oposta: a tabela `sessions` não guarda duração nenhuma,
-só `time`. Não há o que exibir sem antes definir de onde vem a duração.
+**Resposta à terceira pergunta:** laudo e supervisão de 1h30 ou 2h já eram cadastráveis — o
+formulário de compromisso tem o campo "Termina (opcional)" (`cf-end`) desde o passo 2, com
+duração livre. Nada a mudar ali; faltava só a agenda mostrar e bloquear.
 
-### Plano em passos
+- [x] Passo 1 — Spec: `docs/spec-periodo-agenda-20260819.md` (commit `6bcc85c`).
+- [x] Passo 2 — Compromisso mostra `HH:MM–HH:MM` e tinge as faixas atravessadas.
+- [x] Passo 3 — Sessão com duração padrão de 50 min, configurável em Configurações,
+      persistida em `notes/app_settings` (mesmo padrão de `client_status`).
+- [x] Passo 4 — Provas: `prova-periodo-agenda.mjs` 12/12 (funções puras) e
+      `prova-periodo-render.mjs` 9/9 (renderização real, com o caso dela).
+      Contrafactual: a prova de renderização dá **5/9 na versão anterior** — o teste 3,
+      que é o caso dela, falha lá e passa aqui.
+- [x] Passo 5 — `APP_VERSION` 2026-08-17-03 → 2026-08-19-01, commit e publicação.
 
-- [ ] Passo 1 — Spec da mudança em `docs/`. PRONTO quando a spec estiver commitada.
-- [ ] Passo 2 — Compromisso: exibir `HH:MM–HH:MM` no chip (mês e semana) e tingir as faixas
-      de hora atravessadas, sem aumentar a altura do bloco.
-      PRONTO quando a prova nova passar e `node --check` estiver OK.
-- [ ] Passo 3 — Sessão: duração padrão de 50 min, configurável em Configurações, persistida
-      no padrão `notes` já usado. Agenda passa a mostrar o período das sessões.
-      PRONTO quando a prova cobrir padrão, valor alterado e sessão sem horário.
-- [ ] Passo 4 — Prova de renderização cobrindo o caso dela (14:00–15:30 marca as 14h e as 15h).
-      PRONTO quando rodar verde e o contrafactual falhar na versão atual.
-- [ ] Passo 5 — Bump de `APP_VERSION`, commit e publicar.
+Bateria final: **61/61 PASS** nas 7 provas.
 
-**SUPOSIÇÃO DECLARADA:** duração de sessão = 50 min. Escolhida para não travar o trabalho numa
-pergunta; fica configurável justamente porque pode estar errada.
+### Como foi feito
+
+Codex `gpt-5.6-terra` esforço `high`, lab `neuropsi-periodo`, spec com prova de aceite escrita
+ANTES. Diff revisado linha a linha por mim, com **dois consertos pós-colheita**:
+
+1. **Mês**: o Codex pôs o período também no chip da sessão. O `.cal-chip` é
+   `nowrap`+`ellipsis`, então `09:00–09:50 Idalice 1/8` espremia o nome do paciente — e na
+   visão de mês não existe faixa de hora, logo o período não resolve problema nenhum ali.
+   Revertido para a hora de início; o compromisso mantém o período, porque a duração dele varia.
+2. **Semana**: o filtro varria TODAS as sessões do banco 105 vezes (15 horas × 7 dias).
+   Passou a filtrar o dia uma única vez fora do laço.
+
+### Decisões de desenho
+
+7. **Fim exclusivo**: compromisso que termina às 16:00 em ponto NÃO ocupa a faixa das 16h.
+8. **Ocupação sem bloco novo**: a faixa de continuação só recebe a classe CSS `ocupado`
+   (fundo tingido, com variante para light mode). Nenhum elemento é inserido — é a restrição
+   dela, "sem ocupar mais espaço".
+9. **Duração de sessão = 50 min por padrão**, configurável. Suposição declarada a ela: se as
+   sessões dela não forem de 50 min, o número se troca em Configurações e vale para a agenda toda.
+10. **`sessionEnd` satura em 23:59** — sessão tarde da noite não vira o dia.
 
 ## ENTREGUE — pedido de 17/08/2026 10:28
 
