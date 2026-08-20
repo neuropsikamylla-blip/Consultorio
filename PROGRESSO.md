@@ -35,7 +35,7 @@ Pedido completo dela em `docs/pedido-reforma-20260820.md`. Ponto de retorno:
 
 ### Fases (cada uma: spec → Codex → revisão linha a linha → prova → commit → publicar)
 
-- [ ] **A — Renomes + sidebar** (itens 2, 3, 4, 5, 6): Clientes→Pacientes, Anexos→Documentos,
+- [x] **A — Renomes + sidebar** ✅ 20/08/2026, commit publicado. (itens 2, 3, 4, 5, 6): Clientes→Pacientes, Anexos→Documentos,
       Boletos→Contas a Pagar, nova ordem do menu, Anamnese fora da sidebar (módulo INTACTO).
       Sessões/Pacotes PERMANECE no menu nesta fase.
 - [ ] **B — Ficha do paciente com abas** (8, 9, 10, 12, 18): Resumo | Sessões | Pacotes |
