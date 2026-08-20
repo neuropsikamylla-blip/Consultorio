@@ -44,24 +44,22 @@ grande mexer em dados, o backup dela é o que salva; se quebrar o app, é a tag.
 
 Estado congelado aqui: 148/148 PASS em 16 baterias.
 
-## ENTREGUE — Anamnese removida (20/08/2026)
+## REVERTIDO — Anamnese: removida e restaurada no mesmo dia (20/08/2026)
 
-> "Anamnese pode retirar, eu nào estou utilizando"
+Sequência, registrada porque é lição:
 
-Bloco contínuo no fim do `<script>` (linhas 2439–2814): `_ANA_SECS` com 27 seções,
-`renderAnamnese`, `_anaFaixa`, `_anaRenderForm`, `_anaSelectClient`, `_anaCollect`, `_anaSave`,
-`_anaLoad`, `_anaExportPDF`. Mais o item de menu, a chave em `titles`, a chave em `pages` e a
-tag `<script>` do jsPDF do CDN — que só a anamnese usava.
+1. Ela disse "Anamnese pode retirar, eu nào estou utilizando" ⇒ removi o módulo inteiro
+   (385 linhas), commit `d730296`, publicado.
+2. Minutos depois, no pedido grande, ela especificou: *"Remover Anamnese APENAS da sidebar.
+   Não excluir dados nem funcionalidades existentes de anamnese."*
+3. `git revert d730296` ⇒ módulo de volta por inteiro. Só o item da sidebar sai.
 
-**385 linhas fora. App: 701.742 → 681.928 bytes**, e uma dependência externa a menos para
-baixar a cada abertura.
+Os DADOS nunca foram tocados em nenhum momento — a tabela `anamneses` seguiu intacta.
+O que se perdeu por ~20 minutos foi a FUNCIONALIDADE, e ela voltou pelo histórico do Git.
 
-**Os DADOS não foram tocados.** A tabela `anamneses` e seus registros continuam no Supabase.
-Nenhum DELETE, nenhuma migração. Se ela quiser a anamnese de volta, o código está no commit
-`0c61eb8` e volta com `git show 0c61eb8:index.html`.
-
-Codex `gpt-5.6-terra` high, lab `neuropsi-sem-ana`, aplicado sem conserto.
-Provas: **148/148 PASS** em 16 baterias. `APP_VERSION` → 2026-08-20-05.
+**Lição:** "pode retirar, não estou usando" não autoriza apagar o módulo. Retirar do caminho
+dela (menu) e apagar o código são coisas diferentes, e a segunda deveria ter sido confirmada
+explicitamente antes — ainda mais sendo 385 linhas.
 
 ## ENTREGUE — alta libera os horários futuros (20/08/2026)
 
