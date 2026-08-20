@@ -18,6 +18,34 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## EM ANDAMENTO — gaveta dos recebimentos antigos (aberto 20/08/2026)
+
+Pedido dela, nas palavras dela:
+> "queria que resetasse.. todo pacote que iniciamos até agosto zera sei la faz uma pastinha
+> (recebimentos antigos concluidos) e deixa meio que fechado vou apertar tudo como recebido e
+> vc deixa como escondidinho) para todos novos pacotes que inicarmos em setembro pois eu me
+> desorganizei então esta tudo errado la beleza?"
+
+Leitura: o histórico bagunçado não deve ser APAGADO, e sim FECHADO numa gaveta recolhida.
+Setembro começa limpo. Ela quer quitar os antigos ("apertar tudo como recebido").
+
+**ARMADILHA ENCONTRADA (20/08/2026)** — `window.markPaid` (linha ~1739) grava
+`paymentDate=today()`. Se ela quitar os pacotes antigos já em setembro, cada um recebe data de
+setembro, `pkgMonth` vira `'2026-09'` e os ~R$ 9.180 de dívida velha ENTRAM como receita de
+setembro. A bagunça mudaria de lugar em vez de encerrar. A quitação da gaveta tem de gravar a
+data do mês ORIGINAL do pacote, nunca a de hoje.
+
+Estado observado no print dela: marco ainda NÃO ativo (o Histórico lista julho..fevereiro).
+
+- [ ] Passo 1 — Spec.
+- [ ] Passo 2 — Gaveta `<details>` fechada com o consolidado antigo (recebido, pendente,
+      histórico por mês e a lista de pendências antigas).
+- [ ] Passo 3 — Encerrar o período com UM clique dentro do Financeiro (grava o marco),
+      sem ela ter de ir às Configurações.
+- [ ] Passo 4 — Quitar em massa os antigos, com confirmação mostrando quantidade e valor,
+      gravando a data do mês original. Resiliente a falha no meio.
+- [ ] Passo 5 — Provas + contrafactual, bump, commit, publicar.
+
 ## ENTREGUE — barra lateral retrátil e marco do financeiro (19/08/2026)
 
 > "coloque uma setinha para recuar essa parte do dashboard (para ampliar a agenda) mensal e

@@ -37,3 +37,6 @@ seria interessante colocar o periodo por exemplo:[Image #1] para saber qts min t
 
 ## 19/08/2026 17:41
 [Image #2] esta ficando embaixo deveria ficar certinho na agenda ou seja 14h ficar antes das 15h ou das 16h (quando for esses dois casos) que são sessoes mais longas enfim.. entendeu?
+
+## 20/08/2026 09:57
+[Image #4] queria que resetasse.. todo pacote que iniciamos até agosto zera sei la faz uma pastinha (recebimentos antigos concluidos) e deixa meio que fechado vou apertar tudo como recebido e vc deixa como escondidinho) para todos novos pacotes que inicarmos em setembro pois eu me desorganizei então esta tudo errado la beleza?
