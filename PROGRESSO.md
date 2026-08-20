@@ -18,6 +18,41 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## EM ANDAMENTO — Pacotes a Encerrar: clique útil (aberto 20/08/2026)
+
+> "eu acho que quando estiver faltando 1 sessão, mas quando eu clicar para ver ir direto para
+> sessão que está restando (pois se for uma falha minha de marcar realizada eu consigo
+> resolver).. problema que estou clicando e nao vai"
+
+### Diagnóstico com evidência (não por leitura)
+
+Simulei o dashboard com um pacote de 8 e 7 realizadas:
+
+- o card FUNCIONA: mostra "Maria Helena · Pacote Maria · 1 sessão restante";
+- `navigate('packages')` também funciona (renderiza 1111 caracteres de lista).
+
+**Por que "não vai":** só o `<button>Ver →</button>` tem `onclick`. O nome do paciente e o
+resto da linha não são clicáveis — clicar ali, que é o gesto natural, não faz nada. E mesmo
+acertando o botão, o destino é a lista de Pacotes, que sequer tem item no menu
+(`data-page="packages"` não existe), então nada fica destacado e parece que não saiu do lugar.
+
+### ERRO MEU, registrado para não se repetir
+
+Antes disso eu afirmei a ela que o alerta mostrava praticamente todo paciente com pacote e que
+"não estava funcional". **Eu tinha analisado a função errada**: `clientNeedsAttention` /
+`attentionSlots` alimenta os marcadores "?" da AGENDA. O card do dashboard é outro trecho
+(linha ~858) e usa `!isExhausted && remaining<=2 && remaining>0`, baseado em sessões
+realizadas — critério que já fazia sentido. Corrigido com ela na hora.
+
+### Plano
+
+- [ ] Passo 1 — Spec.
+- [ ] Passo 2 — Critério passa a ser `remaining===1` (decisão dela: "faltando 1 sessão").
+- [ ] Passo 3 — A LINHA INTEIRA vira clicável e abre direto a sessão restante
+      (`showSessionEditForm`), para ela corrigir a marcação que esqueceu.
+      Fallback quando não houver sessão pendente: abrir o pacote.
+- [ ] Passo 4 — Provas + contrafactual, bump, commit, publicar.
+
 ## ENTREGUE — gaveta dos recebimentos antigos (20/08/2026)
 
 > "todo pacote que iniciamos até agosto zera ... faz uma pastinha (recebimentos antigos

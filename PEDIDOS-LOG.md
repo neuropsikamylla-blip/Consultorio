@@ -43,3 +43,6 @@ seria interessante colocar o periodo por exemplo:[Image #1] para saber qts min t
 
 ## 20/08/2026 10:35
 otimo.. o que esta me incomodando agora é : ⚠️ Pacotes a Encerrar. Tem pacientes que ja iniciaram novos pacotes mas eu esqueci de marcar sessão realizada, como fazemos isso? pois eu nao sei se isso está funcional
+
+## 20/08/2026 10:44
+eu acho que quando estiver faltando 1 sessão, mas quando eu clicar para ver ir direto para sessão que está restando (pois se for uma falha minha de marcar realizada eu consigo resolver).. problema que estou clicando e nao vai
