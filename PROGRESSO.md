@@ -18,6 +18,25 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## ENTREGUE — Anamnese removida (20/08/2026)
+
+> "Anamnese pode retirar, eu nào estou utilizando"
+
+Bloco contínuo no fim do `<script>` (linhas 2439–2814): `_ANA_SECS` com 27 seções,
+`renderAnamnese`, `_anaFaixa`, `_anaRenderForm`, `_anaSelectClient`, `_anaCollect`, `_anaSave`,
+`_anaLoad`, `_anaExportPDF`. Mais o item de menu, a chave em `titles`, a chave em `pages` e a
+tag `<script>` do jsPDF do CDN — que só a anamnese usava.
+
+**385 linhas fora. App: 701.742 → 681.928 bytes**, e uma dependência externa a menos para
+baixar a cada abertura.
+
+**Os DADOS não foram tocados.** A tabela `anamneses` e seus registros continuam no Supabase.
+Nenhum DELETE, nenhuma migração. Se ela quiser a anamnese de volta, o código está no commit
+`0c61eb8` e volta com `git show 0c61eb8:index.html`.
+
+Codex `gpt-5.6-terra` high, lab `neuropsi-sem-ana`, aplicado sem conserto.
+Provas: **148/148 PASS** em 16 baterias. `APP_VERSION` → 2026-08-20-05.
+
 ## ENTREGUE — alta libera os horários futuros (20/08/2026)
 
 > "quando eu der alta e encerrar o paciente precisa sair da lista da agenda"
