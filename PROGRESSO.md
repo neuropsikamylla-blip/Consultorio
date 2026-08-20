@@ -18,40 +18,36 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
-## EM ANDAMENTO — Pacotes a Encerrar: clique útil (aberto 20/08/2026)
+## ENTREGUE — Pacotes a Encerrar com clique útil (20/08/2026)
 
-> "eu acho que quando estiver faltando 1 sessão, mas quando eu clicar para ver ir direto para
-> sessão que está restando (pois se for uma falha minha de marcar realizada eu consigo
-> resolver).. problema que estou clicando e nao vai"
+> "quando estiver faltando 1 sessão, mas quando eu clicar para ver ir direto para sessão que
+> está restando ... problema que estou clicando e nao vai"
 
-### Diagnóstico com evidência (não por leitura)
+**Por que "não vinha":** só o `<button>Ver →</button>` tinha `onclick`. O nome do paciente e o
+resto da linha não eram clicáveis — clicar ali, o gesto natural, não fazia nada. E o botão
+levava à lista de Pacotes, que nem tem item no menu (`data-page="packages"` não existe), então
+nada ficava destacado e parecia que não saía do lugar.
 
-Simulei o dashboard com um pacote de 8 e 7 realizadas:
+Agora: critério `remaining===1` (decisão dela), LINHA INTEIRA clicável com `cursor:pointer`, e
+o destino é a própria sessão que falta (`nextOpenSession` → `showSessionEditForm`), onde ela
+marca "realizada" e o pacote sai do alerta. Sem sessão em aberto, vai para `sessions` (página
+que existe no menu) com aviso.
 
-- o card FUNCIONA: mostra "Maria Helena · Pacote Maria · 1 sessão restante";
-- `navigate('packages')` também funciona (renderiza 1111 caracteres de lista).
+Codex `gpt-5.6-terra` high, lab `neuropsi-encerrar`, diff aplicado sem conserto.
+Provas: **117/117 PASS** em 13 baterias. `APP_VERSION` → 2026-08-20-02.
 
-**Por que "não vai":** só o `<button>Ver →</button>` tem `onclick`. O nome do paciente e o
-resto da linha não são clicáveis — clicar ali, que é o gesto natural, não faz nada. E mesmo
-acertando o botão, o destino é a lista de Pacotes, que sequer tem item no menu
-(`data-page="packages"` não existe), então nada fica destacado e parece que não saiu do lugar.
+### DOIS ALARMES FALSOS MEUS NESTA TAREFA — a lição
 
-### ERRO MEU, registrado para não se repetir
+1. Afirmei que o alerta "mostrava todo paciente com pacote e não estava funcional". Eu havia
+   lido `clientNeedsAttention`/`attentionSlots`, que alimenta os marcadores "?" da AGENDA — o
+   card do dashboard é outro trecho, com critério próprio e correto.
+2. Afirmei que o botão ficara sem `stopPropagation`. Ele estava lá; meu `grep -oE` cortou o
+   início da linha.
 
-Antes disso eu afirmei a ela que o alerta mostrava praticamente todo paciente com pacote e que
-"não estava funcional". **Eu tinha analisado a função errada**: `clientNeedsAttention` /
-`attentionSlots` alimenta os marcadores "?" da AGENDA. O card do dashboard é outro trecho
-(linha ~858) e usa `!isExhausted && remaining<=2 && remaining>0`, baseado em sessões
-realizadas — critério que já fazia sentido. Corrigido com ela na hora.
-
-### Plano
-
-- [ ] Passo 1 — Spec.
-- [ ] Passo 2 — Critério passa a ser `remaining===1` (decisão dela: "faltando 1 sessão").
-- [ ] Passo 3 — A LINHA INTEIRA vira clicável e abre direto a sessão restante
-      (`showSessionEditForm`), para ela corrigir a marcação que esqueceu.
-      Fallback quando não houver sessão pendente: abrir o pacote.
-- [ ] Passo 4 — Provas + contrafactual, bump, commit, publicar.
+**Lição:** nas duas vezes a causa foi a mesma — conclusão tirada de saída truncada (`tail`,
+`cut -c1-N`, `grep -oE` sem âncora). Antes de afirmar defeito, ler o trecho INTEIRO da função,
+ou provar com teste executável. O diagnóstico do clique só ficou correto quando rodei o
+dashboard de verdade em vez de ler o HTML.
 
 ## ENTREGUE — gaveta dos recebimentos antigos (20/08/2026)
 
