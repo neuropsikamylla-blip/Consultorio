@@ -18,36 +18,35 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
-## EM ANDAMENTO — alta libera os horários futuros (aberto 20/08/2026)
+## ENTREGUE — alta libera os horários futuros (20/08/2026)
 
 > "quando eu der alta e encerrar o paciente precisa sair da lista da agenda"
 
-### Diagnóstico rodando a agenda (não lendo)
+Medido rodando a agenda: o marcador "?" JÁ saía com a alta (1 → 0); o que ficava eram as
+sessões futuras agendadas.
 
-|  | antes da alta | depois da alta |
-|---|---|---|
-| marcador "?" na agenda | 1 | **0** ✅ já sai |
-| sessão FUTURA na agenda | sim | **sim** ❌ fica |
+**Decisão dela**, entre três opções: ao dar alta, PERGUNTAR e apagar as futuras. "Apenas
+ocultar" foi descartado por motivo concreto — a checagem de conflito continuaria bloqueando o
+horário invisível, e ela receberia "já existe atendimento com <paciente em alta>" sem ver nada.
 
-O marcador já sai. O que permanece são as sessões futuras já agendadas.
+O modal de alta agora diz "<nome> tem N sessões futuras marcadas" e oferece três saídas:
+Cancelar · Dar alta e manter · ✅ Dar alta e liberar horários. Sem futuras, segue com os dois
+botões de antes — nada de passo inútil.
 
-**Decisão dela (20/08/2026)**, entre três opções: ao dar alta, PERGUNTAR quantas sessões
-futuras existem e apagá-las se ela confirmar — o horário fica livre de verdade. Descartadas:
-apagar sem perguntar, e apenas ocultar. Ocultar foi descartado por um motivo concreto: existe
-checagem de conflito de horário; a sessão oculta continuaria bloqueando o horário e ela levaria
-"já existe atendimento com <paciente em alta>" sem ver nada na tela.
+Sessão futura já marcada como realizada/falta NÃO é removida: conta no pacote e é histórico.
 
-### Defeito adjacente encontrado
+### Defeito preexistente consertado junto
 
-`dbDeleteSession` NÃO verifica o retorno do `supaFetch` — falha de DELETE passa silenciosa.
-Suas irmãs verificam (`dbDeletePackage` 1, `dbDeleteClient` 2); ela ficou de fora. Sem
-consertar, a remoção em massa relataria sucesso falso.
+`dbDeleteSession` não verificava o retorno do `supaFetch` — falha de DELETE passava silenciosa.
+As irmãs verificavam (`dbDeletePackage` 1, `dbDeleteClient` 2); ela ficou de fora. Agora lança,
+e os 2 chamadores ganharam `try/catch` com aviso de erro — senão o conserto trocaria "erro
+silencioso" por "erro não tratado".
 
-- [ ] Passo 1 — Spec.
-- [ ] Passo 2 — `dbDeleteSession` passa a lançar; os 2 chamadores ganham tratamento.
-- [ ] Passo 3 — Modal de alta com contagem e três saídas (liberar / manter / cancelar).
-- [ ] Passo 4 — Remoção em massa honesta e com uma única recarga.
-- [ ] Passo 5 — Provas + contrafactual, bump, commit, publicar.
+A liberação em massa conta sucessos e falhas de verdade (`result===null` ⇒ falha), não aborta
+no meio e recarrega o banco UMA vez só, em vez de uma vez por sessão.
+
+Codex `gpt-5.6-sol` high, lab `neuropsi-alta`, aplicado sem conserto.
+Provas: **138/138 PASS** em 15 baterias. `APP_VERSION` → 2026-08-20-04.
 
 ## ENTREGUE — ação rápida no card Pacotes a Encerrar (20/08/2026)
 
