@@ -18,6 +18,32 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## 🔖 PONTO DE RETORNO — `ponto-seguro-20260820`
+
+Ela avisou em 20/08/2026 que faria backup dos dados e proporia mudanças grandes, com o direito
+de voltar atrás. Marca criada e publicada no GitHub:
+
+```bash
+git checkout ponto-seguro-20260820 -- index.html
+git commit -m "Volta ao ponto seguro de 20/08/2026"
+git push origin main
+```
+
+O app volta ao ar em poucos minutos (o `APP_VERSION` aqui é `2026-08-20-05`; ao voltar,
+BUMPAR para um valor novo, senão o navegador dela pode ficar com a versão em cache).
+
+**Dois backups diferentes, não confundir:**
+
+| O quê | Onde | Cobre |
+|---|---|---|
+| Backup dela (botão Exportar) | JSON no computador dela | os DADOS (pacientes, sessões, pagamentos) |
+| Tag `ponto-seguro-20260820` | GitHub | o CÓDIGO do app |
+
+Restaurar o código NÃO desfaz mudanças de dados feitas no Supabase, e vice-versa. Se a mudança
+grande mexer em dados, o backup dela é o que salva; se quebrar o app, é a tag.
+
+Estado congelado aqui: 148/148 PASS em 16 baterias.
+
 ## ENTREGUE — Anamnese removida (20/08/2026)
 
 > "Anamnese pode retirar, eu nào estou utilizando"
