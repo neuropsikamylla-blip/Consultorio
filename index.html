@@ -256,7 +256,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-20-02';
+const APP_VERSION='2026-08-20-03';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -566,6 +566,15 @@ window.openExpiringPackage=function(packageId){
   navigate('sessions');
   showToast('Este pacote não tem sessão em aberto — confira o pacote.');
 };
+window.markExpiringSession=async function(sessionId,status){
+  try{
+    await dbUpdateSession(sessionId,{status:status});
+    renderDashboard();
+    showToast(status==='falta'?'⚠️ Marcada como falta (conta como feita)':'✅ Sessão marcada como realizada');
+  }catch(e){
+    showToast('❌ Não foi possível marcar. Tente de novo.',true);
+  }
+};
 function clientName(id){var c=getDB().clients.find(function(c){return c.id===id;});return c?escHtml(c.name):'—';}
 function pkgName(id){var p=getDB().packages.find(function(p){return p.id===id;});return p?escHtml(p.name):'—';}
 // Nome curto "Primeiro Último" (Danilo Fernandes Nery -> Danilo Nery)
@@ -872,7 +881,10 @@ function renderDashboard(){
     var st=pkgStats(p);
     if(!st.isExhausted&&st.remaining===1){
       expiringCount++;
-      expiringHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer" title="Abrir a sessão que falta" onclick="window.openExpiringPackage(\''+p.id+'\')"><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(p.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+p.name+' · <span style="color:var(--yellow)">'+st.remaining+' sessão restante</span></div></div><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.openExpiringPackage(\''+p.id+'\')">Abrir →</button></div>';
+      var openSession=nextOpenSession(db,p.id);
+      var whereHtml=openSession?' · 📅 '+fmtDate(openSession.date).slice(0,5)+(openSession.time?' '+openSession.time.slice(0,5):''):' · <span style="color:var(--yellow)">⚠️ falta agendar</span>';
+      var actionsHtml=openSession?'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.markExpiringSession(\''+openSession.id+'\',\'realizada\')">✅ Feita</button><button class="btn btn-ghost btn-sm" title="Paciente faltou sem avisar — a sessão conta como feita mesmo assim" onclick="event.stopPropagation();window.markExpiringSession(\''+openSession.id+'\',\'falta\')">⚠️ Falta</button>':'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showSessionForm(\''+p.clientId+'\')">📅 Agendar</button>';
+      expiringHtml+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer" title="Abrir a sessão que falta" onclick="window.openExpiringPackage(\''+p.id+'\')"><div style="flex:1"><div style="font-size:13.5px;font-weight:600">'+clientName(p.clientId)+'</div><div style="font-size:12px;color:var(--text2)">'+p.name+' · <span style="color:var(--yellow)">'+st.remaining+' sessão restante</span>'+whereHtml+'</div></div>'+actionsHtml+'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.openExpiringPackage(\''+p.id+'\')">Abrir →</button></div>';
     }
   });
   if(expiringCount===0)expiringHtml='<div class="empty" style="padding:24px"><div class="empty-icon">✅</div><p>Nenhum pacote encerrando em breve</p></div>';
@@ -925,7 +937,7 @@ function renderDashboard(){
 
   html+='<div class="grid-2">';
   html+='<div class="card"><div class="section-header"><div class="section-title">📅 Próximas 7 dias</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'agenda\')">Ver agenda →</button></div>'+upcomingHtml+'</div>';
-  html+='<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'packages\')">Ver pacotes →</button></div>'+expiringHtml+'</div>';
+  html+='<div class="card"><div class="section-header"><div class="section-title">⚠️ Pacotes a Encerrar</div><button class="btn btn-ghost btn-sm" onclick="navigate(\'sessions\')">Ver sessões →</button></div>'+expiringHtml+'</div>';
   html+='</div>';
 
   html+='<div class="card" style="margin-top:16px;border-color:rgba(245,200,66,0.25);cursor:pointer" onclick="navigate(\'notes\')"><div style="display:flex;align-items:center;justify-content:space-between"><div><div class="section-title" style="margin-bottom:6px">📝 Notas Importantes</div><div style="font-size:13px;color:var(--text2)">'+(hasNotes?notesPreview.slice(0,120)+(notesPreview.length>120?'...':''):'Nenhuma nota ainda. Clique para adicionar.')+'</div></div><button class="btn btn-ghost btn-sm" style="margin-left:16px;flex-shrink:0">Abrir →</button></div></div>';

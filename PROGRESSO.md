@@ -18,6 +18,44 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## ENTREGUE — ação rápida no card Pacotes a Encerrar (20/08/2026)
+
+> "fica mto enrolada pois vc tem de procurar o paciente pra saber onde ficou essa sessão
+> restante ... lembrando que falta = sessao feita, ela precisa ser contabilizada como feita"
+
+### O caso que faltava (diagnóstico rodando o dashboard, não lendo)
+
+| Cenário | `nextOpenSession` | Clique |
+|---|---|---|
+| 8 criadas, 7 marcadas, 1 agendada | acha | ia direto ✅ |
+| **só 7 criadas, todas marcadas** | `null` | caía na lista ❌ |
+| 6 realizadas + 1 falta + 1 agendada | acha | ia direto ✅ |
+
+O caso do meio é o dela: o pacote tem 8 vagas mas só 7 viraram sessão — não há sessão para
+abrir, falta AGENDAR. Agora a linha diz `⚠️ falta agendar` e oferece `📅 Agendar`.
+
+### O que mudou
+
+- A linha mostra ONDE está a sessão: `· 📅 15/08 09:00`. Ela não precisa mais procurar.
+- Ações na própria linha: `✅ Feita` e `⚠️ Falta`, com `stopPropagation`, sem abrir nada.
+- Botão do cabeçalho ia para `navigate('packages')` — página SEM item de menu, que parecia
+  "não sair do lugar". Agora `navigate('sessions')`, "Ver sessões →".
+
+### Regra dela sobre falta — já estava correta, agora está PROVADA
+
+"falta = sessão feita; a marcação de falta é só controle dela". Os seis pontos que contam
+sessão usada (linhas ~553, 848, 949, 1208, 1293, 1320) já incluíam `'falta'`; o único que
+separa é `realizadaCount` (~1294), de propósito, para exibir "realizadas × faltas".
+O teste 7 da prova nova fixa isso: após marcar Falta, `pkgStats.used` sobe para 8.
+
+Codex `gpt-5.6-terra` high, lab `neuropsi-acao`, aplicado sem conserto.
+Provas: **126/126 PASS** em 14 baterias. `APP_VERSION` → 2026-08-20-03.
+
+### Em aberto, se ela quiser
+
+Marcar em massa as sessões passadas que continuam "agendada" — hoje só dá uma a uma, e foi
+esse o esquecimento que originou tudo. O card resolve os pacotes com exatamente 1 faltando.
+
 ## ENTREGUE — Pacotes a Encerrar com clique útil (20/08/2026)
 
 > "quando estiver faltando 1 sessão, mas quando eu clicar para ver ir direto para sessão que
