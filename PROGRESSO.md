@@ -18,33 +18,46 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
-## EM ANDAMENTO — gaveta dos recebimentos antigos (aberto 20/08/2026)
+## ENTREGUE — gaveta dos recebimentos antigos (20/08/2026)
 
-Pedido dela, nas palavras dela:
-> "queria que resetasse.. todo pacote que iniciamos até agosto zera sei la faz uma pastinha
-> (recebimentos antigos concluidos) e deixa meio que fechado vou apertar tudo como recebido e
-> vc deixa como escondidinho) para todos novos pacotes que inicarmos em setembro pois eu me
-> desorganizei então esta tudo errado la beleza?"
+> "todo pacote que iniciamos até agosto zera ... faz uma pastinha (recebimentos antigos
+> concluidos) e deixa meio que fechado, vou apertar tudo como recebido e vc deixa como
+> escondidinho ... pois eu me desorganizei então esta tudo errado la"
 
-Leitura: o histórico bagunçado não deve ser APAGADO, e sim FECHADO numa gaveta recolhida.
-Setembro começa limpo. Ela quer quitar os antigos ("apertar tudo como recebido").
+Nada foi apagado. O histórico antigo saiu da vista principal e foi para uma gaveta `<details>`
+fechada, com o consolidado (recebido, pendente, histórico por mês, pendências).
 
-**ARMADILHA ENCONTRADA (20/08/2026)** — `window.markPaid` (linha ~1739) grava
-`paymentDate=today()`. Se ela quitar os pacotes antigos já em setembro, cada um recebe data de
-setembro, `pkgMonth` vira `'2026-09'` e os ~R$ 9.180 de dívida velha ENTRAM como receita de
-setembro. A bagunça mudaria de lugar em vez de encerrar. A quitação da gaveta tem de gravar a
-data do mês ORIGINAL do pacote, nunca a de hoje.
+### A armadilha da data — o ponto central desta entrega
 
-Estado observado no print dela: marco ainda NÃO ativo (o Histórico lista julho..fevereiro).
+`markPaid` grava `paymentDate=today()`. Quitar os antigos já em setembro faria `pkgMonth`
+virar `'2026-09'` e os ~R$ 9.180 de dívida velha entrariam como RECEITA DE SETEMBRO — a
+bagunça mudaria de lugar em vez de encerrar. A quitação da gaveta grava o ÚLTIMO DIA DO MÊS DE
+ORIGEM (`legacyPayload` + `lastDayOfMonth`), nunca a data de hoje. Pacote de junho ⇒
+`2026-06-30`. `parcela1` preserva o `paymentDate` original e fecha a 2ª parcela no mês de origem.
 
-- [ ] Passo 1 — Spec.
-- [ ] Passo 2 — Gaveta `<details>` fechada com o consolidado antigo (recebido, pendente,
-      histórico por mês e a lista de pendências antigas).
-- [ ] Passo 3 — Encerrar o período com UM clique dentro do Financeiro (grava o marco),
-      sem ela ter de ir às Configurações.
-- [ ] Passo 4 — Quitar em massa os antigos, com confirmação mostrando quantidade e valor,
-      gravando a data do mês original. Resiliente a falha no meio.
-- [ ] Passo 5 — Provas + contrafactual, bump, commit, publicar.
+### Alarme falso registrado, para não se repetir
+
+Na revisão eu apontei que `dbUpdatePackage` não lançava em falha e que o contador de sucesso
+mentiria. **Estava errado**: o `throw` existe desde a correção de auth de 17/08 (`b314f22`) —
+eu havia lido só o fim da função. Em vez de resolver por leitura, escrevi
+`prova-gaveta-falha.mjs`, que controla a rede de fora e inspeciona o que sai no PATCH.
+
+### Provas: 107/107 PASS em 12 baterias
+
+`prova-gaveta-antigos.mjs` 11/11 e a nova `prova-gaveta-falha.mjs` 8/8, que prova o que
+importa de verdade:
+
+- data gravada = `2026-06-30` para pacote de junho; NENHUM lançamento datado no mês corrente;
+- rede fora ⇒ o aviso diz "0 quitados, 3 falharam" — **não mente sucesso**;
+- falha parcial ⇒ relata quitados E falhas, sem abortar no meio;
+- recusar a confirmação ⇒ zero gravações.
+
+Codex `gpt-5.6-sol` high, lab `neuropsi-gaveta`. `APP_VERSION` → 2026-08-20-01.
+
+### Os dois gestos dela (não dá para eu fazer: exigem escrita no Supabase dela)
+
+1. Financeiro → **"Encerrar até agosto de 2026"** (um clique; grava o marco `2026-09`).
+2. Abrir **📦 Recebimentos antigos** → **"✅ Marcar todos como recebidos"** → confirmar.
 
 ## ENTREGUE — barra lateral retrátil e marco do financeiro (19/08/2026)
 

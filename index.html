@@ -110,6 +110,10 @@ select option{background:var(--bg3);}
 .alert-red{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,96,96,0.25);}
 .alert-green{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,217,138,0.25);}
 .alert-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid rgba(245,200,66,0.25);}
+.gaveta{margin-top:20px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.gaveta>summary{cursor:pointer;padding:18px 20px;font-weight:600;color:var(--text);list-style-position:inside;}
+.gaveta[open]>summary{border-bottom:1px solid var(--border);}
+.gaveta-body{padding:20px;}
 .empty{text-align:center;padding:52px 20px;color:var(--text2);}
 .empty-icon{font-size:44px;margin-bottom:12px;opacity:0.4;}
 .search-input-wrap{position:relative;flex:1;}
@@ -252,7 +256,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-19-04';
+const APP_VERSION='2026-08-20-01';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -424,7 +428,8 @@ async function dbUpdatePackage(id,data){
   if(data.paymentDate!==undefined)row.payment_date=data.paymentDate||null;
   if(data.paymentDate2!==undefined)row.payment_date2=data.paymentDate2||null;
   if(data.paymentType!==undefined)row.payment_type=data.paymentType;
-  await supaFetch('PATCH','packages',row,'?id=eq.'+id);
+  var result=await supaFetch('PATCH','packages',row,'?id=eq.'+id);
+  if(result===null)throw new Error('Falha ao salvar. Verifique sua conexão ou faça login novamente.');
   if(data.newTime){await supaFetch('PATCH','sessions',{time:data.newTime},'?package_id=eq.'+id+'&date=gte.'+today()+'&status=eq.agendada');}
   await loadFromSupabase();
 }
@@ -644,6 +649,54 @@ function financeSessions(db){
   return db.sessions.filter(function(s){return withinFinance((s.date||'').slice(0,7));});
 }
 // ── FINMARCO-CORE-FIM ──
+
+// ── GAVETA-CORE-INICIO ──
+function lastDayOfMonth(m){
+  if(typeof m!=='string'||!/^\d{4}-(0[1-9]|1[0-2])$/.test(m))return'';
+  var parts=m.split('-');
+  var year=Number(parts[0]);var month=Number(parts[1]);
+  var day=new Date(Date.UTC(year,month,0)).getUTCDate();
+  return m+'-'+String(day).padStart(2,'0');
+}
+function legacyPackages(db){
+  if(!financeStartMonth())return[];
+  return(db.packages||[]).filter(function(p){return withinFinance(pkgMonth(p))===false;});
+}
+function legacySessions(db){
+  if(!financeStartMonth())return[];
+  return(db.sessions||[]).filter(function(s){return withinFinance((s.date||'').slice(0,7))===false;});
+}
+function legacyTotals(db){
+  var oldPackages=legacyPackages(db);var oldSessions=legacySessions(db);
+  var recebido=0;var pendente=0;var qtdPendente=0;
+  oldPackages.forEach(function(p){
+    if(p.paymentType==='sessao')return;
+    var price=Number(p.price)||0;
+    if(p.paymentStatus==='paid')recebido+=price;
+    else if(p.paymentStatus==='parcela1'){recebido+=price/2;pendente+=price/2;qtdPendente++;}
+    else{pendente+=price;qtdPendente++;}
+  });
+  oldSessions.forEach(function(s){
+    var pkg=(db.packages||[]).find(function(p){return p.id===s.packageId;});
+    var isPerSession=pkg&&pkg.paymentType==='sessao';var isStandalone=!s.packageId;
+    if(!isPerSession&&!isStandalone)return;
+    var value=isPerSession&&pkg?(Number(pkg.price)||0)/(Number(pkg.totalSessions)||1):(Number(s.sessionPrice)||0);
+    if(s.sessionPayStatus==='paid'||s.status==='falta')recebido+=value;
+    else{pendente+=value;qtdPendente++;}
+  });
+  return{recebido:recebido,pendente:pendente,qtdPendente:qtdPendente};
+}
+function legacyPayload(p){
+  var paymentDate=lastDayOfMonth(pkgMonth(p));
+  var data={paymentStatus:'paid'};
+  if(p.paymentStatus==='parcela1'){
+    if(p.paymentDate)data.paymentDate=p.paymentDate;
+    else data.paymentDate=paymentDate;
+    data.paymentDate2=paymentDate;
+  }else data.paymentDate=paymentDate;
+  return data;
+}
+// ── GAVETA-CORE-FIM ──
 
 // ── COMPROMISSOS-CORE-INICIO ──
 function compromissoKindMeta(kind){
@@ -1604,8 +1657,11 @@ window.dayClick=function(dateStr){
 function renderFinancial(){
   var db=getDB();
   var finPackages=financePackages(db);var finSessions=financeSessions(db);
+  var oldPackages=legacyPackages(db);var oldSessions=legacySessions(db);var oldTotals=legacyTotals(db);
   var nowDate=today();
   var currentMonth=nowDate.slice(0,7); // 'YYYY-MM'
+  var monthLabel=function(mon){var parts=mon.split('-');var label=new Date(Number(parts[0]),Number(parts[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});return label.charAt(0).toUpperCase()+label.slice(1);};
+  var shiftMonth=function(mon,amount){var parts=mon.split('-');var date=new Date(Number(parts[0]),Number(parts[1])-1+amount,1);return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');};
 
   // Pacotes sem nenhuma sessão vinculada não entram nos cálculos financeiros
   var hasSessF=function(p){return db.sessions.some(function(s){return s.packageId===p.id;});};
@@ -1701,7 +1757,40 @@ function renderFinancial(){
       '<td><button class="btn btn-ghost btn-sm" onclick="(async function(){await markPending(\''+p.id+'\');})()">Reverter</button></td></tr>';
   });
 
+  var legacyRevenueByMonth={};
+  oldPackages.forEach(function(p){
+    if(p.paymentType==='sessao')return;
+    var mon=pkgMonth(p);if(mon&&!legacyRevenueByMonth[mon])legacyRevenueByMonth[mon]=0;
+    if(p.paymentStatus==='paid'&&mon)legacyRevenueByMonth[mon]+=(Number(p.price)||0);
+    else if(p.paymentStatus==='parcela1'&&p.paymentDate){var firstMon=p.paymentDate.slice(0,7);if(!legacyRevenueByMonth[firstMon])legacyRevenueByMonth[firstMon]=0;legacyRevenueByMonth[firstMon]+=(Number(p.price)||0)/2;}
+  });
+  oldSessions.forEach(function(s){
+    var pkg=db.packages.find(function(p){return p.id===s.packageId;});var isPerSession=pkg&&pkg.paymentType==='sessao';var isStandalone=!s.packageId;
+    if(!isPerSession&&!isStandalone)return;
+    var mon=(s.date||'').slice(0,7);if(mon&&!legacyRevenueByMonth[mon])legacyRevenueByMonth[mon]=0;
+    if(mon&&(s.sessionPayStatus==='paid'||s.status==='falta'))legacyRevenueByMonth[mon]+=isPerSession?(Number(pkg.price)||0)/(Number(pkg.totalSessions)||1):(Number(s.sessionPrice)||0);
+  });
+  var legacyMonthRows='';
+  Object.keys(legacyRevenueByMonth).sort().reverse().forEach(function(mon){legacyMonthRows+='<tr><td><strong>'+monthLabel(mon)+'</strong></td><td style="color:var(--green);font-weight:700">'+fmt(legacyRevenueByMonth[mon])+'</td></tr>';});
+
+  var legacyPendingRows='';
+  oldPackages.filter(function(p){return p.paymentType!=='sessao'&&(p.paymentStatus==='pending'||p.paymentStatus==='parcela1');}).forEach(function(p){
+    var partial=p.paymentStatus==='parcela1';
+    legacyPendingRows+='<tr><td><strong>'+clientName(p.clientId)+'</strong></td><td class="td-muted">'+p.name+'</td><td style="font-weight:600">'+fmt(partial?(Number(p.price)||0)/2:p.price)+'</td><td><span class="badge '+(partial?'badge-parcial':'badge-gray')+'">'+(partial?'🔶 2ª Parcela Pendente':'⚠️ Antigo')+'</span></td><td class="td-muted">'+monthLabel(pkgMonth(p))+'</td><td><button class="btn btn-primary btn-sm" onclick="(async function(){await markLegacyPaid(\''+p.id+'\',\'package\');})()">'+(partial?'2ª Parcela Paga':'Marcar pago')+'</button></td></tr>';
+  });
+  oldSessions.forEach(function(s){
+    var pkg=db.packages.find(function(p){return p.id===s.packageId;});var isPerSession=pkg&&pkg.paymentType==='sessao';var isStandalone=!s.packageId;
+    if((!isPerSession&&!isStandalone)||s.sessionPayStatus==='paid'||s.status==='falta')return;
+    var value=isPerSession?(Number(pkg.price)||0)/(Number(pkg.totalSessions)||1):(Number(s.sessionPrice)||0);
+    legacyPendingRows+='<tr><td><strong>'+clientName(s.clientId)+'</strong></td><td class="td-muted">'+(isStandalone?'Sessão avulsa':pkg.name+' · sessão')+'</td><td style="font-weight:600">'+fmt(value)+'</td><td><span class="badge badge-gray">⚠️ Antigo</span></td><td class="td-muted">'+(s.date?fmtDate(s.date):'—')+'</td><td><button class="btn btn-primary btn-sm" onclick="(async function(){await markLegacyPaid(\''+s.id+'\',\'session\');})()">Marcar pago</button></td></tr>';
+  });
+
   var html='<div class="page">';
+
+  if(!financeStartMonth()){
+    var closeLabel=monthLabel(currentMonth);
+    html+='<div class="alert alert-yellow" style="justify-content:space-between;align-items:center;flex-wrap:wrap"><span>Fechar o período anterior? Os lançamentos até '+closeLabel+' saem do resumo e vão para a gaveta. Nada é apagado — dá para desfazer em Configurações.</span><button class="btn btn-secondary btn-sm" onclick="closeLegacyPeriod()">Encerrar até '+closeLabel+'</button></div>';
+  }
 
   // Top cards - current month only
   var curMonthName=new Date(parseInt(currentMonth.split('-')[0]),parseInt(currentMonth.split('-')[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
@@ -1733,6 +1822,15 @@ function renderFinancial(){
       '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Data Pgto</th><th>Valor</th><th>Ação</th></tr></thead><tbody>'+paidRows+'</tbody></table></div>')+
     '</div>';
 
+  if(financeStartMonth()&&(oldPackages.length>0||oldSessions.length>0)){
+    var closedUntil=monthLabel(shiftMonth(financeStartMonth(),-1));
+    html+='<details class="gaveta"><summary>📦 Recebimentos antigos (encerrados até '+closedUntil+') — recebido '+fmt(oldTotals.recebido)+' · pendente '+fmt(oldTotals.pendente)+'</summary><div class="gaveta-body">'+
+      '<div style="display:flex;justify-content:flex-end;margin-bottom:20px"><button class="btn btn-primary" onclick="markAllLegacyPaid()" '+(oldTotals.qtdPendente===0?'disabled':'')+'>✅ Marcar todos como recebidos</button></div>'+
+      (legacyMonthRows?'<div class="card" style="margin-bottom:20px"><div class="section-header"><div class="section-title">📆 Histórico por Mês</div></div><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Receita Recebida</th></tr></thead><tbody>'+legacyMonthRows+'</tbody></table></div></div>':'')+
+      (legacyPendingRows?'<div class="card"><div class="section-header"><div class="section-title">⏳ Pendências antigas</div></div><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Pacote</th><th>Valor</th><th>Status</th><th>Data</th><th>Ação</th></tr></thead><tbody>'+legacyPendingRows+'</tbody></table></div></div>':'<div class="empty" style="padding:20px"><p>Nenhuma pendência antiga</p></div>')+
+      '</div></details>';
+  }
+
   html+='</div>';
   document.getElementById('page-content').innerHTML=html;
 }
@@ -1749,6 +1847,46 @@ window.markParcela1=async function(id){
 };
 window.markPending=async function(id){await dbUpdatePackage(id,{paymentStatus:'pending',paymentDate:null,paymentDate2:null});renderFinancial();showToast('↩️ Revertido para pendente');};
 window.markSessionPaid=async function(id){await dbUpdateSession(id,{sessionPayStatus:'paid',sessionPaid:true});renderFinancial();showToast('✅ Sessão avulsa paga!');};
+window.closeLegacyPeriod=async function(){
+  var current=today().slice(0,7);var parts=current.split('-');var nextDate=new Date(Number(parts[0]),Number(parts[1]),1);
+  var next=nextDate.getFullYear()+'-'+String(nextDate.getMonth()+1).padStart(2,'0');
+  var settings=Object.assign({},getDB().appSettings||{},{financeStart:next});
+  if(!await saveAppSettings(settings)){showToast('❌ Não foi possível encerrar o período. Tente novamente.',true);return;}
+  renderFinancial();showToast('✅ Período anterior encerrado. Nada foi apagado.');
+};
+window.markLegacyPaid=async function(id,kind){
+  try{
+    if(kind==='session')await dbUpdateSession(id,{sessionPayStatus:'paid',sessionPaid:true});
+    else{
+      var pkg=getDB().packages.find(function(p){return p.id===id;});
+      if(!pkg)throw new Error('Pacote não encontrado.');
+      await dbUpdatePackage(id,legacyPayload(pkg));
+    }
+    showToast('✅ Pagamento antigo confirmado!');
+  }catch(e){showToast('❌ Não foi possível quitar este lançamento. Tente novamente.',true);}
+  renderFinancial();
+};
+window.markAllLegacyPaid=async function(){
+  var db=getDB();var oldPackages=legacyPackages(db);var oldSessions=legacySessions(db);var totals=legacyTotals(db);
+  var pendingPackages=oldPackages.filter(function(p){return p.paymentType!=='sessao'&&(p.paymentStatus==='pending'||p.paymentStatus==='parcela1');});
+  var pendingSessions=oldSessions.filter(function(s){
+    var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+    return(!s.packageId||(pkg&&pkg.paymentType==='sessao'))&&s.sessionPayStatus!=='paid'&&s.status!=='falta';
+  });
+  var count=pendingPackages.length+pendingSessions.length;
+  if(count===0)return;
+  if(!window.confirm('Marcar '+count+' lançamentos como recebidos, no total de '+fmt(totals.pendente)+'? Eles serão datados no mês de origem e continuarão fora do resumo. Nada é apagado.'))return;
+  var success=0;var failures=0;
+  for(var i=0;i<pendingPackages.length;i++){
+    try{await dbUpdatePackage(pendingPackages[i].id,legacyPayload(pendingPackages[i]));success++;}catch(e){failures++;}
+  }
+  for(var j=0;j<pendingSessions.length;j++){
+    try{await dbUpdateSession(pendingSessions[j].id,{sessionPayStatus:'paid',sessionPaid:true});success++;}catch(e){failures++;}
+  }
+  renderFinancial();
+  if(failures)showToast(success+' quitados, '+failures+' falharam — tente de novo',true);
+  else showToast(success+' quitados');
+};
 
 // ── BILLS ──
 var _billsCache=null;
