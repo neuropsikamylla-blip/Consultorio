@@ -18,6 +18,37 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## EM ANDAMENTO — alta libera os horários futuros (aberto 20/08/2026)
+
+> "quando eu der alta e encerrar o paciente precisa sair da lista da agenda"
+
+### Diagnóstico rodando a agenda (não lendo)
+
+|  | antes da alta | depois da alta |
+|---|---|---|
+| marcador "?" na agenda | 1 | **0** ✅ já sai |
+| sessão FUTURA na agenda | sim | **sim** ❌ fica |
+
+O marcador já sai. O que permanece são as sessões futuras já agendadas.
+
+**Decisão dela (20/08/2026)**, entre três opções: ao dar alta, PERGUNTAR quantas sessões
+futuras existem e apagá-las se ela confirmar — o horário fica livre de verdade. Descartadas:
+apagar sem perguntar, e apenas ocultar. Ocultar foi descartado por um motivo concreto: existe
+checagem de conflito de horário; a sessão oculta continuaria bloqueando o horário e ela levaria
+"já existe atendimento com <paciente em alta>" sem ver nada na tela.
+
+### Defeito adjacente encontrado
+
+`dbDeleteSession` NÃO verifica o retorno do `supaFetch` — falha de DELETE passa silenciosa.
+Suas irmãs verificam (`dbDeletePackage` 1, `dbDeleteClient` 2); ela ficou de fora. Sem
+consertar, a remoção em massa relataria sucesso falso.
+
+- [ ] Passo 1 — Spec.
+- [ ] Passo 2 — `dbDeleteSession` passa a lançar; os 2 chamadores ganham tratamento.
+- [ ] Passo 3 — Modal de alta com contagem e três saídas (liberar / manter / cancelar).
+- [ ] Passo 4 — Remoção em massa honesta e com uma única recarga.
+- [ ] Passo 5 — Provas + contrafactual, bump, commit, publicar.
+
 ## ENTREGUE — ação rápida no card Pacotes a Encerrar (20/08/2026)
 
 > "fica mto enrolada pois vc tem de procurar o paciente pra saber onde ficou essa sessão
