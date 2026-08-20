@@ -18,6 +18,42 @@ node docs/provas/prova-render-agenda.mjs    # 12/12 — agenda renderizada + o q
 node docs/provas/prova-renovar-pacote.mjs   # 5/5  — renovar pacote com token vencido
 ```
 
+## 🚧 EM ANDAMENTO — REFORMA DE 27 ITENS (aberta 20/08/2026)
+
+Pedido completo dela em `docs/pedido-reforma-20260820.md`. Ponto de retorno:
+**`antes-da-reforma-20260820`** (código) + backup JSON que ela exportou (dados).
+
+### Restrições transversais — valem em TODAS as fases
+
+- **Item 1**: NÃO alterar o visual. Tema claro/escuro, cores, botões, cards, modais,
+  tipografia, ícones, tabelas — tudo como está. O novo segue o estilo existente.
+- **Item 25**: NÃO reformular a Agenda. Só as integrações necessárias.
+- **Item 26**: NENHUM recadastro. Nenhuma migração destrutiva.
+- Renomeações mudam **apenas rótulos visíveis**; as chaves internas de rota
+  (`clients`, `anexos`, `bills`) ficam como estão — mexer nelas quebraria o app sem
+  benefício algum para ela.
+
+### Fases (cada uma: spec → Codex → revisão linha a linha → prova → commit → publicar)
+
+- [ ] **A — Renomes + sidebar** (itens 2, 3, 4, 5, 6): Clientes→Pacientes, Anexos→Documentos,
+      Boletos→Contas a Pagar, nova ordem do menu, Anamnese fora da sidebar (módulo INTACTO).
+      Sessões/Pacotes PERMANECE no menu nesta fase.
+- [ ] **B — Ficha do paciente com abas** (8, 9, 10, 12, 18): Resumo | Sessões | Pacotes |
+      Prontuário | Cadastro; histórico de pacotes recolhível; filtros e busca.
+- [ ] **C — Fim de pacote** (11, 13, 14, 17): três saídas (renovar / continuar avulso /
+      encerrar); horário recorrente NÃO liberado automaticamente; encerrado continua pesquisável.
+- [ ] **D — Prontuário por sessão** (15, 16): anotação ligada à sessão, ordem cronológica,
+      anotação antiga sem sessão identificável vira "Anotação histórica do pacote" — nunca adivinhar.
+- [ ] **E — Dashboard** (19, 20, 21, 22, 23): Hoje → Atenção → Próximos 7 dias → estatísticas.
+- [ ] **F — Notas/Pendências** (24): descrição, paciente opcional, data opcional, Pendente/Concluída.
+- [ ] **G — Sessões/Pacotes sai da sidebar** (7): SOMENTE depois da Fase B, com a garantia
+      escrita dela de que tudo está acessível na ficha do paciente.
+
+### Ordem obrigatória
+
+G depende de B (ela mesma escreveu: "antes de retirar, garanta que tudo continue acessível").
+D depende de B (o Prontuário é aba da ficha).
+
 ## 🔖 PONTO DE RETORNO — `ponto-seguro-20260820`
 
 Ela avisou em 20/08/2026 que faria backup dos dados e proporia mudanças grandes, com o direito
