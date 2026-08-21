@@ -602,3 +602,272 @@ Quando terminar, me informe apenas:
 5. quais pontos principais devo testar.
 
 **Não considere a nova versão definitiva até eu testar e dar meu aval.**
+
+## 20/08/2026 21:11
+Quero ajustar apenas a parte de **Pacientes** e **Sessões/Pacotes**, porque do jeito que está agora a tela de **Pacientes** ficou desorganizada e eu prefiro muito mais a organização visual que já existe em **Sessões/Pacotes**.
+
+## IMPORTANTE
+
+Antes de mexer, manter o backup da versão atual para eu poder voltar caso eu não goste.
+
+Não alterar o visual do app.
+Quero manter o mesmo estilo atual, tanto no tema claro quanto no escuro.
+
+---
+
+# 1. PROBLEMA ATUAL
+
+A tela **Pacientes** ficou em formato de tabela simples e, para mim, ela está pior para visualizar os pacientes.
+
+Ela está muito seca e pouco funcional.
+
+Já a tela **Sessões/Pacotes** está com uma organização muito melhor para leitura, porque:
+
+* separa melhor cada paciente;
+* mostra informações importantes de forma mais visual;
+* é mais fácil bater o olho;
+* parece mais organizada;
+* permite enxergar melhor contexto, próximas sessões e status.
+
+Por isso, quero que a organização de **Pacientes** siga a lógica e o layout base de **Sessões/Pacotes**.
+
+---
+
+# 2. O QUE QUERO FAZER
+
+## A tela Pacientes deve ser reorganizada usando como base o layout atual de Sessões/Pacotes.
+
+Ou seja:
+
+em vez da lista em tabela simples que está hoje em **Pacientes**, quero uma visualização em blocos/cards por paciente, semelhante ao que já existe em **Sessões/Pacotes**.
+
+---
+
+# 3. COMO A TELA PACIENTES DEVE FICAR
+
+Na tela **Pacientes**, cada paciente deve aparecer em um bloco/card individual, no mesmo espírito visual da tela atual de **Sessões/Pacotes**.
+
+Cada bloco deve mostrar de forma clara:
+
+* iniciais do paciente;
+* nome do paciente;
+* resumo com quantidade de sessões realizadas;
+* faltas, quando houver;
+* botões rápidos como:
+
+  * Prontuário
+  * Ver perfil
+
+E abaixo disso, uma linha organizada com as informações mais relevantes da próxima sessão ou da sessão atual do contexto do paciente, como já acontece em Sessões/Pacotes:
+
+* Nº
+* Data
+* Hora
+* Categoria
+* Pacote
+* Status
+* Pgto
+* Ações
+
+Quero exatamente esse tipo de organização mais “em card”, e não a tabela seca que está hoje em Pacientes.
+
+---
+
+# 4. PACIENTES DEVE HERDAR A MELHOR PARTE DE SESSÕES/PACOTES
+
+A ideia é esta:
+
+## Pacientes deve virar a principal tela de visualização dos pacientes,
+
+mas com o estilo de organização que hoje está em Sessões/Pacotes.
+
+Ou seja:
+
+* manter Pacientes como módulo principal;
+* usar a estrutura visual de Sessões/Pacotes como base;
+* deixar mais agradável e funcional para bater o olho.
+
+---
+
+# 5. SESSÕES/PACOTES NÃO DEVE CONTINUAR DUPLICADO
+
+Hoje existe duplicidade entre:
+
+* Pacientes
+* Sessões/Pacotes
+
+Isso continua ruim.
+
+Então quero o seguinte:
+
+## Primeiro
+
+reorganizar **Pacientes** para ele ficar com a boa estrutura visual de **Sessões/Pacotes**.
+
+## Depois
+
+migrar para dentro de **Pacientes** tudo que for necessário para que a tela **Sessões/Pacotes** deixe de ser necessária como módulo separado.
+
+### Regra:
+
+Só remover **Sessões/Pacotes** da sidebar quando todas as funções importantes estiverem acessíveis dentro de **Pacientes**.
+
+---
+
+# 6. O QUE APROVEITAR DE SESSÕES/PACOTES
+
+Quero reaproveitar em **Pacientes** a lógica visual que hoje já está boa em **Sessões/Pacotes**, incluindo:
+
+* card/bloco por paciente;
+* nome bem destacado;
+* resumo de sessões realizadas e faltas;
+* linha com colunas organizadas:
+
+  * número
+  * data
+  * hora
+  * categoria
+  * pacote
+  * status
+  * pgto
+  * ações
+* botão de Prontuário;
+* botão Ver perfil;
+* link para visualizar realizadas/faltas;
+* leitura fácil e rápida.
+
+---
+
+# 7. O QUE NÃO QUERO MANTER EM PACIENTES
+
+Não quero continuar com a organização atual da tela Pacientes em formato de grade/tabela simples com colunas como:
+
+* Paciente
+* Telefone
+* Pacotes
+* Sessões
+* Ações
+
+Esse formato está pobre, menos intuitivo e pior para leitura.
+
+Pode ser removido/substituído pela nova organização em cards.
+
+---
+
+# 8. O QUE A TELA PACIENTES PRECISA TER
+
+A nova tela **Pacientes** deve ter:
+
+## no topo:
+
+* campo de busca;
+* botão **+ Novo Paciente**;
+* se fizer sentido, filtros simples como:
+
+  * Todos
+  * Psicoterapia
+  * Avaliação
+  * Reabilitação
+  * Supervisão
+  * Encerrados
+
+## na listagem:
+
+cada paciente em um card/bloco no estilo Sessões/Pacotes.
+
+---
+
+# 9. AÇÕES DENTRO DE PACIENTES
+
+Dentro de cada card do paciente, manter acesso rápido a:
+
+* Prontuário
+* Ver perfil
+* Editar
+* Excluir/Arquivar (com cuidado e confirmação)
+
+Se já existir uma lógica segura, manter.
+
+---
+
+# 10. VER PERFIL
+
+O botão **Ver perfil** deve continuar levando para a ficha mais completa do paciente.
+
+Essa ficha pode continuar existindo com abas como:
+
+* Resumo
+* Sessões
+* Pacotes
+* Prontuário
+* Cadastro
+
+Ou estrutura equivalente.
+
+---
+
+# 11. PRONTUÁRIO
+
+O botão **Prontuário** dentro do card do paciente deve continuar acessível, como já está hoje em Sessões/Pacotes.
+
+---
+
+# 12. SESSÕES/PACOTES
+
+A tela atual de **Sessões/Pacotes** está visualmente melhor organizada do que Pacientes.
+
+Então, a tarefa aqui não é redesenhar Sessões/Pacotes.
+
+A tarefa é:
+
+## usar Sessões/Pacotes como referência visual e estrutural para reorganizar Pacientes.
+
+---
+
+# 13. OBJETIVO FINAL
+
+Quero que o resultado seja este:
+
+### Pacientes
+
+vira a tela principal para visualizar pacientes, com uma organização clara, visual e parecida com o layout atual de Sessões/Pacotes.
+
+### Sessões/Pacotes
+
+deixa de ser um módulo separado depois que tudo importante estiver acessível em Pacientes.
+
+---
+
+# 14. RESUMINDO A ALTERAÇÃO
+
+Fazer estas mudanças:
+
+1. Reorganizar a tela **Pacientes**.
+2. Trocar o formato atual de tabela simples por cards/blocos no estilo de **Sessões/Pacotes**.
+3. Reaproveitar a estrutura visual de Sessões/Pacotes:
+
+   * nome;
+   * sessões realizadas;
+   * faltas;
+   * prontuário;
+   * ver perfil;
+   * linha organizada com data, hora, categoria, pacote, status, pgto e ações.
+4. Manter busca e botão **Novo Paciente**.
+5. Manter acesso à ficha completa do paciente.
+6. Só depois disso retirar **Sessões/Pacotes** da sidebar, desde que não se perca nenhuma função.
+
+---
+
+# 15. AO FINAL
+
+Quando concluir, me diga apenas:
+
+1. o que foi alterado em Pacientes;
+2. se Pacientes já incorporou completamente a função de Sessões/Pacotes ou se ainda falta algo;
+3. se Sessões/Pacotes já pode sair da sidebar com segurança;
+4. se houve alguma alteração no banco;
+5. quais pontos eu devo testar nessa parte.
+
+Não mudar o visual geral do app.
+Não transformar isso em redesign.
+Apenas reorganizar Pacientes para ele ficar com a clareza e a boa leitura que Sessões/Pacotes já tem hoje.

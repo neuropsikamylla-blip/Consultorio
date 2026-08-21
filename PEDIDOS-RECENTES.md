@@ -1,317 +1,116 @@
 # As 3 ultimas especificacoes dela (automatico; a mais nova por ultimo)
 # Na retomada: ler as 3, conectar com PROGRESSO.md e git, declarar e seguir.
 
-## Pacote atual
+## no topo:
 
-Deixar o pacote atual visível com:
+* campo de busca;
+* botão **+ Novo Paciente**;
+* se fizer sentido, filtros simples como:
 
-* quantidade total;
-* realizadas;
-* restantes;
-* valor;
-* pagamento;
-* período;
-* status.
+  * Todos
+  * Psicoterapia
+  * Avaliação
+  * Reabilitação
+  * Supervisão
+  * Encerrados
 
-Manter botão para:
+## na listagem:
 
-**Renovar pacote**
-
-## Pacotes anteriores
-
-Em vez de deixar todos os pacotes antigos ocupando muito espaço, criar:
-
-**Histórico de pacotes**
-
-que possa ser expandido quando eu quiser consultar.
-
-Não apagar nenhum pacote antigo.
+cada paciente em um card/bloco no estilo Sessões/Pacotes.
 
 ---
 
-# 13. QUANDO O PACOTE TERMINAR
+# 9. AÇÕES DENTRO DE PACIENTES
 
-Manter a lógica atual de alerta quando chegar a:
+Dentro de cada card do paciente, manter acesso rápido a:
 
-**0 sessões restantes.**
+* Prontuário
+* Ver perfil
+* Editar
+* Excluir/Arquivar (com cuidado e confirmação)
 
-Quero três opções:
-
-### Renovar pacote
-
-Continua através de novo pacote.
-
-### Continuar avulso
-
-Paciente permanece ativo e começa a pagar individualmente por sessão.
-
-### Dar alta / Encerrar acompanhamento
-
-Paciente é encerrado.
+Se já existir uma lógica segura, manter.
 
 ---
 
-# 14. HORÁRIO RECORRENTE
+# 10. VER PERFIL
 
-Manter uma regra atual muito importante:
+O botão **Ver perfil** deve continuar levando para a ficha mais completa do paciente.
 
-**quando o pacote termina, o horário recorrente NÃO deve ser liberado automaticamente.**
+Essa ficha pode continuar existindo com abas como:
 
-O horário deve continuar reservado até eu escolher:
+* Resumo
+* Sessões
+* Pacotes
+* Prontuário
+* Cadastro
 
-* renovar;
-* continuar avulso;
-* dar alta/encerrar.
-
-Somente no encerramento o horário deve ser liberado conforme a lógica atual.
-
----
-
-# 15. PRONTUÁRIO
-
-Quero melhorar a organização do prontuário.
-
-Em vez de o prontuário ficar principalmente organizado por pacote, quero que as novas anotações clínicas fiquem preferencialmente relacionadas às sessões.
-
-Exemplo:
-
-**26/08/2026 — Psicoterapia**
-Anotação clínica...
-
-**19/08/2026 — Psicoterapia**
-Anotação clínica...
-
-Organizar cronologicamente.
-
-### MUITO IMPORTANTE
-
-Não perder nenhuma anotação antiga.
-
-Se alguma anotação antiga estiver vinculada apenas ao pacote e não for possível identificar com segurança a sessão correspondente:
-
-**não tente adivinhar.**
-
-Mantenha como:
-
-**Anotação histórica do pacote**
-
-ou estrutura equivalente.
+Ou estrutura equivalente.
 
 ---
 
-# 16. SESSÃO REALIZADA
+# 11. PRONTUÁRIO
 
-Ao marcar uma sessão como:
-
-**Realizada**
-
-pode existir a opção:
-
-**Adicionar anotação clínica**
-
-Mas não deve ser obrigatório preencher o prontuário naquele momento.
-
-Preciso poder escrever depois.
+O botão **Prontuário** dentro do card do paciente deve continuar acessível, como já está hoje em Sessões/Pacotes.
 
 ---
 
-# 17. PACIENTES ENCERRADOS
+# 12. SESSÕES/PACOTES
 
-Ao dar alta:
+A tela atual de **Sessões/Pacotes** está visualmente melhor organizada do que Pacientes.
 
-não excluir o paciente.
+Então, a tarefa aqui não é redesenhar Sessões/Pacotes.
 
-Alterar para status:
+A tarefa é:
 
-**Encerrado**
-
-Ele deve continuar pesquisável e manter:
-
-* sessões;
-* pacotes;
-* prontuário;
-* pagamentos;
-* histórico.
+## usar Sessões/Pacotes como referência visual e estrutural para reorganizar Pacientes.
 
 ---
 
-# 18. FILTROS EM PACIENTES
+# 13. OBJETIVO FINAL
 
-Adicionar filtros simples:
+Quero que o resultado seja este:
 
-* Todos
-* Psicoterapia
-* Avaliação
-* Reabilitação
-* Supervisão
-* Encerrados
+### Pacientes
 
-Manter também a busca por nome.
+vira a tela principal para visualizar pacientes, com uma organização clara, visual e parecida com o layout atual de Sessões/Pacotes.
 
----
+### Sessões/Pacotes
 
-# 19. DASHBOARD
-
-Quero que o Dashboard fique mais focado no que preciso fazer **hoje**.
-
-## Primeira área
-
-Mostrar:
-
-### Atendimentos hoje
-
-Quantidade.
-
-### Próximo atendimento
-
-Horário + paciente + categoria.
-
-### Pendências
-
-Quantidade aberta.
-
-### Contas
-
-Quantidade vencendo hoje ou vencidas.
+deixa de ser um módulo separado depois que tudo importante estiver acessível em Pacientes.
 
 ---
 
-# 20. AGENDA DE HOJE NO DASHBOARD
+# 14. RESUMINDO A ALTERAÇÃO
 
-Criar uma seção:
+Fazer estas mudanças:
 
-**Hoje**
+1. Reorganizar a tela **Pacientes**.
+2. Trocar o formato atual de tabela simples por cards/blocos no estilo de **Sessões/Pacotes**.
+3. Reaproveitar a estrutura visual de Sessões/Pacotes:
 
-com os atendimentos do dia em ordem de horário.
-
-Exemplo:
-
-14:00 — Supervisão Lua — Supervisão
-16:00 — Danilo Nery — Psicoterapia
-17:00 — Letícia Siqueira — Psicoterapia
-19:00 — Eloa Simon — Psicoterapia
-
-Permitir abrir rapidamente o paciente/sessão.
-
----
-
-# 21. ÁREA “ATENÇÃO” NO DASHBOARD
-
-Criar uma área reunindo alertas relevantes, como:
-
-* paciente com 1 sessão restante;
-* pacote encerrado;
-* pagamento pendente;
-* conta vencendo;
-* conta vencida;
-* paciente ativo sem próxima sessão.
-
-Exemplo:
-
-**Atenção**
-
-Eduardo Oliveira — 1 sessão restante
-Ana Luisa — pacote encerrado
-Ana Mendonça — pagamento pendente
-Internet — vence hoje
+   * nome;
+   * sessões realizadas;
+   * faltas;
+   * prontuário;
+   * ver perfil;
+   * linha organizada com data, hora, categoria, pacote, status, pgto e ações.
+4. Manter busca e botão **Novo Paciente**.
+5. Manter acesso à ficha completa do paciente.
+6. Só depois disso retirar **Sessões/Pacotes** da sidebar, desde que não se perca nenhuma função.
 
 ---
 
-# 22. PACIENTES SEM PRÓXIMA SESSÃO
+# 15. AO FINAL
 
-Adicionar ao Dashboard um alerta para:
+Quando concluir, me diga apenas:
 
-**pacientes ativos que não possuem nenhuma próxima sessão agendada.**
+1. o que foi alterado em Pacientes;
+2. se Pacientes já incorporou completamente a função de Sessões/Pacotes ou se ainda falta algo;
+3. se Sessões/Pacotes já pode sair da sidebar com segurança;
+4. se houve alguma alteração no banco;
+5. quais pontos eu devo testar nessa parte.
 
-Não considerar pacientes encerrados.
-
----
-
-# 23. PRÓXIMOS 7 DIAS
-
-Manter a seção existente.
-
-A ordem de prioridade do Dashboard deve ser:
-
-1. Hoje
-2. Atenção
-3. Próximos 7 dias
-4. Informações gerais/estatísticas
-
----
-
-# 24. NOTAS → NOTAS/PENDÊNCIAS
-
-Aproveitar a função atual de notas para criar algo mais funcional.
-
-Quero poder registrar tarefas simples como:
-
-* enviar laudo;
-* emitir NF;
-* responder responsável;
-* imprimir contrato;
-* ligar para paciente.
-
-Campos:
-
-* descrição;
-* paciente relacionado — opcional;
-* data — opcional;
-* status: Pendente ou Concluída.
-
-No Dashboard mostrar apenas as pendências abertas.
-
-Ao clicar em **Concluir**, retirar da lista de pendências abertas, mas preservar no histórico.
-
-Evitar mostrar “Notas Importantes” duplicadas em diferentes partes do Dashboard.
-
----
-
-# 25. NÃO ALTERAR A AGENDA ALÉM DO NECESSÁRIO
-
-Não quero reformular a Agenda agora.
-
-Preservar:
-
-* horários;
-* recorrência;
-* reagendamentos;
-* sessões;
-* faltas;
-* categorias;
-* reservas;
-* lógica atual dos pacotes.
-
-Fazer apenas as integrações necessárias com a nova ficha de Pacientes e o Dashboard.
-
----
-
-# 26. DADOS EXISTENTES
-
-Nenhuma dessas mudanças pode exigir que eu recadastre informações.
-
-Preservar todos os dados atuais:
-
-* pacientes;
-* sessões;
-* pacotes;
-* prontuários;
-* pagamentos;
-* documentos;
-* contas;
-* notas;
-* agenda.
-
----
-
-# 27. AO FINAL
-
-Quando terminar, me informe apenas:
-
-1. o que foi alterado;
-2. se houve alguma alteração no banco;
-3. onde está o backup da versão anterior;
-4. como voltar para a versão anterior;
-5. quais pontos principais devo testar.
-
-**Não considere a nova versão definitiva até eu testar e dar meu aval.**
+Não mudar o visual geral do app.
+Não transformar isso em redesign.
+Apenas reorganizar Pacientes para ele ficar com a clareza e a boa leitura que Sessões/Pacotes já tem hoje.
