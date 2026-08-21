@@ -255,7 +255,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const AUTH_KEY='consultorio_auth';
 const CREDS_KEY='consultorio_creds';
 // Marcador de versão — DEVE ser alterado a cada deploy para a auto-atualização funcionar
-const APP_VERSION='2026-08-20-07';
+const APP_VERSION='2026-08-20-08';
 try{document.addEventListener('DOMContentLoaded',function(){var _vl=document.getElementById('app-version-label');if(_vl)_vl.textContent='v'+APP_VERSION;});}catch(e){}
 let _cache=null;
 let _idCounter=0;
@@ -978,23 +978,76 @@ window.saveDashNotes=function(){var notes=document.getElementById('dash-notes')?
 // ── CLIENTS ──
 function renderClients(){closeSidebar();
   var db=getDB();
-  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-primary" onclick="showClientForm()">+ Novo Paciente</button>';
-  var search='';
+  document.getElementById('topbar-actions').innerHTML='<button class="btn btn-ghost" onclick="showSessionForm()">+ Nova Sessão</button><button class="btn btn-primary" onclick="showClientForm()">+ Novo Paciente</button>';
+  var search='';var filter='todos';
   function render(){
-    var filtered=db.clients.filter(function(c){return !search||c.name.toLowerCase().includes(search.toLowerCase())||(c.email||'').toLowerCase().includes(search.toLowerCase())||(c.phone||'').includes(search);}).sort(function(a,b){return a.name.localeCompare(b.name);});
-    var rows='';
+    var term=search.toLowerCase().trim();
+    var filtered=db.clients.filter(function(c){
+      if(term&&!c.name.toLowerCase().includes(term))return false;
+      var encerrado=isClientAlta(c.id);
+      if(filter==='encerrados')return encerrado;
+      if(encerrado)return false;
+      if(filter==='todos')return true;
+      return db.sessions.some(function(s){return s.clientId===c.id&&s.category===filter;});
+    }).sort(function(a,b){return a.name.localeCompare(b.name);});
+    var cards='';
     filtered.forEach(function(c){
-      var pkgs=db.packages.filter(function(p){return p.clientId===c.id;});
-      var done=db.sessions.filter(function(s){return s.clientId===c.id&&(s.status==='realizada'||s.status==='completed'||s.status==='falta');}).length;
-      var age='';if(c.birthDate){var bd=new Date(c.birthDate+'T12:00:00');var now2=new Date();age=' · '+(now2.getFullYear()-bd.getFullYear()-(now2<new Date(now2.getFullYear(),bd.getMonth(),bd.getDate())?1:0))+' anos';}
-    rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:9px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green);flex-shrink:0">'+getInitials(c.name)+'</div><div><div style="font-weight:600">'+c.name+'</div>'+(c.email?'<div style="font-size:12px;color:var(--text2)">'+c.email+age+'</div>':'<div style="font-size:12px;color:var(--text2)">'+age.replace(' · ','')+'</div>')+'</div></div></td><td class="td-muted">'+(c.phone||'—')+'</td><td><span class="badge badge-blue">'+pkgs.length+' pacote'+(pkgs.length!==1?'s':'')+'</span></td><td><span class="badge badge-green">'+done+' realizada'+(done!==1?'s':'')+'</span></td><td><div style="display:flex;gap:6px"><button class="btn-icon" onclick="showClientDetail(\''+c.id+'\')">👁️</button><button class="btn-icon" onclick="showSessionForm(\''+c.id+'\')">📝</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></td></tr>';
+      var sessions=db.sessions.filter(function(s){return s.clientId===c.id;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+      var completedCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed'||s.status==='falta';}).length;
+      var realizadaCount=sessions.filter(function(s){return s.status==='realizada'||s.status==='completed';}).length;
+      var faltaCount=sessions.filter(function(s){return s.status==='falta';}).length;
+      var rows='';var doneRows='';
+      sessions.forEach(function(s){
+        var sb=statusBadge(s.status);
+        var pkgSessions=db.sessions.filter(function(ss){return ss.packageId===s.packageId;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+        var sessNum=pkgSessions.findIndex(function(ss){return ss.id===s.id;})+1;
+        var pkg=db.packages.find(function(p){return p.id===s.packageId;});
+        var total=pkg?pkg.totalSessions:'?';
+        var isStandalone=!s.packageId;
+        var isPerSession=pkg&&pkg.paymentType==='sessao';
+        var needsIndividualPay=isStandalone||isPerSession;
+        var payStatus='pending';
+        if(needsIndividualPay)payStatus=s.sessionPayStatus||'pending';
+        else if(pkg)payStatus=pkg.paymentStatus||'pending';
+        var payBadge=payStatus==='paid'?'badge-green':payStatus==='parcela1'?'badge-parcial':'badge-yellow';
+        var payLabel=payStatus==='paid'?'💰 Pago':payStatus==='parcela1'?'🔶 1ª Parcela':'⏳ Pendente';
+        var paidCell=needsIndividualPay?
+          '<td><span class="badge '+payBadge+'" style="cursor:pointer" onclick="window.cycleSessionPay(\''+s.id+'\',this)">'+payLabel+'</span></td>':
+          '<td><span class="badge '+payBadge+'">'+payLabel+'</span></td>';
+        var rowHtml='<tr><td><strong style="color:var(--text2);font-size:13px">'+sessNum+'/'+total+'</strong></td><td><strong>'+fmtDate(s.date)+'</strong></td><td class="td-muted">'+(s.time||'—')+'</td><td><span class="badge '+catBadgeClass(s.category)+'">'+catLabelShort(s.category)+'</span></td><td class="td-muted">'+pkgName(s.packageId)+'</td><td><div style="position:relative;display:inline-block"><span class="badge '+sb[0]+'" style="cursor:pointer" onclick="quickStatusMenu(\''+s.id+'\',this)">'+sb[1]+'</span></div></td>'+paidCell+'<td><div style="display:flex;gap:4px"><button class="btn-icon" onclick="showSessionEditForm(\''+s.id+'\')">✏️</button><button class="btn-icon" onclick="deleteSessionConfirm(\''+s.id+'\')">🗑️</button></div></td></tr>';
+        if(s.status==='realizada'||s.status==='completed'||s.status==='falta')doneRows+=rowHtml;else rows+=rowHtml;
+      });
+      var doneRowsFalta=faltaCount>0?' ('+faltaCount+' falta'+(faltaCount!==1?'s':'')+')':'';
+      var collapseId='col-client-'+c.id;
+      cards+='<div class="card sess-client-card" data-s="'+escHtml(c.name.toLowerCase())+'" style="margin-bottom:16px">';
+      cards+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">';
+      cards+='<div style="display:flex;align-items:center;gap:12px">';
+      cards+='<div style="width:36px;height:36px;border-radius:10px;background:var(--green-bg2);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--green);font-size:14px">'+getInitials(c.name)+'</div>';
+      cards+='<div><div style="font-weight:700;font-size:15px">'+escHtml(c.name)+'</div>';
+      cards+='<div style="font-size:12px;color:var(--text2);margin-top:2px">'+sessions.length+(sessions.length===1?' sessão:':' sessões:')+' <span style="color:var(--green)">'+realizadaCount+' realizada'+(realizadaCount!==1?'s':'')+'</span>'+(faltaCount>0?' · <span style="color:var(--red)">'+faltaCount+' falta'+(faltaCount!==1?'s':'')+'</span>':'')+'</div></div></div>';
+      cards+='<div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showSessionForm(\''+c.id+'\')">📅 Agendar</button><button class="btn btn-ghost btn-sm" onclick="showProntuario(\''+c.id+'\')">📋 Prontuário</button><button class="btn btn-ghost btn-sm" onclick="showClientDetail(\''+c.id+'\')">Ver perfil →</button><button class="btn-icon" onclick="showClientForm(\''+c.id+'\')">✏️</button><button class="btn-icon" onclick="deleteClientConfirm(\''+c.id+'\')">🗑️</button></div></div>';
+      if(sessions.length===0){
+        cards+='<div class="empty" style="padding:18px"><p>Nenhuma sessão registrada</p></div>';
+      }else{
+        cards+='<div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+        if(doneRows){
+          cards+='<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">';
+          cards+='<button onclick="(function(btn){var sec=document.getElementById(\''+collapseId+'\');var open=sec.style.display!==\'none\';sec.style.display=open?\'none\':\'block\';btn.innerHTML=open?\'▶ Ver realizadas/faltas ('+completedCount+doneRowsFalta+')\': \'▼ Ocultar realizadas/faltas\';})(this)" style="background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:6px;font-family:inherit">▶ Ver realizadas/faltas ('+completedCount+doneRowsFalta+')</button>';
+          cards+='<div id="'+collapseId+'" style="display:none;margin-top:8px"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Categoria</th><th>Pacote</th><th>Status</th><th>Pgto</th><th>Ações</th></tr></thead><tbody>'+doneRows+'</tbody></table></div></div></div>';
+        }
+      }
+      cards+='</div>';
     });
     var html='<div class="page"><div style="display:flex;gap:10px;margin-bottom:18px"><div class="search-input-wrap"><span class="search-icon">🔍</span><input type="text" placeholder="Buscar paciente..." value="'+search+'" oninput="window._cs(this.value)" style="padding-left:36px"/></div></div>';
-    html+=filtered.length===0?'<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum paciente encontrado</p></div></div>':'<div class="card"><div class="table-wrap"><table><thead><tr><th>Paciente</th><th>Telefone</th><th>Pacotes</th><th>Sessões</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">';
+    [['todos','Todos'],['psicoterapia','Psicoterapia'],['avaliacao','Avaliação'],['reabilitacao','Reabilitação'],['encerrados','Encerrados']].forEach(function(opt){html+='<button class="btn '+(filter===opt[0]?'btn-primary':'btn-ghost')+' btn-sm" onclick="window._clientFilter(\''+opt[0]+'\')">'+opt[1]+'</button>';});
+    html+='</div>';
+    html+=filtered.length===0?'<div class="card"><div class="empty"><div class="empty-icon">👥</div><p>Nenhum paciente encontrado</p></div></div>':cards;
     html+='</div>';
     document.getElementById('page-content').innerHTML=html;
   }
   window._cs=function(v){search=v;render();};
+  window._clientFilter=function(v){filter=v;render();};
   render();
 }
 

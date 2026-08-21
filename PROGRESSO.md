@@ -54,6 +54,48 @@ Pedido completo dela em `docs/pedido-reforma-20260820.md`. Ponto de retorno:
 G depende de B (ela mesma escreveu: "antes de retirar, garanta que tudo continue acessível").
 D depende de B (o Prontuário é aba da ficha).
 
+## ENTREGUE — tela Pacientes em cards (20/08/2026)
+
+> "a tela Pacientes ficou em formato de tabela simples e para mim está pior ... quero que a
+> organização de Pacientes siga a lógica e o layout base de Sessões/Pacotes."
+
+`renderClients` reescrita para produzir a MESMA estrutura de `renderSessions`: `card
+sess-client-card`, iniciais em bloco 36×36, nome em 15px/700, resumo "X realizadas · Y faltas",
+tabela Nº/Data/Hora/Categoria/Pacote/Status/Pgto/Ações e o colapsável de realizadas/faltas.
+**Zero CSS novo** — todo estilo veio do que já existia. `renderSessions` não foi tocada.
+
+Ponto crítico atendido: `renderSessions` parte das SESSÕES; `renderClients` parte dos
+PACIENTES. Paciente sem nenhuma sessão APARECE, com "Nenhuma sessão registrada" — perder um
+paciente da lista seria falha grave, ela cadastra antes de agendar.
+
+Filtros: Todos · Psicoterapia · Avaliação · Reabilitação · Encerrados, combinando com a busca.
+**"Supervisão" NÃO virou filtro**: não é categoria de sessão (as reais são psicoterapia,
+reabilitacao, avaliacao); supervisão é tipo de COMPROMISSO de agenda, que não tem paciente.
+O filtro estaria sempre vazio e enganaria.
+
+### Lacuna encontrada na revisão e fechada
+
+Comparando as ações das duas telas, `showSessionForm` (agendar) existia em Sessões/Pacotes e
+NÃO havia entrado em Pacientes. Sem isso a tela não substituiria a outra. Acrescentados:
+`+ Nova Sessão` na barra superior e `📅 Agendar` em cada card, já com o paciente selecionado.
+
+### Paridade demonstrada — a base para a Fase G
+
+`prova-paridade-pacientes.mjs` (8/8) compara o CÓDIGO das duas funções e prova que toda ação de
+Sessões/Pacotes existe em Pacientes:
+
+```
+Sessões/Pacotes: deleteSessionConfirm, quickStatusMenu, showClientDetail,
+                 showProntuario, showSessionEditForm, showSessionForm
+Pacientes:       as 6 acima + showClientForm + deleteClientConfirm
+```
+
+Pacientes é hoje um SUPERCONJUNTO de Sessões/Pacotes. Tecnicamente a Fase G está liberada —
+mas fica esperando o aval dela depois de testar, como ela exigiu.
+
+Codex `gpt-5.6-sol` high, lab `neuropsi-pac-cards`, mais o conserto pós-colheita do agendar.
+Provas: **172/172 PASS** em 18 baterias. `APP_VERSION` → 2026-08-20-08.
+
 ## 🔖 PONTO DE RETORNO — `ponto-seguro-20260820`
 
 Ela avisou em 20/08/2026 que faria backup dos dados e proporia mudanças grandes, com o direito
